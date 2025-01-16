@@ -6,6 +6,7 @@ const { OpenAIAdapter } = require('./src/providers/openAi');
 const { GeminiAdapter } = require('./src/providers/gemini');
 const { HFAdapter } = require('./src/providers/huggingFace');
 const { encodeBase64 } = require('./src/utils/encodeBase64');
+const { PineconeManager } = require('./src/db/PineconeManager');
 
 module.exports = {
   Agent,
@@ -14,5 +15,6 @@ module.exports = {
   OpenAIAdapter,
   GeminiAdapter,
   HFAdapter,
-  encodeBase64
+  encodeBase64,
+  PineconeManager
 };
