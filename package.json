@@ -1,0 +1,29 @@
+{
+  "name": "agnostic-agents",
+  "version": "1.0.0",
+  "description": "A Node.js package for multi-LLM agent support",
+  "main": "index.js",
+  "directories": {
+    "example": "examples",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "jest --coverage",
+    "test:watch": "jest --watch",
+    "example:openai": "node examples/openaiFunctionCallExample.js",
+    "example:gemini": "node examples/geminiToolExample.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/paulogustavopeixoto/agnostic-agents.git"
+  },
+  "author": "Paulo Assis Peixoto",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/paulogustavopeixoto/agnostic-agents/issues"
+  },
+  "homepage": "https://github.com/paulogustavopeixoto/agnostic-agents#readme",
+  "devDependencies": {
+    "jest": "^29.0.0" 
+}
+}
