@@ -8,8 +8,10 @@ class OpenAIAdapter {
     this.openai = new OpenAI({ apiKey });
   }
 
+  /**
+   * Generate text via chat-completion with optional function calling (tools).
+   */
   async generateText(prompt, { model = "gpt-4o-mini", temperature = 0.7, tools = [] } = {}) {
-    // (unchanged) ...
     const openAIFunctions = tools.map((tool) => ({
       name: tool.name,
       description: tool.description,
@@ -38,8 +40,10 @@ class OpenAIAdapter {
     return { message: choice.content || "" };
   }
 
+  /**
+   * If the LLM requested a tool call, we handle a "second pass" to feed the tool result back.
+   */
   async generateToolResult(originalPrompt, toolCall, toolResult, config) {
-    // (unchanged) ...
     const completion = await this.openai.chat.completions.create({
       model: config.model || "gpt-4o-mini",
       messages: [
@@ -63,10 +67,9 @@ class OpenAIAdapter {
   }
 
   /**
-   * Text-to-image via DALL·E or another model
+   * (Text -> Image) generation using e.g. DALL·E 3
    */
   async generateImage(prompt, { model = "dall-e-3", size = "1024x1024", returnBase64 = false } = {}) {
-    // OpenAI image generation
     const response = await this.openai.images.generate({
       model,
       prompt,
@@ -76,12 +79,11 @@ class OpenAIAdapter {
 
     // Typically returns { data: [{ url: ... }] }
     const imageUrl = response.data[0].url;
-
     if (!returnBase64) {
-      return imageUrl; // just return the URL
+      return imageUrl;
     }
 
-    // If you want base64, fetch the image and encode it
+    // Optionally fetch and return as base64
     const axios = (await import("axios")).default;
     const imageResponse = await axios.get(imageUrl, { responseType: "arraybuffer" });
     const base64 = Buffer.from(imageResponse.data, "binary").toString("base64");
@@ -91,42 +93,37 @@ class OpenAIAdapter {
   /**
    * Analyze an image by sending it to "gpt-4o" or "gpt-4o-mini" (Vision-enabled).
    *
-   * @param {string|Buffer} imageData  - If string: could be a URL or base64. If Buffer, we convert to base64.
-   * @param {object} config            - e.g. { model: "gpt-4o-mini", prompt: "What's in this image?" }
+   * @param {string|Buffer} imageData - If string: could be a URL or base64. If Buffer, convert to base64.
+   * @param {object} config - e.g. { model: "gpt-4o-mini", prompt: "What's in this image?" }
    */
   async analyzeImage(imageData, config = {}) {
     const model = config.model || "gpt-4o-mini";
     const userPrompt = config.prompt || "What's in this image?";
 
-    // 1) Convert the input to a data URL or pass it as a normal URL if it's a string
+    // Convert input to data URL if needed
     let dataUrl = "";
     if (Buffer.isBuffer(imageData)) {
-      // It's raw image data. Convert to base64.
       const base64 = imageData.toString("base64");
       dataUrl = `data:image/jpeg;base64,${base64}`;
     } else if (typeof imageData === "string") {
-      // Check if it's already a valid "data:image/..." or "http" URL
-      // For example, you can do a simple check:
       const lower = imageData.toLowerCase();
       if (lower.startsWith("data:image/")) {
-        dataUrl = imageData; // already a data URL
+        dataUrl = imageData;
       } else if (lower.startsWith("http")) {
-        dataUrl = imageData; // a direct URL
+        dataUrl = imageData;
       } else {
-        // Otherwise assume it's a file path -> read and convert
+        // Assume it's a local file path
         if (fs.existsSync(imageData)) {
           const fileBuffer = fs.readFileSync(imageData);
           dataUrl = `data:image/jpeg;base64,${fileBuffer.toString("base64")}`;
         } else {
-          // If it's none of the above, treat it as a path that might not exist
           throw new Error(`Image path "${imageData}" not found or invalid.`);
         }
       }
     } else {
-      throw new Error("Unsupported imageData format. Must be string (URL or path) or Buffer.");
+      throw new Error("Unsupported imageData format. Must be string (URL/path) or Buffer.");
     }
 
-    // 2) Build the messages array with "image_url" content
     const messages = [
       {
         role: "user",
@@ -136,21 +133,40 @@ class OpenAIAdapter {
             type: "image_url",
             image_url: {
               url: dataUrl,
-              detail: "low",
+              detail: "high", // this can be "high" or "low"
             },
           },
         ],
       },
     ];
 
-    // 3) Send the request to the chat completion endpoint
     const response = await this.openai.chat.completions.create({
       model,
       messages,
     });
-
-    // 4) Return the text from the response
     return response.choices[0].message.content;
+  }
+
+  /**
+   * Generate embeddings for an array of text chunks using OpenAI.
+   * Returns an array of embedding objects, each containing an "embedding" array of floats.
+   *
+   * @param {string[]} chunks - array of text strings to embed.
+   * @param {object} [options]
+   * @param {string} [options.model="text-embedding-3-small"] - the embedding model to use
+   * @returns {Promise<Array>} - array of objects { object, index, embedding }
+   */
+  async embedChunks(chunks, { model = "text-embedding-3-small" } = {}) {
+    // The new OpenAI library supports multiple inputs in a single call
+    const response = await this.openai.embeddings.create({
+      model,
+      input: chunks,
+      encoding_format: "float",
+    });
+
+    // response.data is an object with shape:
+    // { object: 'list', data: [ { object: 'embedding', index: 0, embedding: [ floats ] }, ... ] }
+    return response.data.data; // array of { index, embedding, ... }
   }
 }
 
