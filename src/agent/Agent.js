@@ -1,39 +1,85 @@
+// src/agent/Agent.js
 class Agent {
-    constructor(providerAdapter, options = {}) {
-      this.provider = providerAdapter;   // e.g. new OpenAIProvider(), new GeminiProvider()
-      this.memory = options.memory || null;  // memory instance if desired
-      this.tools = options.tools || [];      // array of available tools
+    /**
+     * @param {object} adapter - An instance of your provider adapter (OpenAIAdapter, GeminiAdapter, HFAdapter, etc.)
+     * @param {object} options
+     * @param {array}  options.tools - If using function calling
+     * @param {object} options.memory - Optional memory instance
+     * @param {object} options.defaultConfig - e.g. { model, temperature, maxTokens } 
+     */
+    constructor(adapter, { tools = [], memory = null, defaultConfig = {} } = {}) {
+      this.adapter = adapter;
+      this.tools = tools;
+      this.memory = memory;
+      this.defaultConfig = defaultConfig; 
     }
   
     /**
-     * Main method to handle user queries.
-     * @param {string} userMessage - The user's question or command.
-     * @returns {Promise<string>} The response from the LLM (after any internal logic).
+     * Generic text-based prompt method.
+     * @param {string} userMessage 
+     * @param {object} config - e.g. { model, temperature, maxTokens }
      */
-    async handle(userMessage) {
-      // 1. Build the prompt (may include memory, instructions, userMessage)
-      const prompt = this._buildPrompt(userMessage);
+    async sendMessage(userMessage, config = {}) {
+      // 1) Merge config with defaults
+      const finalConfig = { ...this.defaultConfig, ...config };
   
-      // 2. Call the provider
-      const llmResponse = await this.provider.generate(prompt);
+      // 2) Build or update memory
+      const conversationContext = this.memory ? this.memory.getContext() : "";
+      const prompt = conversationContext + "\nUser: " + userMessage + "\nAgent:";
   
-      // 3. Optionally parse the LLM response to decide next steps (use a tool? store memory?)
-      //    For a simple agent that just returns the LLM text:
-      if (this.memory) {
-        this.memory.store(userMessage, llmResponse);
+      // 3) Possibly do function calling if the adapter supports it
+      //    or just call generateText if you don’t detect a function call.
+      const result = await this.adapter.generateText(prompt, {
+        ...finalConfig,
+        tools: this.tools, // if function calling is integrated
+      });
+  
+      // 4) If there's a function/tool call:
+      if (result.toolCall) {
+        const toolResult = await this._handleToolCall(result.toolCall);
+        // Then feed toolResult back to the LLM for a final answer, etc.
+        return await this.adapter.generateToolResult(prompt, result.toolCall, toolResult, finalConfig);
       }
   
-      return llmResponse;
+      // 5) Update memory with user + agent content
+      if (this.memory) {
+        this.memory.store(userMessage, result.message);
+      }
+  
+      return result.message;
     }
   
-    _buildPrompt(userMessage) {
-      // Construct a prompt that includes system instructions, memory context, etc.
-      let prompt = "";
-      if (this.memory) {
-        prompt += this.memory.getContext();
+    /**
+     * If the LLM requests a tool call, we find the matching tool and run it.
+     */
+    async _handleToolCall(toolCall) {
+      const toolInstance = this.tools.find((t) => t.name === toolCall.name);
+      if (!toolInstance) {
+        throw new Error(`Tool ${toolCall.name} not found.`);
       }
-      prompt += `User: ${userMessage}\nAgent:`;
-      return prompt;
+      // toolCall.arguments => pass to the tool's implementation
+      return await toolInstance.call(toolCall.arguments || {});
+    }
+  
+    /**
+     * Analyze an image (if the adapter supports it).
+     * @param {Buffer|string} imageData - Could be a file path, base64, or Buffer
+     * @param {object} config 
+     */
+    async analyzeImage(imageData, config = {}) {
+      // merges config with default
+      const finalConfig = { ...this.defaultConfig, ...config };
+      // calls adapter
+      return await this.adapter.analyzeImage(imageData, finalConfig);
+    }
+  
+    /**
+     * Generate an image (text -> image).
+     * e.g., stable diffusion or DALL·E
+     */
+    async generateImage(prompt, config = {}) {
+      const finalConfig = { ...this.defaultConfig, ...config };
+      return await this.adapter.generateImage(prompt, finalConfig);
     }
   }
   
