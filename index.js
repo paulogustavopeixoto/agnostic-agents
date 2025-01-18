@@ -8,7 +8,7 @@ const { HFAdapter } = require('./src/providers/huggingFace');
 const { encodeBase64 } = require('./src/utils/encodeBase64');
 const { chunkText } = require('./src/utils/chunkText');
 const { repairJsonOutput } = require('./src/utils/jsonRepair');
-const { PineconeManager } = require('./src/db/PineconeManager');
+const { PineconeManager } = require('./db/PineconeManager');
 
 module.exports = {
   Agent,
