@@ -5,7 +5,7 @@
  * @param {number} overlap
  * @returns {string[]}
  */
-function chunkText(text, chunkSize = 1000, overlap = 100) {
+async function chunkText(text, chunkSize = 1000, overlap = 100) {
   const cleanText = text.trim();
   const chunks = [];
   let start = 0;
