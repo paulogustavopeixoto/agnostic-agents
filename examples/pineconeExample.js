@@ -4,8 +4,7 @@ const { PineconeManager } = require('../index');
 (async () => {
   // 1) Initialize the manager
   const pineconeManager = new PineconeManager({
-    apiKey: process.env.PINECONE_API_KEY, 
-    environment: process.env.PINECONE_ENV || "us-east1-gcp"
+    apiKey: process.env.PINECONE_API_KEY
   });
 
   // 2) Upsert sample

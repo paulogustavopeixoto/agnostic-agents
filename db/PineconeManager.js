@@ -10,13 +10,13 @@ class PineconeManager {
    * @param {string} options.apiKey - Pinecone API key
    * @param {string} [options.environment] - Pinecone environment (e.g., "us-east-1-aws")
    */
-  constructor({ apiKey, environment }) {
+  constructor({ apiKey }) {
     if (!apiKey) {
       throw new Error("PineconeManager requires an apiKey.");
     }
 
     // 1) Construct the Pinecone client
-    this.client = new Pinecone({ apiKey, environment });
+    this.client = new Pinecone({ apiKey });
   }
 
   /**
