@@ -156,10 +156,10 @@ class OpenAIAdapter {
    * @param {string} [options.model="text-embedding-3-small"] - the embedding model to use
    * @returns {Promise<Array>} - array of objects { object, index, embedding }
    */
-  async embedChunks(chunks, { model = "text-embedding-3-small" } = {}) {
+  async embedChunks(chunks) {
     // The new OpenAI library supports multiple inputs in a single call
     const response = await this.openai.embeddings.create({
-      model,
+      model: "text-embedding-3-small",
       input: chunks,
       encoding_format: "float",
     });
