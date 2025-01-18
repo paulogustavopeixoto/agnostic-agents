@@ -166,7 +166,7 @@ class OpenAIAdapter {
 
     // response.data is an object with shape:
     // { object: 'list', data: [ { object: 'embedding', index: 0, embedding: [ floats ] }, ... ] }
-    return response.data.data; // array of { index, embedding, ... }
+    return response.data; // array of { index, embedding, ... }
   }
 }
 
