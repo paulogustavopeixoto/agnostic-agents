@@ -26,7 +26,7 @@ class GeminiAdapter {
 
     // Raw Gemini response
     const response = await result.response;
-    console.log("Gemini raw response:", JSON.stringify(response, null, 2));
+    //console.log("Gemini raw response:", JSON.stringify(response, null, 2));
 
     // 1) Check if there's a candidate with a function call
     const candidate = response?.candidates?.[0];
