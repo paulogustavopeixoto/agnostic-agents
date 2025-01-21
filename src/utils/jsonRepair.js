@@ -37,7 +37,7 @@ function removeJsonCodeFence(input) {
     `.trim();
   
     // The agent's .sendMessage() method returns a string
-    const repairResponse = await agent.sendMessage(repairPrompt);
+    const repairResponse = await agent.generateText(repairPrompt);
     const repairedCleaned = removeJsonCodeFence(repairResponse);
   
     try {
