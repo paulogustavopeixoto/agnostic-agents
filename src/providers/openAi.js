@@ -28,13 +28,22 @@ class OpenAIAdapter {
 
     const choice = completion.choices[0].message;
     if (choice.function_call) {
-      return {
-        message: "",
-        toolCall: {
-          name: choice.function_call.name,
-          arguments: JSON.parse(choice.function_call.arguments || "{}"),
-        },
-      };
+      try {
+        const parsed = JSON.parse(choice.function_call.arguments || "{}");
+        return {
+          message: "",
+          toolCall: {
+            name: choice.function_call.name,
+            arguments: parsed,
+          },
+        };
+      } catch (err) {
+        console.error("Failed to parse function_call arguments:", err);
+        return {
+          message: choice.content || "",
+          toolCall: { name: choice.function_call.name, arguments: {} },
+        };
+      }
     }
 
     return { message: choice.content || "" };
