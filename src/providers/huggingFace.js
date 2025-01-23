@@ -33,11 +33,18 @@ class HFAdapter {
     return (await this.generateText(prompt, config)).message;
   }
 
-  async generateImage(prompt, options = {}) {
+  async generateImage(prompt, options = {negative_prompt: null, height: 256, width: 256, num_inference_steps: 3, guidance_scale: 0.5}) {
     // For example, stable diffusion:
     const result = await this.inference.textToImage({
       model: this.imageGenModel,
       inputs: prompt,
+      parameters: {
+        negative_prompt: options.negative_prompt,
+        height: options.height,
+        width: options.width,
+        num_inference_steps: options.num_inference_steps,
+        guidance_scale: options.guidance_scale
+      }
       // possibly pass other parameters
     });
     // result is a base64 or a buffer, depending on your library
