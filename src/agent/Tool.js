@@ -64,6 +64,27 @@ class Tool {
         // Gemini might ignore or handle `description` differently
       };
     }
+
+    /**
+     * Return a tool definition in Anthropic's expected format for "beta" function calling.
+     */
+    toAnthropicTool() {
+      return {
+        name: this.name,
+        description: this.description,
+        // Anthropic expects an `input_schema` with JSON schema
+        input_schema: {
+          ...this.parameters,
+        },
+        // Possibly add more fields if needed:
+        // input_schema: {
+        //   type: 'object',
+        //   properties: { ... },
+        //   required: [...]
+        // },
+        // strict: this.strict, etc.
+      };
+    }
   }
   
   module.exports = { Tool };
