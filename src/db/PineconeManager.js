@@ -20,52 +20,65 @@ class PineconeManager {
   }
 
   /**
-   * Upserts embeddings into Pinecone, with metadata and a specified namespace.
+   * Upserts a list of vector records into a Pinecone index under a specific namespace,
+   * returning both the Pinecone API response and the list of inserted IDs.
+   *
+   * @example <caption>Usage Example</caption>
+   * const vectors = [
+   *   {
+   *     id: "doc123-0",
+   *     values: [0.123, 0.456, 0.789],
+   *     metadata: { chunk_index: 0, text: "Hello World", input_id: "doc123" },
+   *   },
+   *   {
+   *     id: "doc123-1",
+   *     values: [0.987, 0.654, 0.321],
+   *     metadata: { chunk_index: 1, text: "Some text snippet", input_id: "doc123" },
+   *   },
+   * ];
    * 
-   * @param {string} indexName       - name of your Pinecone index
-   * @param {string[]} chunks        - array of text chunks
-   * @param {object[]} embeddings    - array of embedding objects (each must have `.embedding` array)
-   * @param {object} options
-   * @param {string} options.inputId
-   * @param {string} [options.outputId]
-   * @param {string} [options.docType]
-   * @param {string} [options.namespace] - e.g. "my_user_123"
-   * 
-   * @returns {Promise<any>} - the Pinecone upsert response
+   * const { upsertResponse, insertedIds } = await pineconeManager.upsertVectors(
+   *   "myIndexName",
+   *   "myNamespace",
+   *   vectors
+   * );
+   * console.log("Inserted IDs:", insertedIds);
+   *
+   * @param {string} indexName
+   *   The name of your Pinecone index.
+   *
+   * @param {string} namespace
+   *   The namespace to store these vectors under (e.g., "user123").
+   *
+   * @param {object[]} vectors
+   *   An array of vector records. Each must have:
+   *   - `id` (string): Unique ID for this vector
+   *   - `values` (number[]): The embedding (float[]) to store
+   *   - `metadata` (object, optional): Any additional info for the vector
+   *
+   * @returns {Promise<{ upsertResponse: any, insertedIds: string[] }>}
+   *   An object containing the raw Pinecone response and an array of the inserted vector IDs.
+   *
+   * @throws {Error}
+   *   Throws if the upsert call fails or if required parameters are missing.
    */
-  async upsertVectors(
-    indexName,
-    chunks,
-    embeddings,
-    {
-      inputId = "0",
-      outputId = "",
-      docType = "",
-      namespace = ""
-    } = {}
-  ) {
-    // 2.1 Retrieve the index object
+  async upsertVectors(indexName, namespace, vectors = []) {
+    // 1) Retrieve the index object
     const index = this.client.Index(indexName);
 
-    // 2.2 Construct the upsert request
-    // Each embedding + chunk is a single record
-    const vectors = embeddings.map((obj, i) => ({
-      id: `${inputId}-${i}`,
-      values: obj.embedding,  // the float array
-      metadata: {
-        chunk_index: i,
-        text: chunks[i],
-        input_id: inputId,
-        output_id: outputId,
-        doc_type: docType
-      },
-    }));
+    // 2) Extract the IDs right now (or after the call—either works)
+    const insertedIds = vectors.map((v) => v.id);
 
     // 3) Execute the upsert
     try {
       const upsertResponse = await index.namespace(namespace).upsert(vectors);
       console.log("Upsert succeeded! Response:", upsertResponse);
-      return upsertResponse;
+
+      // 4) Return both the Pinecone response and the IDs
+      return {
+        upsertResponse,
+        insertedIds,
+      };
     } catch (error) {
       console.error("Upsert failed:", error);
       throw error;

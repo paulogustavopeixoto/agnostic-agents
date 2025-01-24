@@ -1,7 +1,7 @@
 // Suppose we have two tasks that share an agent or different agents
-const { Agent } = require("../agent/Agent");
-const { Task } = require("./Task");
-const { Team } = require("./Team");
+const { Agent } = require("../src/agent/Agent");
+const { Task } = require("../src/orchestrator/Task");
+const { Team } = require("../src/orchestrator/Team");
 
 (async () => {
   const researchAgent = new Agent(/* ... */);
