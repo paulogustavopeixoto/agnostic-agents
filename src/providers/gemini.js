@@ -8,18 +8,26 @@ class GeminiAdapter {
   }
 
   async generateText(prompt, { tools = [], temperature = 0.7 } = {}) {
-    const functionDeclarations = tools.map((tool) =>
-      tool.toGeminiFunctionDeclaration()
-    );
-
-    const model = this.genAI.getGenerativeModel({
+    let modelConfig = {
       model: this.modelName,
-      tools: { functionDeclarations },
-      toolConfig: {
-        functionCallingConfig: { mode: "ANY" },
-      },
       temperature,
-    });
+    };
+
+    if (tools && tools.length > 0) {
+      const functionDeclarations = tools.map((tool) =>
+        tool.toGeminiFunctionDeclaration()
+      );
+   
+      modelConfig = {
+           ...modelConfig,
+           tools: { functionDeclarations },
+           toolConfig: {
+             functionCallingConfig: { mode: "ANY" },
+           }
+       }
+    }
+
+    const model = this.genAI.getGenerativeModel(modelConfig);
 
     const chat = model.startChat({ history: [] });
     const result = await chat.sendMessage(prompt);
