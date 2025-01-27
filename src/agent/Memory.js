@@ -15,6 +15,6 @@ class Memory {
         )
         .join("\n");
     }
-  }
+}
   
-  module.exports = { Memory };
+module.exports = { Memory };
