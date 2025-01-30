@@ -5,12 +5,12 @@ class HFAdapter {
   constructor(apiKey, options = {}) {
     this.apiKey = apiKey;
     this.inference = new HfInference(apiKey);
-    this.textModel = options.textModel || "bigscience/bloom";
+    this.textModel = options.textModel || "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B";
     this.visionModel = options.visionModel || "microsoft/vision-transformer-base";
     this.imageGenModel = options.imageGenModel || "runwayml/stable-diffusion-v1-5";
   }
 
-  async generateText(prompt, { temperature = 0.7, maxNewTokens = 256, tools = [] } = {}) {
+  async generateText(prompt, { temperature = 0.7, maxNewTokens = 12000, tools = [] } = {}) {
     // Hugging Face does not have official "function calling" 
     // so you'd do prompt-based function calling if you want that
     // or skip it in HF for now.
