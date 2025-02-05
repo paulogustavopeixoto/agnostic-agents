@@ -5,6 +5,7 @@ const { Memory } = require('./src/agent/Memory');
 const { OpenAIAdapter } = require('./src/providers/openAi');
 const { GeminiAdapter } = require('./src/providers/gemini');
 const { HFAdapter } = require('./src/providers/huggingFace');
+const { DeepSeekAdapter } = require('./src/providers/deepSeek');
 const { encodeBase64 } = require('./src/utils');
 const { chunkText } = require('./src/utils');
 const { repairJsonOutput } = require('./src/utils');
@@ -20,6 +21,7 @@ module.exports = {
   OpenAIAdapter,
   GeminiAdapter,
   HFAdapter,
+  DeepSeekAdapter,
   encodeBase64,
   PineconeManager,
   chunkText,
