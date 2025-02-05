@@ -6,13 +6,13 @@ const { OpenAIAdapter } = require('./src/providers/openAi');
 const { GeminiAdapter } = require('./src/providers/gemini');
 const { HFAdapter } = require('./src/providers/huggingFace');
 const { DeepSeekAdapter } = require('./src/providers/deepSeek');
-const { encodeBase64 } = require('./src/utils');
-const { chunkText } = require('./src/utils');
-const { repairJsonOutput } = require('./src/utils');
 const { PineconeManager } = require('./src/db/PineconeManager');
 const { Flow } = require('./src/orchestrator/Flow');
 const { Task } = require('./src/orchestrator/Task');
 const { Team } = require('./src/orchestrator/Team');
+const { encodeBase64 } = require('./src/utils');
+const { chunkText } = require('./src/utils');
+const { repairJsonOutput } = require('./src/utils');
 
 module.exports = {
   Agent,
@@ -22,11 +22,11 @@ module.exports = {
   GeminiAdapter,
   HFAdapter,
   DeepSeekAdapter,
-  encodeBase64,
   PineconeManager,
-  chunkText,
-  repairJsonOutput,
   Flow,
   Task,
   Team,
+  chunkText,
+  repairJsonOutput,
+  encodeBase64,
 };
