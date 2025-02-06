@@ -8,7 +8,7 @@ class Agent {
    * @param {object} options.defaultConfig - e.g. { model, temperature, maxTokens } 
    * @param {string} options.description - Optional system instructions or agent description.
    */
-  constructor(adapter, { tools = [], memory = null, defaultConfig = {} } = {}) {
+  constructor(adapter, { tools = [], memory = null, defaultConfig = {}, description = "" } = {}) {
     this.adapter = adapter;
     this.tools = tools;
     this.memory = memory;
