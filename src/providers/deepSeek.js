@@ -1,4 +1,4 @@
-// src/providers/OpenAIAdapter.js
+// src/providers/deepSeek.js
 const { OpenAI } = require("openai");
 const fs = require("fs");
 

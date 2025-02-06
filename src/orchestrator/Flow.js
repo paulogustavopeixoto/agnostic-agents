@@ -70,7 +70,7 @@ class Flow {
         }
         return output;
     }
-    }
+}
 
 // Export the decorators and base class
 module.exports = {

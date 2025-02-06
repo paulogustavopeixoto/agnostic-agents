@@ -96,6 +96,6 @@ class Task {
       }
       return basePrompt;
     }
-  }
-  
-  module.exports = { Task };
+}
+
+module.exports = { Task };

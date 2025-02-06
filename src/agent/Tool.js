@@ -85,6 +85,6 @@ class Tool {
         // strict: this.strict, etc.
       };
     }
-  }
-  
-  module.exports = { Tool };
+}
+
+module.exports = { Tool };

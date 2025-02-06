@@ -1,4 +1,4 @@
-// src/providers/AnthropicAdapter.js
+// src/providers/Anthropic.js
 const { Anthropic } = require('@anthropic-ai/sdk');
 
 class AnthropicAdapter {
