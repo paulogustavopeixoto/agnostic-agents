@@ -6,12 +6,14 @@ class Agent {
    * @param {array}  options.tools - If using function calling
    * @param {object} options.memory - Optional memory instance
    * @param {object} options.defaultConfig - e.g. { model, temperature, maxTokens } 
+   * @param {string} options.description - Optional system instructions or agent description.
    */
   constructor(adapter, { tools = [], memory = null, defaultConfig = {} } = {}) {
     this.adapter = adapter;
     this.tools = tools;
     this.memory = memory;
     this.defaultConfig = defaultConfig; 
+    this.description = description;
   }
 
   /**
@@ -25,7 +27,10 @@ class Agent {
 
     // 2) Build or update memory
     const conversationContext = this.memory ? this.memory.getContext() : "";
-    const prompt = conversationContext + "\nUser: " + userMessage + "\nAgent:";
+    
+    // Incorporate the system-level description if provided.
+    const systemPrompt = this.description ? `System: ${this.description}\n` : "";
+    const prompt = systemPrompt + conversationContext + "\nUser: " + userMessage + "\nAgent:";
 
     // 3) Possibly do function calling if the adapter supports it
     //    or just call generateText if you don’t detect a function call.

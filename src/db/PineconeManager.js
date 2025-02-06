@@ -114,7 +114,8 @@ class PineconeManager {
       const queryRequest = {
         vector: queryVector,
         topK,
-        includeMetadata: true
+        includeMetadata: true,
+        include_values: true
       };
 
       // 3) If a filter is present, attach it
