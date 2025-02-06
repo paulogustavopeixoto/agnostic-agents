@@ -168,7 +168,7 @@ class OpenAIAdapter {
   async embedChunks(chunks) {
     // The new OpenAI library supports multiple inputs in a single call
     const response = await this.openai.embeddings.create({
-      model: "text-embedding-3-small",
+      model: "text-embedding-ada-002",
       input: chunks,
       encoding_format: "float",
     });
