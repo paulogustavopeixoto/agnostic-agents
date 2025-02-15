@@ -30,8 +30,7 @@ npm install agnostic-agents --save
 Below is an example demonstrating how to create an AI agent with conversation memory and a custom tool, then send a message and receive a response.
 
 ```bash
-const { Agent, Memory, Tool } = require("agnostic-agents");
-const { OpenAIAdapter } = require("agnostic-agents/providers/OpenAi");
+const { Agent, Memory, Tool, OpenAIAdapter } = require("agnostic-agents");
 
 // Initialize conversation memory
 const memory = new Memory();
@@ -75,3 +74,18 @@ const agent = new Agent(openaiAdapter, {
 })();
 ```
 
+## API Reference
+
+### Agent
+
+**Constructor**
+
+```bash
+new Agent(adapter, { tools = [], memory = null, defaultConfig = {}, description = "" })
+```
+
+- **adapter**: An instance of a provider adapter (e.g., OpenAIAdapter, GeminiAdapter, etc.).
+- **tools**: An array of Tool objects used for function calling.
+- **memory**: An optional memory instance to store conversation context.
+- **defaultConfig**: Default configuration options (e.g., { model, temperature, maxTokens }).
+- **description**: Optional system instructions or an agent description.
