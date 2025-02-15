@@ -12,3 +12,66 @@ _____/\\\\\\\\\________/\\\\\\\\\\\\__/\\\\\_____/\\\_______/\\\\\__________/\\\
 ```
 
 # agnostic-agents
+
+## Overview
+
+**agnostic-agents** is a modular, provider-agnostic framework for building and orchestrating AI agents. It enables you to integrate with multiple language model providers (e.g., OpenAI, Gemini, Anthropic, Hugging Face, DeepSeek) and provides powerful abstractions for managing conversation memory, function (tool) calling, task orchestration, and team collaboration. Use this package to develop chatbots, automated workflows, or any system that requires dynamic AI-driven decision making.
+
+## Installation
+
+Install **agnostic-agents** via npm:
+
+```bash
+npm install agnostic-agents --save
+```
+
+## Usage
+
+Below is an example demonstrating how to create an AI agent with conversation memory and a custom tool, then send a message and receive a response.
+
+```bash
+const { Agent, Memory, Tool } = require("agnostic-agents");
+const { OpenAIAdapter } = require("agnostic-agents/providers/OpenAi");
+
+// Initialize conversation memory
+const memory = new Memory();
+
+// Define a custom tool (e.g., a simple calculator)
+const calculatorTool = new Tool({
+  name: "calculate",
+  description: "Perform basic arithmetic calculations.",
+  parameters: {
+    type: "object",
+    properties: {
+      expression: {
+        type: "string",
+        description: "The arithmetic expression to evaluate (e.g., '12 * 7')."
+      }
+    },
+    required: ["expression"]
+  },
+  implementation: async ({ expression }) => {
+    // Note: Using eval() for demonstration only. Avoid eval in production!
+    const result = eval(expression);
+    return { result };
+  }
+});
+
+// Create an adapter instance (using OpenAI in this example)
+const openaiAdapter = new OpenAIAdapter(process.env.OPENAI_API_KEY);
+
+// Create an agent with default configuration, memory, and tools
+const agent = new Agent(openaiAdapter, {
+  tools: [calculatorTool],
+  memory: memory,
+  defaultConfig: { model: "gpt-4o-mini", temperature: 0.7 },
+  description: "You are a helpful AI assistant that answers questions and can perform calculations."
+});
+
+// Send a message to the agent
+(async () => {
+  const response = await agent.sendMessage("What is 12 * 7?");
+  console.log("Agent Response:", response);
+})();
+```
+
