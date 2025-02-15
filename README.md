@@ -89,3 +89,24 @@ new Agent(adapter, { tools = [], memory = null, defaultConfig = {}, description 
 - **memory**: An optional memory instance to store conversation context.
 - **defaultConfig**: Default configuration options (e.g., { model, temperature, maxTokens }).
 - **description**: Optional system instructions or an agent description.
+
+**Methods**
+
+- **sendMessage(userMessage, config = {})**
+Sends a prompt to the agent. Merges provided configuration with defaults, includes conversation context (if available), and processes function/tool calls if detected.
+Returns: Promise<string> or the result of a tool call.
+
+- **_handleToolCall(toolCall)**
+Internally resolves and calls the appropriate tool based on the agent’s tool call request.
+
+- **analyzeImage(imageData, config = {})**
+Analyzes an image using the underlying adapter (if supported).
+
+- **generateImage(prompt, config = {})**
+Generates an image from a text prompt using the adapter (e.g., via DALL·E or Stable Diffusion).
+
+...
+
+## Contributing
+
+Contributions to agnostic-agents are welcome! If you find bugs, have feature requests, or wish to contribute improvements, please open an issue or submit a pull request on the GitHub repository.
