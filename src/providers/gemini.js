@@ -1,3 +1,4 @@
+// src/providers/gemini.js
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 class GeminiAdapter {

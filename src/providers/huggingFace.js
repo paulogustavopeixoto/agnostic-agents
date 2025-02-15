@@ -1,4 +1,4 @@
-// src/providers/HFAdapter.js
+// src/providers/huggingFace.js
 const { HfInference } = require('@huggingface/inference'); 
 
 class HFAdapter {

@@ -74,7 +74,7 @@ class Flow {
 
 // Export the decorators and base class
 module.exports = {
-Flow,
-start,
-listen,
+    Flow,
+    start,
+    listen,
 };

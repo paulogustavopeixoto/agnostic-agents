@@ -1,3 +1,5 @@
+// src/agent/Memory.js
+
 class Memory {
     constructor() {
       this.conversation = []; // or a more advanced structure
