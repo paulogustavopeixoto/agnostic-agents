@@ -12,43 +12,38 @@ class Agent {
     this.adapter = adapter;
     this.tools = tools;
     this.memory = memory;
-    this.defaultConfig = defaultConfig; 
+    this.defaultConfig = defaultConfig;
     this.description = description;
+  }
+
+  // Helper to build the system prompt from description and user input
+  _buildSystemPrompt(userPrompt = "") {
+    return {
+      system: this.description || "",
+      context: this.memory ? this.memory.getContext() : "",
+      user: userPrompt || "",
+    };
   }
 
   /**
    * Generic text-based prompt method.
-   * @param {string} userMessage 
+   * @param {string} userMessage - The user's input message
    * @param {object} config - e.g. { model, temperature, maxTokens }
    */
   async sendMessage(userMessage, config = {}) {
-    // 1) Merge config with defaults
     const finalConfig = { ...this.defaultConfig, ...config };
+    const promptObject = this._buildSystemPrompt(userMessage);
 
-    // 2) Build or update memory
-    const conversationContext = this.memory ? this.memory.getContext() : "";
-    
-    // Incorporate the system-level description if provided.
-    const systemPrompt = this.description ? `System: ${this.description}\n` : "";
-    const prompt = systemPrompt + conversationContext + "\nUser: " + userMessage + "\nAgent:";
-
-    // 3) Possibly do function calling if the adapter supports it
-    //    or just call generateText if you don’t detect a function call.
-    const result = await this.adapter.generateText(prompt, {
+    const result = await this.adapter.generateText(promptObject, {
       ...finalConfig,
-      tools: this.tools, // if function calling is integrated
+      tools: this.tools,
     });
 
-    // 4) If there's a function/tool call:
     if (result.toolCall) {
       const toolResult = await this._handleToolCall(result.toolCall);
-      //console.log("Tool result:", JSON.stringify(toolResult, null, 2));
-      // Then feed toolResult back to the LLM for a final answer, etc.
-      //return await this.adapter.generateToolResult(prompt, result.toolCall, toolResult, finalConfig);
-      return toolResult;
+      return await this.adapter.generateToolResult(promptObject, result.toolCall, toolResult, finalConfig);
     }
 
-    // 5) Update memory with user + agent content
     if (this.memory) {
       this.memory.store(userMessage, result.message);
     }
@@ -64,29 +59,36 @@ class Agent {
     if (!toolInstance) {
       throw new Error(`Tool ${toolCall.name} not found.`);
     }
-    // toolCall.arguments => pass to the tool's implementation
     return await toolInstance.call(toolCall.arguments || {});
   }
 
   /**
    * Analyze an image (if the adapter supports it).
-   * @param {Buffer|string} imageData - Could be a file path, base64, or Buffer
-   * @param {object} config 
+   * @param {Buffer|string} imageData - Could be a URL or base64 string
+   * @param {object} config - e.g. { prompt, model, temperature }
    */
   async analyzeImage(imageData, config = {}) {
-    // merges config with default
     const finalConfig = { ...this.defaultConfig, ...config };
-    // calls adapter
-    return await this.adapter.analyzeImage(imageData, finalConfig);
+    const userPrompt = config.prompt || "Analyze this image.";
+    const promptObject = this._buildSystemPrompt(userPrompt);
+
+    return await this.adapter.analyzeImage(imageData, {
+      ...finalConfig,
+      prompt: promptObject, 
+    });
   }
 
   /**
    * Generate an image (text -> image).
    * e.g., stable diffusion or DALL·E
+   * @param {string} userPrompt - The user's input for image generation
+   * @param {object} config - e.g. { model, size, returnBase64 }
    */
-  async generateImage(prompt, config = {}) {
+  async generateImage(userPrompt, config = {}) {
     const finalConfig = { ...this.defaultConfig, ...config };
-    return await this.adapter.generateImage(prompt, finalConfig);
+    const promptObject = this._buildSystemPrompt(userPrompt);
+
+    return await this.adapter.generateImage(promptObject, finalConfig);
   }
 }
 

@@ -7,19 +7,21 @@ class OpenAIAdapter {
     this.openai = new OpenAI({ apiKey });
   }
 
-  /**
-   * Generate text via chat-completion with optional function calling (tools).
-   */
-  async generateText(prompt, { model = "gpt-4o-mini", temperature = 0.7, tools = [] } = {}) {
+  async generateText(promptObject, { model = "gpt-4o-mini", temperature = 0.7, tools = [] } = {}) {
     const openAIFunctions = tools.map((tool) => ({
       name: tool.name,
       description: tool.description,
       parameters: tool.parameters,
     }));
 
+    const messages = [];
+    if (promptObject.system) messages.push({ role: "system", content: promptObject.system });
+    if (promptObject.context) messages.push({ role: "user", content: promptObject.context });
+    if (promptObject.user) messages.push({ role: "user", content: promptObject.user });
+
     const completion = await this.openai.chat.completions.create({
       model,
-      messages: [{ role: "user", content: prompt }],
+      messages,
       temperature,
       functions: openAIFunctions.length > 0 ? openAIFunctions : undefined,
       function_call: openAIFunctions.length > 0 ? "auto" : undefined,
@@ -44,18 +46,15 @@ class OpenAIAdapter {
         };
       }
     }
-
     return { message: choice.content || "" };
   }
 
-  /**
-   * If the LLM requested a tool call, we handle a "second pass" to feed the tool result back.
-   */
-  async generateToolResult(originalPrompt, toolCall, toolResult, config) {
+  async generateToolResult(promptObject, toolCall, toolResult, config) {
+    const fullPrompt = `${promptObject.system ? `${promptObject.system}\n` : ""}${promptObject.context}${promptObject.user || ""}`.trim();
     const completion = await this.openai.chat.completions.create({
       model: config.model || "gpt-4o-mini",
       messages: [
-        { role: "user", content: originalPrompt },
+        { role: "user", content: fullPrompt },
         {
           role: "assistant",
           content: "",
@@ -69,15 +68,12 @@ class OpenAIAdapter {
       ],
       temperature: config.temperature || 0.7,
     });
-
     const choice = completion.choices[0].message;
     return choice.content;
   }
 
-  /**
-   * (Text -> Image) generation using e.g. DALL·E 3
-   */
-  async generateImage(prompt, { model = "dall-e-3", size = "1024x1024", returnBase64 = false } = {}) {
+  async generateImage(promptObject, { model = "dall-e-3", size = "1024x1024", returnBase64 = false } = {}) {
+    const prompt = `${promptObject.system ? `${promptObject.system}\n` : ""}${promptObject.context}${promptObject.user || ""}`.trim();
     const response = await this.openai.images.generate({
       model,
       prompt,
@@ -96,16 +92,9 @@ class OpenAIAdapter {
     return `data:image/png;base64,${base64}`;
   }
 
-  /**
-   * Analyze an image by sending it to "gpt-4o" or "gpt-4o-mini" (Vision-enabled).
-   *
-   * @param {string|Buffer} imageData - If string: must be a URL or base64 data URL. If Buffer, converted to base64.
-   * @param {object} config - e.g. { model: "gpt-4o-mini", prompt: "What's in this image?" }
-   */
   async analyzeImage(imageData, config = {}) {
     const model = config.model || "gpt-4o-mini";
-    const userPrompt = config.prompt || "What's in this image?";
-
+    const promptObject = config.prompt || { user: "What's in this image?" };
     let dataUrl = "";
     if (Buffer.isBuffer(imageData)) {
       const base64 = imageData.toString("base64");
@@ -123,44 +112,27 @@ class OpenAIAdapter {
       throw new Error("Unsupported imageData format. Must be a URL, base64 string, or Buffer.");
     }
 
-    const messages = [
-      {
-        role: "user",
-        content: [
-          { type: "text", text: userPrompt },
-          {
-            type: "image_url",
-            image_url: {
-              url: dataUrl,
-              detail: "high", // "high" or "low"
-            },
-          },
-        ],
-      },
-    ];
-
-    const response = await this.openai.chat.completions.create({
-      model,
-      messages,
+    const messages = [];
+    if (promptObject.system) messages.push({ role: "system", content: promptObject.system });
+    if (promptObject.context) messages.push({ role: "user", content: promptObject.context });
+    messages.push({
+      role: "user",
+      content: [
+        { type: "text", text: promptObject.user || "What's in this image?" },
+        { type: "image_url", image_url: { url: dataUrl, detail: "high" } },
+      ],
     });
+    const response = await this.openai.chat.completions.create({ model, messages });
     return response.choices[0].message.content;
   }
 
-  /**
-   * Generate embeddings for an array of text chunks using OpenAI.
-   *
-   * @param {string[]} chunks - Array of text strings to embed.
-   * @param {object} [options]
-   * @param {string} [options.model="text-embedding-3-small"] - The embedding model to use.
-   * @returns {Promise<Array>} - Array of objects { object, index, embedding }
-   */
   async embedChunks(chunks, { model = "text-embedding-ada-002" } = {}) {
     const response = await this.openai.embeddings.create({
       model,
       input: chunks,
       encoding_format: "float",
     });
-    return response.data; // Array of { index, embedding, ... }
+    return response.data;
   }
 }
 
