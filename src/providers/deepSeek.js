@@ -1,26 +1,30 @@
 // src/providers/deepSeek.js
 const { OpenAI } = require("openai");
-const fs = require("fs");
 
 class DeepSeekAdapter {
   constructor(apiKey) {
     this.apiKey = apiKey;
-    this.openai = new OpenAI({ baseURL: 'https://api.deepseek.com', apiKey: apiKey });
+    this.openai = new OpenAI({ baseURL: 'https://api.deepseek.com', apiKey });
   }
 
   /**
    * Generate text via chat-completion with optional function calling (tools).
    */
-  async generateText(prompt, { model = "deepseek-chat", temperature = 0.7, tools = [] } = {}) {
+  async generateText(promptObject, { model = "deepseek-chat", temperature = 0.7, tools = [] } = {}) {
     const openAIFunctions = tools.map((tool) => ({
       name: tool.name,
       description: tool.description,
       parameters: tool.parameters,
     }));
 
+    const messages = [];
+    if (promptObject.system) messages.push({ role: "system", content: promptObject.system });
+    if (promptObject.context) messages.push({ role: "user", content: promptObject.context });
+    if (promptObject.user) messages.push({ role: "user", content: promptObject.user });
+
     const completion = await this.openai.chat.completions.create({
       model,
-      messages: [{ role: "user", content: prompt }],
+      messages,
       temperature,
       functions: openAIFunctions.length > 0 ? openAIFunctions : undefined,
       function_call: openAIFunctions.length > 0 ? "auto" : undefined,
@@ -45,18 +49,18 @@ class DeepSeekAdapter {
         };
       }
     }
-
     return { message: choice.content || "" };
   }
 
   /**
-   * If the LLM requested a tool call, we handle a "second pass" to feed the tool result back.
+   * Handle a second pass for tool call results (if supported).
    */
-  async generateToolResult(originalPrompt, toolCall, toolResult, config) {
+  async generateToolResult(promptObject, toolCall, toolResult, config) {
+    const fullPrompt = `${promptObject.system ? `${promptObject.system}\n` : ""}${promptObject.context}${promptObject.user || ""}`.trim();
     const completion = await this.openai.chat.completions.create({
-      model: config.model || "gpt-4o-mini",
+      model: config.model || "deepseek-chat",
       messages: [
-        { role: "user", content: originalPrompt },
+        { role: "user", content: fullPrompt },
         {
           role: "assistant",
           content: "",
@@ -76,106 +80,24 @@ class DeepSeekAdapter {
   }
 
   /**
-   * (Text -> Image) generation using e.g. DALL·E 3
+   * DeepSeek doesn’t support image generation.
    */
-  async generateImage(prompt, { model = "dall-e-3", size = "1024x1024", returnBase64 = false } = {}) {
-    const response = await this.openai.images.generate({
-      model,
-      prompt,
-      n: 1,
-      size,
-    });
-
-    // Typically returns { data: [{ url: ... }] }
-    const imageUrl = response.data[0].url;
-    if (!returnBase64) {
-      return imageUrl;
-    }
-
-    // Optionally fetch and return as base64
-    const axios = (await import("axios")).default;
-    const imageResponse = await axios.get(imageUrl, { responseType: "arraybuffer" });
-    const base64 = Buffer.from(imageResponse.data, "binary").toString("base64");
-    return `data:image/png;base64,${base64}`;
+  async generateImage(promptObject, config = {}) {
+    throw new Error("DeepSeek does not support image generation.");
   }
 
   /**
-   * Analyze an image by sending it to "gpt-4o" or "gpt-4o-mini" (Vision-enabled).
-   *
-   * @param {string|Buffer} imageData - If string: could be a URL or base64. If Buffer, convert to base64.
-   * @param {object} config - e.g. { model: "gpt-4o-mini", prompt: "What's in this image?" }
+   * DeepSeek doesn’t support image analysis.
    */
   async analyzeImage(imageData, config = {}) {
-    const model = config.model || "gpt-4o-mini";
-    const userPrompt = config.prompt || "What's in this image?";
-
-    // Convert input to data URL if needed
-    let dataUrl = "";
-    if (Buffer.isBuffer(imageData)) {
-      const base64 = imageData.toString("base64");
-      dataUrl = `data:image/jpeg;base64,${base64}`;
-    } else if (typeof imageData === "string") {
-      const lower = imageData.toLowerCase();
-      if (lower.startsWith("data:image/")) {
-        dataUrl = imageData;
-      } else if (lower.startsWith("http")) {
-        dataUrl = imageData;
-      } else {
-        // Assume it's a local file path
-        if (fs.existsSync(imageData)) {
-          const fileBuffer = fs.readFileSync(imageData);
-          dataUrl = `data:image/jpeg;base64,${fileBuffer.toString("base64")}`;
-        } else {
-          throw new Error(`Image path "${imageData}" not found or invalid.`);
-        }
-      }
-    } else {
-      throw new Error("Unsupported imageData format. Must be string (URL/path) or Buffer.");
-    }
-
-    const messages = [
-      {
-        role: "user",
-        content: [
-          { type: "text", text: userPrompt },
-          {
-            type: "image_url",
-            image_url: {
-              url: dataUrl,
-              detail: "high", // this can be "high" or "low"
-            },
-          },
-        ],
-      },
-    ];
-
-    const response = await this.openai.chat.completions.create({
-      model,
-      messages,
-    });
-    return response.choices[0].message.content;
+    throw new Error("DeepSeek does not support image analysis.");
   }
 
   /**
-   * Generate embeddings for an array of text chunks using OpenAI.
-   * Returns an array of embedding objects, each containing an "embedding" array of floats.
-   *
-   * @param {string[]} chunks - array of text strings to embed.
-   * @param {object} [options]
-   * @param {string} [options.model="text-embedding-3-small"] - the embedding model to use
-   * @returns {Promise<Array>} - array of objects { object, index, embedding }
+   * Generate embeddings for text chunks.
    */
-  async embedChunks(chunks) {
-    // The new OpenAI library supports multiple inputs in a single call
-    const response = await this.openai.embeddings.create({
-      model: "text-embedding-3-small",
-      input: chunks,
-      encoding_format: "float",
-    });
-
-    // response.data is an object with shape:
-    // { object: 'list', data: [ { object: 'embedding', index: 0, embedding: [ floats ] }, ... ] }
-    return response.data; // array of { index, embedding, ... }
+  async embedChunks(chunks, { model = "text-embedding-3-small" } = {}) {
+    throw new Error("DeepSeek does not support image analysis.");
   }
 }
 

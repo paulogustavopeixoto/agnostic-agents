@@ -1,4 +1,4 @@
-// examples/openaiFunctionCallExample.js
+// examples/openaiExample.js
 const { Agent, Tool, Memory, OpenAIAdapter } = require('../index');
 require("dotenv").config();
 
