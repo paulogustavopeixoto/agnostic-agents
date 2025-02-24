@@ -1,6 +1,5 @@
 // src/providers/OpenAi.js
 const { OpenAI } = require("openai");
-const fs = require("fs");
 
 class OpenAIAdapter {
   constructor(apiKey) {
@@ -86,13 +85,11 @@ class OpenAIAdapter {
       size,
     });
 
-    // Typically returns { data: [{ url: ... }] }
     const imageUrl = response.data[0].url;
     if (!returnBase64) {
       return imageUrl;
     }
 
-    // Optionally fetch and return as base64
     const axios = (await import("axios")).default;
     const imageResponse = await axios.get(imageUrl, { responseType: "arraybuffer" });
     const base64 = Buffer.from(imageResponse.data, "binary").toString("base64");
@@ -102,14 +99,13 @@ class OpenAIAdapter {
   /**
    * Analyze an image by sending it to "gpt-4o" or "gpt-4o-mini" (Vision-enabled).
    *
-   * @param {string|Buffer} imageData - If string: could be a URL or base64. If Buffer, convert to base64.
+   * @param {string|Buffer} imageData - If string: must be a URL or base64 data URL. If Buffer, converted to base64.
    * @param {object} config - e.g. { model: "gpt-4o-mini", prompt: "What's in this image?" }
    */
   async analyzeImage(imageData, config = {}) {
     const model = config.model || "gpt-4o-mini";
     const userPrompt = config.prompt || "What's in this image?";
 
-    // Convert input to data URL if needed
     let dataUrl = "";
     if (Buffer.isBuffer(imageData)) {
       const base64 = imageData.toString("base64");
@@ -121,16 +117,10 @@ class OpenAIAdapter {
       } else if (lower.startsWith("http")) {
         dataUrl = imageData;
       } else {
-        // Assume it's a local file path
-        if (fs.existsSync(imageData)) {
-          const fileBuffer = fs.readFileSync(imageData);
-          dataUrl = `data:image/jpeg;base64,${fileBuffer.toString("base64")}`;
-        } else {
-          throw new Error(`Image path "${imageData}" not found or invalid.`);
-        }
+        throw new Error("Unsupported imageData format. Must be a URL or base64 string.");
       }
     } else {
-      throw new Error("Unsupported imageData format. Must be string (URL/path) or Buffer.");
+      throw new Error("Unsupported imageData format. Must be a URL, base64 string, or Buffer.");
     }
 
     const messages = [
@@ -142,7 +132,7 @@ class OpenAIAdapter {
             type: "image_url",
             image_url: {
               url: dataUrl,
-              detail: "high", // this can be "high" or "low"
+              detail: "high", // "high" or "low"
             },
           },
         ],
@@ -158,24 +148,19 @@ class OpenAIAdapter {
 
   /**
    * Generate embeddings for an array of text chunks using OpenAI.
-   * Returns an array of embedding objects, each containing an "embedding" array of floats.
    *
-   * @param {string[]} chunks - array of text strings to embed.
+   * @param {string[]} chunks - Array of text strings to embed.
    * @param {object} [options]
-   * @param {string} [options.model="text-embedding-3-small"] - the embedding model to use
-   * @returns {Promise<Array>} - array of objects { object, index, embedding }
+   * @param {string} [options.model="text-embedding-3-small"] - The embedding model to use.
+   * @returns {Promise<Array>} - Array of objects { object, index, embedding }
    */
-  async embedChunks(chunks) {
-    // The new OpenAI library supports multiple inputs in a single call
+  async embedChunks(chunks, { model = "text-embedding-ada-002" } = {}) {
     const response = await this.openai.embeddings.create({
-      model: "text-embedding-ada-002",
+      model,
       input: chunks,
       encoding_format: "float",
     });
-
-    // response.data is an object with shape:
-    // { object: 'list', data: [ { object: 'embedding', index: 0, embedding: [ floats ] }, ... ] }
-    return response.data; // array of { index, embedding, ... }
+    return response.data; // Array of { index, embedding, ... }
   }
 }
 
