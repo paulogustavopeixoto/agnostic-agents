@@ -10,7 +10,7 @@ const { DeepSeekAdapter } = require('./src/providers/deepSeek');
 const { PineconeManager } = require('./src/db/PineconeManager');
 const { Flow } = require('./src/orchestrator/Flow');
 const { Task } = require('./src/orchestrator/Task');
-const { Team } = require('./src/orchestrator/Orchestrator');
+const { Orchestrator } = require('./src/orchestrator/Orchestrator');
 const { encodeBase64 } = require('./src/utils');
 const { chunkText } = require('./src/utils');
 const { repairJsonOutput } = require('./src/utils');
@@ -27,7 +27,7 @@ module.exports = {
   PineconeManager,
   Flow,
   Task,
-  Team,
+  Orchestrator,
   chunkText,
   repairJsonOutput,
   encodeBase64,
