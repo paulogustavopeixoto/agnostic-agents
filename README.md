@@ -15,98 +15,80 @@ _____/\\\\\\\\\________/\\\\\\\\\\\\__/\\\\\_____/\\\_______/\\\\\__________/\\\
 
 ## Overview
 
-**agnostic-agents** is a modular, provider-agnostic framework for building and orchestrating AI agents. It enables you to integrate with multiple language model providers (e.g., OpenAI, Gemini, Anthropic, Hugging Face, DeepSeek) and provides powerful abstractions for managing conversation memory, function (tool) calling, task orchestration, and team collaboration. Use this package to develop chatbots, automated workflows, or any system that requires dynamic AI-driven decision making.
+**agnostic-agents** is a modular, provider-agnostic framework for building and orchestrating AI agents. It supports integration with multiple language model providers (e.g., OpenAI, DeepSeek, Gemini, Anthropic, Hugging Face) and offers abstractions for conversation memory, function calling (tools), task execution, team orchestration, and retrieval-augmented generation (RAG). Whether you're creating chatbots, automating workflows, or building collaborative AI teams, this package provides a flexible and resilient toolkit.
+
+### Key Features
+
+- **Provider-Agnostic**: Switch between LLM providers with minimal changes.
+- **RAG Support**: Augment agents and tasks with retrieval from vector stores (e.g., Pinecone or local).
+- **Task Orchestration**: Execute tasks sequentially, in parallel, or hierarchically.
+- **Resilience**: Built-in retry logic for handling transient API failures.
+- **Extensibility**: Easily add new adapters, tools, or vector stores.
 
 ## Installation
 
-Install **agnostic-agents** via npm:
+Install via npm:
 
 ```bash
 npm install agnostic-agents --save
 ```
 
-## Usage
+## Quick Start
 
-Below is an example demonstrating how to create an AI agent with conversation memory and a custom tool, then send a message and receive a response.
+Here’s an example of an AI agent with memory, a tool, and RAG capabilities:
 
 ```bash
-const { Agent, Memory, Tool, OpenAIAdapter } = require("agnostic-agents");
+const { Agent, Memory, Tool, RAG, OpenAIAdapter, LocalVectorStore, RetryManager } = require('agnostic-agents');
+require('dotenv').config();
 
-// Initialize conversation memory
-const memory = new Memory();
-
-// Define a custom tool (e.g., a simple calculator)
-const calculatorTool = new Tool({
-  name: "calculate",
-  description: "Perform basic arithmetic calculations.",
-  parameters: {
-    type: "object",
-    properties: {
-      expression: {
-        type: "string",
-        description: "The arithmetic expression to evaluate (e.g., '12 * 7')."
-      }
-    },
-    required: ["expression"]
-  },
-  implementation: async ({ expression }) => {
-    // Note: Using eval() for demonstration only. Avoid eval in production!
-    const result = eval(expression);
-    return { result };
-  }
-});
-
-// Create an adapter instance (using OpenAI in this example)
-const openaiAdapter = new OpenAIAdapter(process.env.OPENAI_API_KEY);
-
-// Create an agent with default configuration, memory, and tools
-const agent = new Agent(openaiAdapter, {
-  tools: [calculatorTool],
-  memory: memory,
-  defaultConfig: { model: "gpt-4o-mini", temperature: 0.7 },
-  description: "You are a helpful AI assistant that answers questions and can perform calculations."
-});
-
-// Send a message to the agent
 (async () => {
-  const response = await agent.sendMessage("What is 12 * 7?");
-  console.log("Agent Response:", response);
+  // Setup adapter and retry manager
+  const adapter = new OpenAIAdapter(process.env.OPENAI_API_KEY);
+  const retryManager = new RetryManager({ retries: 2 });
+
+  // Setup RAG with a local vector store
+  const vectorStore = new LocalVectorStore();
+  const rag = new RAG({ adapter, vectorStore, retryManager });
+  await rag.index(["AI ethics involve fairness and transparency."]);
+
+  // Define a calculator tool
+  const calculatorTool = new Tool({
+    name: "calculate",
+    description: "Perform arithmetic calculations.",
+    parameters: {
+      type: "object",
+      properties: { expression: { type: "string", description: "e.g., '12 * 7'" } },
+      required: ["expression"]
+    },
+    implementation: async ({ expression }) => ({ result: eval(expression) }) // Use eval cautiously!
+  });
+
+  // Create agent with memory, tools, and RAG
+  const memory = new Memory();
+  const agent = new Agent(adapter, {
+    tools: [calculatorTool],
+    memory,
+    defaultConfig: { model: "gpt-4o-mini", temperature: 0.7 },
+    description: "A helpful assistant with calculation and ethics knowledge.",
+    rag,
+    retryManager
+  });
+
+  // Test the agent
+  console.log(await agent.sendMessage("What is 12 * 7?")); // Calls calculator tool
+  console.log(await agent.sendMessage("What are AI ethics?")); // Uses RAG
 })();
 ```
 
-## API Reference
+## Classes Overview
 
-### Agent
-
-**Constructor**
-
-```bash
-new Agent(adapter, { tools = [], memory = null, defaultConfig = {}, description = "" })
-```
-
-- **adapter**: An instance of a provider adapter (e.g., OpenAIAdapter, GeminiAdapter, etc.).
-- **tools**: An array of Tool objects used for function calling.
-- **memory**: An optional memory instance to store conversation context.
-- **defaultConfig**: Default configuration options (e.g., { model, temperature, maxTokens }).
-- **description**: Optional system instructions or an agent description.
-
-**Methods**
-
-- **sendMessage(userMessage, config = {})**
-Sends a prompt to the agent. Merges provided configuration with defaults, includes conversation context (if available), and processes function/tool calls if detected.
-Returns: Promise<string> or the result of a tool call.
-
-- **_handleToolCall(toolCall)**
-Internally resolves and calls the appropriate tool based on the agent’s tool call request.
-
-- **analyzeImage(imageData, config = {})**
-Analyzes an image using the underlying adapter (if supported).
-
-- **generateImage(prompt, config = {})**
-Generates an image from a text prompt using the adapter (e.g., via DALL·E or Stable Diffusion).
-
-...
-
-## Contributing
-
-Contributions to agnostic-agents are welcome! If you find bugs, have feature requests, or wish to contribute improvements, please open an issue or submit a pull request on the GitHub repository.
+| Class  | Description |        
+| --------------- | ------------------------------------------------------------------------------------------- |
+| `Agent`  | Core interaction unit—generates responses, handles tools, memory, and RAG queries. |
+| `Task`  | Executes a single task with dependencies, RAG context, and retries—workflow building block. |
+| `Orchestrator`  | Coordinates multiple tasks in sequential, parallel, or hierarchical modes with RAG support. |
+| `RAG`  | Retrieval-Augmented Generation—fetches context from vector stores for enhanced responses. |
+| `Tool`  | Defines callable functions—extends agent capabilities. |
+| `RetryManager`  | Handles retries with exponential backoff—ensures resilience for async operations. |
+| `PineconeManager`  | Vector store integration with Pinecone—persists RAG data externally. |
+| `LocalVectorStore`  | In-memory vector store—lightweight RAG option without external dependencies. |
