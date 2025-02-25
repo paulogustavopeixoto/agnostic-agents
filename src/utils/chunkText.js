@@ -1,3 +1,5 @@
+// src/utils/chunkText.js
+
 /**
  * Splits text into chunks.
  *
@@ -12,36 +14,20 @@
  * @returns {Promise<string[]>} - An array of text chunks.
  */
 async function chunkText(text, chunkSize = 1000, overlap = 100, numChunks = null) {
+  if (typeof text !== 'string' || !text.trim()) return [""];
   const cleanText = text.trim();
 
-  // If a target number of chunks is provided, split the text into exactly that many chunks.
   if (numChunks != null && Number.isInteger(numChunks) && numChunks > 0) {
     const chunks = [];
     const L = cleanText.length;
-
-    // Calculate the ideal chunk length "x" using the formula:
-    // For N chunks with an overlap O between consecutive chunks,
-    // the chunks are defined such that: last chunk end = N*x - (N-1)*O = L.
-    // Solve for x: x = (L + (N-1)*O) / N.
     const x = (L + (numChunks - 1) * overlap) / numChunks;
-
     for (let i = 0; i < numChunks; i++) {
-      // Determine the starting index:
-      // For chunk 0, start is 0.
-      // For subsequent chunks, we subtract the overlap to maintain the desired overlap.
       const start = Math.floor(i * (x - overlap));
-      // For the last chunk, ensure it ends at the end of the text.
-      let end;
-      if (i === numChunks - 1) {
-        end = L;
-      } else {
-        end = Math.floor(start + x);
-      }
+      let end = (i === numChunks - 1) ? L : Math.floor(start + x);
       chunks.push(cleanText.slice(start, end));
     }
     return chunks;
   } else {
-    // Original behavior: create chunks of chunkSize with overlap.
     const chunks = [];
     let start = 0;
     while (start < cleanText.length) {
@@ -50,7 +36,7 @@ async function chunkText(text, chunkSize = 1000, overlap = 100, numChunks = null
       chunks.push(chunk);
       start += (chunkSize - overlap);
     }
-    return chunks;
+    return chunks.length ? chunks : [cleanText]; // Fallback to full text if no chunks
   }
 }
 

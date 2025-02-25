@@ -127,6 +127,10 @@ class OpenAIAdapter {
   }
 
   async embedChunks(chunks, { model = "text-embedding-ada-002" } = {}) {
+    if (!Array.isArray(chunks) || !chunks.length || chunks.some(c => typeof c !== 'string' || !c.trim())) {
+      throw new Error("embedChunks requires a non-empty array of non-empty strings.");
+    }
+    console.log("Embedding chunks:", chunks); // Debug
     const response = await this.openai.embeddings.create({
       model,
       input: chunks,

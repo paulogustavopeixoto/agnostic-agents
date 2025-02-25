@@ -81,23 +81,36 @@ class RAG {
    * @param {object} [options] - { namespace, metadata }
    * @returns {Promise<string[]>} - Inserted vector IDs.
    */
-  async index(documents, options = {}) {
+   async index(documents, options = {}) {
     if (!this.vectorStore) throw new Error("Indexing requires a vector store.");
+    console.log("Raw documents:", documents);
     const texts = Array.isArray(documents) ? documents : [documents];
-    const chunks = texts.flatMap(text => this.chunk(text));
+    console.log("Texts:", texts);
+    const validTexts = texts.filter(t => typeof t === 'string' && t.trim().length > 0);
+    console.log("Valid texts:", validTexts);
+    if (!validTexts.length) throw new Error("No valid text provided for indexing.");
+    
+    const chunkPromises = validTexts.map(text => this.chunk(text));
+    const chunksArray = await Promise.all(chunkPromises);
+    const chunks = chunksArray.flat();
+    console.log("Chunks before embed:", chunks);
+    
+    if (!chunks.length || chunks.some(c => typeof c !== 'string' || !c.trim())) {
+    throw new Error("Chunks must be a non-empty array of non-empty strings.");
+    }
     const embeddings = await this.adapter.embedChunks(chunks);
     const vectors = embeddings.map((emb, i) => ({
-      id: `${Date.now()}-${i}`,
-      values: emb.embedding,
-      metadata: { text: chunks[i], ...(options.metadata || {}) }, // Allow custom metadata
+    id: `${Date.now()}-${i}`,
+    values: emb.embedding,
+    metadata: { text: chunks[i], ...(options.metadata || {}) },
     }));
     const { insertedIds } = await this.vectorStore.upsert({
-      indexName: this.indexName,
-      vectors,
-      namespace: options.namespace || this.namespace,
+    indexName: options.indexName || this.indexName,
+    vectors,
+    namespace: options.namespace || this.namespace,
     });
     return insertedIds;
-  }
+   }
 
   /**
    * Delete vectors by IDs or namespace.
@@ -108,18 +121,51 @@ class RAG {
     if (!this.vectorStore) throw new Error("Deletion requires a vector store.");
     if (options.all) {
       await this.vectorStore.deleteAll({
-        indexName: this.indexName,
+        indexName: options.indexName || this.indexName,
         namespace: options.namespace || this.namespace,
       });
     } else if (options.ids) {
       await this.vectorStore.delete({
-        indexName: this.indexName,
+        indexName: options.indexName || this.indexName,
         ids: options.ids,
         namespace: options.namespace || this.namespace,
       });
     } else {
       throw new Error("Delete requires either ids or all: true.");
     }
+  }
+
+  /**
+   * Create a new index in the vector store.
+   * @param {object} options - { indexName, dimension, metric }
+   * @returns {Promise<void>}
+   */
+  async createIndex(options = {}) {
+    if (!this.vectorStore) throw new Error("createIndex requires a vector store.");
+    const { indexName, dimension, metric = "cosine" } = options;
+    if (!indexName || !dimension) throw new Error("createIndex requires indexName and dimension.");
+    await this.vectorStore.createIndex({ indexName, dimension, metric });
+  }
+
+  /**
+   * List all indexes in the vector store.
+   * @returns {Promise<string[]>} - Array of index names.
+   */
+  async listIndexes() {
+    if (!this.vectorStore) throw new Error("listIndexes requires a vector store.");
+    return await this.vectorStore.listIndexes();
+  }
+
+  /**
+   * Update an existing index (e.g., replicas, pod type).
+   * @param {object} options - { indexName, replicas, podType }
+   * @returns {Promise<void>}
+   */
+  async updateIndex(options = {}) {
+    if (!this.vectorStore) throw new Error("updateIndex requires a vector store.");
+    const { indexName, replicas, podType } = options;
+    if (!indexName) throw new Error("updateIndex requires indexName.");
+    await this.vectorStore.updateIndex({ indexName, replicas, podType });
   }
 
   /**
