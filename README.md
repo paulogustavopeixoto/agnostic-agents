@@ -227,3 +227,60 @@ Lists all indexes. Returns `string[]`.
 
 - `async updateIndex(options = {})`
 Updates index settings. Returns void.
+
+`Memory`
+
+**Constructor**
+
+```bash
+new Memory()
+```
+
+- Simple in-memory conversation store.
+
+**Methods**
+
+- `store(userMessage, response)`
+Adds a message-response pair.
+
+- `getContext()`
+Returns conversation history as a string.
+
+`Tool`
+
+**Constructor**
+
+```bash
+new Tool({ name, description, parameters, implementation })
+```
+
+- **name**: Tool identifier.
+- **description**: Tool purpose.
+- **parameters**: JSON schema for inputs.
+- **implementation**: Async function returning result.
+
+**Methods**
+
+- `async call(args)`
+Executes the tool with arguments. Returns result.
+
+`RetryManager`
+
+**Constructor**
+
+```bash
+new RetryManager({ retries = 3, baseDelay = 1000, maxDelay = 10000 })
+```
+
+- **retries**: Max retry attempts.
+- **baseDelay**: Initial delay (ms).
+- **maxDelay**: Max delay (ms).
+
+**Methods**
+
+- `async execute(fn, ...args)`
+Runs a function with retries. Returns result or throws.
+
+## Contributing
+
+Contributions are welcome! Open issues or submit pull requests on the GitHub repository. Report bugs, suggest features, or improve the code—let’s make this better together!
