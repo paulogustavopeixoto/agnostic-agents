@@ -1,6 +1,7 @@
 // src/orchestrator/Task.js
 const { Agent } = require("../agent/Agent");
 const { RAG } = require("../rag/RAG");
+const { RetryManager } = require('../utils/RetryManager');
 
 class Task {
   /**
@@ -14,8 +15,9 @@ class Task {
    * @param {string} [options.expectedOutput] - A short statement describing desired output
    * @param {string[]} [options.dependsOn=[]] - Names of tasks this task depends on
    * @param {RAG} [options.rag] - Optional RAG instance for retrieval-augmented context
-   * @param {number} [options.timeout] - Optional timeout in milliseconds
-   * @param {number} [options.retries] - Optional number of retries
+   * @param {number} [options.timeout] - Optional timeout in milliseconds (not implemented yet)
+   * @param {number} [options.retries] - Optional number of retries (not implemented yet)
+   * @param {object} [options.retryManager] - Optional RetryManager instance (defaults to 3 retries)
    */
   constructor({
     description,
@@ -29,6 +31,7 @@ class Task {
     rag = null,
     timeout,
     retries,
+    retryManager = new RetryManager({ retries: 3, baseDelay: 1000, maxDelay: 10000 })
   }) {
     this.name = name || "untitledTask";
     this.description = description;
@@ -38,9 +41,10 @@ class Task {
     this.input = input;
     this.expectedOutput = expectedOutput;
     this.dependsOn = dependsOn;
-    this.rag = rag; // New: RAG instance for task context
-    this.timeout = timeout;
-    this.retries = retries;
+    this.rag = rag;
+    this.timeout = timeout; // Placeholder—could integrate with retries later
+    this.retries = retries; // Placeholder—superseded by retryManager
+    this.retryManager = retryManager; // New: RetryManager for resilience
     this.status = "PENDING";
   }
 
@@ -65,14 +69,16 @@ class Task {
       const originalTools = this.agent.tools;
       if (this.tools.length > 0) this.agent.tools = this.tools;
 
-      const userPrompt = await this._buildPrompt(context);
-      const response = await this.agent.sendMessage(userPrompt, { useRag: !!this.rag }); // Pass RAG usage to agent
+      const userPrompt = await this.retryManager.execute(() => this._buildPrompt(context));
+      const response = await this.retryManager.execute(() => 
+        this.agent.sendMessage(userPrompt, { useRag: !!this.rag })
+      );
 
       this.agent.tools = originalTools;
 
       let finalOutput = response;
       if (this.guardrail) {
-        const [ok, validatedOrError] = await this.guardrail(finalOutput);
+        const [ok, validatedOrError] = await this.retryManager.execute(() => this.guardrail(finalOutput));
         if (!ok) throw new Error(`Task "${this.name}" guardrail failed: ${JSON.stringify(validatedOrError)}`);
         finalOutput = validatedOrError;
       }
@@ -96,7 +102,7 @@ class Task {
     let basePrompt = `You are assigned the following task:\n${this.description}\n`;
 
     if (this.rag) {
-      const ragContext = await this.rag.query(this.description); // Retrieve task-specific context
+      const ragContext = await this.rag.query(this.description); // Already retried via RAG's retryManager
       basePrompt += `Retrieved Context:\n${ragContext}\n`;
     }
 

@@ -1,9 +1,11 @@
 // src/rag/RAG.js
 
 const { chunkText } = require('../utils/chunkText');
+const { RetryManager } = require('../utils/RetryManager');
 
 class RAG {
   /**
+   * Initializes a Retrieval-Augmented Generation handler.
    * @param {object} options
    * @param {object} options.adapter - Adapter for generation/embeddings (e.g., OpenAIAdapter).
    * @param {object} [options.vectorStore] - Vector store for retrieval/indexing (e.g., PineconeManager).
@@ -11,8 +13,17 @@ class RAG {
    * @param {number} [options.chunkSize=500] - Size of text chunks for indexing.
    * @param {number} [options.topK=5] - Default number of results to retrieve.
    * @param {string} [options.namespace] - Default namespace for operations.
+   * @param {object} [options.retryManager] - Optional RetryManager instance (defaults to 3 retries).
    */
-  constructor({ adapter, vectorStore, indexName, chunkSize = 500, topK = 5, namespace } = {}) {
+  constructor({ 
+    adapter, 
+    vectorStore, 
+    indexName, 
+    chunkSize = 500, 
+    topK = 5, 
+    namespace, 
+    retryManager = new RetryManager({ retries: 3, baseDelay: 1000, maxDelay: 10000 }) 
+  } = {}) {
     if (!adapter) throw new Error("RAG requires an adapter.");
     if (vectorStore && !indexName) throw new Error("Vector store operations require an indexName.");
     this.adapter = adapter;
@@ -21,6 +32,7 @@ class RAG {
     this.chunkSize = chunkSize;
     this.topK = topK;
     this.namespace = namespace;
+    this.retryManager = retryManager; // New: RetryManager for resilience
   }
 
   /**
@@ -31,12 +43,14 @@ class RAG {
    */
   async query(prompt, options = {}) {
     if (!this.vectorStore) throw new Error("Query requires a vector store.");
-    const context = await this.search(prompt, options);
+    const context = await this.retryManager.execute(() => this.search(prompt, options));
     const fullPrompt = {
       system: options.system || "You are a helpful assistant using provided context.",
       user: `Context:\n${context.join("\n")}\n\nQuery: ${prompt}`,
     };
-    const response = await this.adapter.generateText(fullPrompt, options.adapterOptions || {});
+    const response = await this.retryManager.execute(() => 
+      this.adapter.generateText(fullPrompt, options.adapterOptions || {})
+    );
     return response.message;
   }
 
@@ -48,19 +62,21 @@ class RAG {
    */
   async search(query, options = {}) {
     if (!this.vectorStore) throw new Error("Search requires a vector store.");
-    const embeddings = await this.adapter.embedChunks([query]);
+    const embeddings = await this.retryManager.execute(() => this.adapter.embedChunks([query]));
     const queryVector = embeddings[0].embedding;
-    const results = await this.vectorStore.query({
-      indexName: this.indexName,
-      vector: queryVector,
-      topK: options.topK || this.topK,
-      namespace: options.namespace || this.namespace,
-      filter: options.filter || {}, // Metadata filter
-    });
+    const results = await this.retryManager.execute(() => 
+      this.vectorStore.query({
+        indexName: this.indexName,
+        vector: queryVector,
+        topK: options.topK || this.topK,
+        namespace: options.namespace || this.namespace,
+        filter: options.filter || {},
+      })
+    );
 
     let matches = results.matches.map(match => match.metadata.text);
     if (options.rerank) {
-      matches = await this._rerank(query, matches, options.rerank); // Optional reranking
+      matches = await this.retryManager.execute(() => this._rerank(query, matches, options.rerank));
     }
     return matches;
   }
@@ -81,7 +97,7 @@ class RAG {
    * @param {object} [options] - { namespace, metadata }
    * @returns {Promise<string[]>} - Inserted vector IDs.
    */
-   async index(documents, options = {}) {
+  async index(documents, options = {}) {
     if (!this.vectorStore) throw new Error("Indexing requires a vector store.");
     console.log("Raw documents:", documents);
     const texts = Array.isArray(documents) ? documents : [documents];
@@ -89,47 +105,53 @@ class RAG {
     const validTexts = texts.filter(t => typeof t === 'string' && t.trim().length > 0);
     console.log("Valid texts:", validTexts);
     if (!validTexts.length) throw new Error("No valid text provided for indexing.");
-    
+
     const chunkPromises = validTexts.map(text => this.chunk(text));
     const chunksArray = await Promise.all(chunkPromises);
     const chunks = chunksArray.flat();
     console.log("Chunks before embed:", chunks);
-    
+
     if (!chunks.length || chunks.some(c => typeof c !== 'string' || !c.trim())) {
-    throw new Error("Chunks must be a non-empty array of non-empty strings.");
+      throw new Error("Chunks must be a non-empty array of non-empty strings.");
     }
-    const embeddings = await this.adapter.embedChunks(chunks);
+    const embeddings = await this.retryManager.execute(() => this.adapter.embedChunks(chunks));
     const vectors = embeddings.map((emb, i) => ({
-    id: `${Date.now()}-${i}`,
-    values: emb.embedding,
-    metadata: { text: chunks[i], ...(options.metadata || {}) },
+      id: `${Date.now()}-${i}`,
+      values: emb.embedding,
+      metadata: { text: chunks[i], ...(options.metadata || {}) },
     }));
-    const { insertedIds } = await this.vectorStore.upsert({
-    indexName: options.indexName || this.indexName,
-    vectors,
-    namespace: options.namespace || this.namespace,
-    });
+    const { insertedIds } = await this.retryManager.execute(() => 
+      this.vectorStore.upsert({
+        indexName: options.indexName || this.indexName,
+        vectors,
+        namespace: options.namespace || this.namespace,
+      })
+    );
     return insertedIds;
-   }
+  }
 
   /**
-   * Delete vectors by IDs or namespace.
-   * @param {object} options - { ids, namespace, all }
+   * Delete vectors or an entire namespace.
+   * @param {object} options - { ids, namespace, all, indexName }
    * @returns {Promise<void>}
    */
   async delete(options = {}) {
     if (!this.vectorStore) throw new Error("Deletion requires a vector store.");
     if (options.all) {
-      await this.vectorStore.deleteAll({
-        indexName: options.indexName || this.indexName,
-        namespace: options.namespace || this.namespace,
-      });
+      await this.retryManager.execute(() => 
+        this.vectorStore.deleteAll({
+          indexName: options.indexName || this.indexName,
+          namespace: options.namespace || this.namespace,
+        })
+      );
     } else if (options.ids) {
-      await this.vectorStore.delete({
-        indexName: options.indexName || this.indexName,
-        ids: options.ids,
-        namespace: options.namespace || this.namespace,
-      });
+      await this.retryManager.execute(() => 
+        this.vectorStore.delete({
+          indexName: options.indexName || this.indexName,
+          ids: options.ids,
+          namespace: options.namespace || this.namespace,
+        })
+      );
     } else {
       throw new Error("Delete requires either ids or all: true.");
     }
@@ -137,14 +159,16 @@ class RAG {
 
   /**
    * Create a new index in the vector store.
-   * @param {object} options - { indexName, dimension, metric }
+   * @param {object} options - { indexName, dimension, metric, spec }
    * @returns {Promise<void>}
    */
   async createIndex(options = {}) {
     if (!this.vectorStore) throw new Error("createIndex requires a vector store.");
-    const { indexName, dimension, metric = "cosine" } = options;
+    const { indexName, dimension, metric = "cosine", spec } = options;
     if (!indexName || !dimension) throw new Error("createIndex requires indexName and dimension.");
-    await this.vectorStore.createIndex({ indexName, dimension, metric });
+    await this.retryManager.execute(() => 
+      this.vectorStore.createIndex({ indexName, dimension, metric, spec })
+    );
   }
 
   /**
@@ -153,7 +177,7 @@ class RAG {
    */
   async listIndexes() {
     if (!this.vectorStore) throw new Error("listIndexes requires a vector store.");
-    return await this.vectorStore.listIndexes();
+    return await this.retryManager.execute(() => this.vectorStore.listIndexes());
   }
 
   /**
@@ -165,7 +189,9 @@ class RAG {
     if (!this.vectorStore) throw new Error("updateIndex requires a vector store.");
     const { indexName, replicas, podType } = options;
     if (!indexName) throw new Error("updateIndex requires indexName.");
-    await this.vectorStore.updateIndex({ indexName, replicas, podType });
+    await this.retryManager.execute(() => 
+      this.vectorStore.updateIndex({ indexName, replicas, podType })
+    );
   }
 
   /**
@@ -176,9 +202,8 @@ class RAG {
    * @returns {Promise<string[]>} - Reranked results.
    */
   async _rerank(query, results, strategy = "cosine") {
-    // Placeholder: Implement reranking (e.g., cosine similarity with embeddings)
     console.warn("Reranking not fully implemented—returning original results.");
-    return results; // Future: Add reranking logic with adapter embeddings
+    return results; // Future: Add retry logic here if implemented
   }
 }
 

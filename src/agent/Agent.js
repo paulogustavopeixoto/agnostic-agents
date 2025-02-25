@@ -1,4 +1,6 @@
 // src/agent/Agent.js
+const { RetryManager } = require('../utils/RetryManager');
+
 class Agent {
   /**
    * @param {object} adapter - An instance of your provider adapter (OpenAIAdapter, GeminiAdapter, HFAdapter, etc.)
@@ -8,14 +10,23 @@ class Agent {
    * @param {object} options.defaultConfig - e.g. { model, temperature, maxTokens }
    * @param {string} options.description - Optional system instructions or agent description
    * @param {object} [options.rag] - Optional RAG instance for retrieval-augmented generation
+   * @param {object} [options.retryManager] - Optional RetryManager instance for error handling (defaults to 3 retries)
    */
-  constructor(adapter, { tools = [], memory = null, defaultConfig = {}, description = "", rag = null } = {}) {
+  constructor(adapter, { 
+    tools = [], 
+    memory = null, 
+    defaultConfig = {}, 
+    description = "", 
+    rag = null, 
+    retryManager = new RetryManager({ retries: 3, baseDelay: 1000, maxDelay: 10000 }) 
+  } = {}) {
     this.adapter = adapter;
     this.tools = tools;
     this.memory = memory;
     this.defaultConfig = defaultConfig;
     this.description = description;
-    this.rag = rag; // New: RAG instance for retrieval
+    this.rag = rag;
+    this.retryManager = retryManager; // New: RetryManager for resilience
   }
 
   // Helper to build the system prompt from description and user input
@@ -38,15 +49,23 @@ class Agent {
     const promptObject = this._buildSystemPrompt(userMessage);
 
     let result;
-    if (this.rag && config.useRag !== false) { // Use RAG if present and not explicitly disabled
-      result = await this.rag.query(userMessage, { adapterOptions: finalConfig });
+    if (this.rag && config.useRag !== false) { // Use RAG if present and not disabled
+      result = await this.retryManager.execute(() => 
+        this.rag.query(userMessage, { adapterOptions: finalConfig })
+      );
     } else {
-      result = await this.adapter.generateText(promptObject, { ...finalConfig, tools: this.tools });
+      result = await this.retryManager.execute(() => 
+        this.adapter.generateText(promptObject, { ...finalConfig, tools: this.tools })
+      );
     }
 
     if (!this.rag && result.toolCall) { // Skip tool calls with RAG (handled internally)
-      const toolResult = await this._handleToolCall(result.toolCall);
-      return await this.adapter.generateToolResult(promptObject, result.toolCall, toolResult, finalConfig);
+      const toolResult = await this.retryManager.execute(() => 
+        this._handleToolCall(result.toolCall)
+      );
+      result = await this.retryManager.execute(() => 
+        this.adapter.generateToolResult(promptObject, result.toolCall, toolResult, finalConfig)
+      );
     }
 
     if (this.memory) {
@@ -71,28 +90,34 @@ class Agent {
    * Analyze an image (if the adapter supports it).
    * @param {Buffer|string} imageData - Could be a URL or base64 string
    * @param {object} config - e.g. { prompt, model, temperature }
+   * @returns {Promise<string>} - Image analysis result
    */
   async analyzeImage(imageData, config = {}) {
     const finalConfig = { ...this.defaultConfig, ...config };
     const userPrompt = config.prompt || "Analyze this image.";
     const promptObject = this._buildSystemPrompt(userPrompt);
 
-    return await this.adapter.analyzeImage(imageData, {
-      ...finalConfig,
-      prompt: promptObject,
-    });
+    return await this.retryManager.execute(() => 
+      this.adapter.analyzeImage(imageData, {
+        ...finalConfig,
+        prompt: promptObject,
+      })
+    );
   }
 
   /**
    * Generate an image (text -> image).
    * @param {string} userPrompt - The user's input for image generation
    * @param {object} config - e.g. { model, size, returnBase64 }
+   * @returns {Promise<string|Buffer>} - Generated image (URL or base64)
    */
   async generateImage(userPrompt, config = {}) {
     const finalConfig = { ...this.defaultConfig, ...config };
     const promptObject = this._buildSystemPrompt(userPrompt);
 
-    return await this.adapter.generateImage(promptObject, finalConfig);
+    return await this.retryManager.execute(() => 
+      this.adapter.generateImage(promptObject, finalConfig)
+    );
   }
 }
 
