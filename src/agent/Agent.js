@@ -5,15 +5,17 @@ class Agent {
    * @param {object} options
    * @param {array}  options.tools - If using function calling
    * @param {object} options.memory - Optional memory instance
-   * @param {object} options.defaultConfig - e.g. { model, temperature, maxTokens } 
-   * @param {string} options.description - Optional system instructions or agent description.
+   * @param {object} options.defaultConfig - e.g. { model, temperature, maxTokens }
+   * @param {string} options.description - Optional system instructions or agent description
+   * @param {object} [options.rag] - Optional RAG instance for retrieval-augmented generation
    */
-  constructor(adapter, { tools = [], memory = null, defaultConfig = {}, description = "" } = {}) {
+  constructor(adapter, { tools = [], memory = null, defaultConfig = {}, description = "", rag = null } = {}) {
     this.adapter = adapter;
     this.tools = tools;
     this.memory = memory;
     this.defaultConfig = defaultConfig;
     this.description = description;
+    this.rag = rag; // New: RAG instance for retrieval
   }
 
   // Helper to build the system prompt from description and user input
@@ -26,39 +28,42 @@ class Agent {
   }
 
   /**
-   * Generic text-based prompt method.
+   * Generic text-based prompt method with optional RAG retrieval.
    * @param {string} userMessage - The user's input message
-   * @param {object} config - e.g. { model, temperature, maxTokens }
+   * @param {object} [config] - e.g. { model, temperature, maxTokens, useRag: boolean }
+   * @returns {Promise<string>} - The agent's response
    */
   async sendMessage(userMessage, config = {}) {
     const finalConfig = { ...this.defaultConfig, ...config };
     const promptObject = this._buildSystemPrompt(userMessage);
 
-    const result = await this.adapter.generateText(promptObject, {
-      ...finalConfig,
-      tools: this.tools,
-    });
+    let result;
+    if (this.rag && config.useRag !== false) { // Use RAG if present and not explicitly disabled
+      result = await this.rag.query(userMessage, { adapterOptions: finalConfig });
+    } else {
+      result = await this.adapter.generateText(promptObject, { ...finalConfig, tools: this.tools });
+    }
 
-    if (result.toolCall) {
+    if (!this.rag && result.toolCall) { // Skip tool calls with RAG (handled internally)
       const toolResult = await this._handleToolCall(result.toolCall);
       return await this.adapter.generateToolResult(promptObject, result.toolCall, toolResult, finalConfig);
     }
 
     if (this.memory) {
-      this.memory.store(userMessage, result.message);
+      this.memory.store(userMessage, result);
     }
 
-    return result.message;
+    return result;
   }
 
   /**
    * If the LLM requests a tool call, we find the matching tool and run it.
+   * @param {object} toolCall - Tool call object from adapter
+   * @returns {Promise<any>} - Tool execution result
    */
   async _handleToolCall(toolCall) {
     const toolInstance = this.tools.find((t) => t.name === toolCall.name);
-    if (!toolInstance) {
-      throw new Error(`Tool ${toolCall.name} not found.`);
-    }
+    if (!toolInstance) throw new Error(`Tool ${toolCall.name} not found.`);
     return await toolInstance.call(toolCall.arguments || {});
   }
 
@@ -74,13 +79,12 @@ class Agent {
 
     return await this.adapter.analyzeImage(imageData, {
       ...finalConfig,
-      prompt: promptObject, 
+      prompt: promptObject,
     });
   }
 
   /**
    * Generate an image (text -> image).
-   * e.g., stable diffusion or DALL·E
    * @param {string} userPrompt - The user's input for image generation
    * @param {object} config - e.g. { model, size, returnBase64 }
    */

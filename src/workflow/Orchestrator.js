@@ -1,6 +1,7 @@
 // src/orchestrator/Orchestrator.js
-const { Task } = require("./Task");
 const { Agent } = require("../agent/Agent");
+const { Task } = require("./Task");
+const { RAG } = require("../rag/RAG");
 
 class Orchestrator {
   /**
@@ -11,28 +12,31 @@ class Orchestrator {
    * @param {boolean} [options.verbose=false] - Log execution details
    * @param {string} [options.errorPolicy="throw"] - "throw", "skip", "retry" on task failure
    * @param {number} [options.retries=0] - Number of retries for failed tasks
+   * @param {RAG} [options.rag] - Optional RAG instance for shared retrieval context
    */
-  constructor({ tasks, agents = [], process = "sequential", verbose = false, errorPolicy = "throw", retries = 0 }) {
+  constructor({ tasks, agents = [], process = "sequential", verbose = false, errorPolicy = "throw", retries = 0, rag = null }) {
     this.tasks = tasks || [];
     this.agents = agents;
     this.process = process;
     this.verbose = verbose;
     this.errorPolicy = errorPolicy;
     this.retries = retries;
+    this.rag = rag; // New: Shared RAG instance
     this.results = [];
   }
 
+  /**
+   * Execute all tasks according to the chosen process.
+   * @param {object} [inputs={}] - Initial context or data for tasks
+   * @returns {Promise<object>} - Results with raw final output and task details
+   */
   async kickoff(inputs = {}) {
     this.results = [];
     switch (this.process) {
-      case "sequential":
-        return await this._runSequential(inputs);
-      case "parallel":
-        return await this._runParallel(inputs);
-      case "hierarchical":
-        return await this._runHierarchical(inputs);
-      default:
-        throw new Error(`Unknown process type "${this.process}"`);
+      case "sequential": return await this._runSequential(inputs);
+      case "parallel": return await this._runParallel(inputs);
+      case "hierarchical": return await this._runHierarchical(inputs);
+      default: throw new Error(`Unknown process type "${this.process}"`);
     }
   }
 
@@ -41,11 +45,12 @@ class Orchestrator {
     for (const task of this.tasks) {
       if (this.verbose) console.log(`Running task: ${task.name}`);
       if (!task.agent && this.agents.length) task.agent = this.agents[0];
+      if (this.rag && !task.rag) task.rag = this.rag; // Inject RAG if not set
       task.input = context;
       let output;
       for (let attempt = 0; attempt <= this.retries; attempt++) {
         try {
-          output = await task.run();
+          output = await task.run(context);
           break;
         } catch (error) {
           if (attempt === this.retries) {
@@ -72,6 +77,7 @@ class Orchestrator {
     const executeTask = async (taskEntry) => {
       const { task } = taskEntry;
       if (!task.agent && this.agents.length) task.agent = this.agents[0];
+      if (this.rag && !task.rag) task.rag = this.rag; // Inject RAG if not set
       if (task.dependsOn && task.dependsOn.length) {
         await Promise.all(task.dependsOn.map(depName => {
           const dep = taskMap.get(depName);
@@ -83,7 +89,7 @@ class Orchestrator {
       let output;
       for (let attempt = 0; attempt <= this.retries; attempt++) {
         try {
-          output = await task.run();
+          output = await task.run(inputs);
           break;
         } catch (error) {
           if (attempt === this.retries) {
@@ -113,16 +119,17 @@ class Orchestrator {
     let context = inputs;
 
     for (const task of this.tasks) {
-      if (!task.agent && this.agents.length > 1) task.agent = this.agents[1]; // Manager is 0, worker is 1
+      if (!task.agent && this.agents.length > 1) task.agent = this.agents[1];
+      if (this.rag && !task.rag) task.rag = this.rag; // Inject RAG if not set
       const decisionPrompt = `Current context: ${JSON.stringify(context)}\nTask: ${task.description}\nShould this task run now? (yes/no)`;
-      const decision = await managerAgent.sendMessage(decisionPrompt);
+      const decision = await managerAgent.sendMessage(decisionPrompt, { useRag: !!this.rag });
       if (decision.toLowerCase().includes("yes")) {
         if (this.verbose) console.log(`Manager approved task: ${task.name}`);
         task.input = context;
         let output;
         for (let attempt = 0; attempt <= this.retries; attempt++) {
           try {
-            output = await task.run();
+            output = await task.run(context);
             break;
           } catch (error) {
             if (attempt === this.retries) {
