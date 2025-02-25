@@ -82,13 +82,148 @@ require('dotenv').config();
 
 ## Classes Overview
 
-| Class  | Description |        
-| --------------- | ------------------------------------------------------------------------------------------- |
-| `Agent`  | Core interaction unit—generates responses, handles tools, memory, and RAG queries. |
-| `Task`  | Executes a single task with dependencies, RAG context, and retries—workflow building block. |
-| `Orchestrator`  | Coordinates multiple tasks in sequential, parallel, or hierarchical modes with RAG support. |
-| `RAG`  | Retrieval-Augmented Generation—fetches context from vector stores for enhanced responses. |
-| `Tool`  | Defines callable functions—extends agent capabilities. |
-| `RetryManager`  | Handles retries with exponential backoff—ensures resilience for async operations. |
-| `PineconeManager`  | Vector store integration with Pinecone—persists RAG data externally. |
-| `LocalVectorStore`  | In-memory vector store—lightweight RAG option without external dependencies. |
+| Class | Description |        
+| ----- | ----------- |
+| `Agent` | Core interaction unit—generates responses, handles tools, memory, and RAG queries. |
+| `Task` | Executes a single task with dependencies, RAG context, and retries—workflow building block. |
+| `Orchestrator` | Coordinates multiple tasks in sequential, parallel, or hierarchical modes with RAG support. |
+| `RAG` | Retrieval-Augmented Generation—fetches context from vector stores for enhanced responses. |
+| `Memory` | Stores conversation history—simple context management. |
+| `Tool` | Defines callable functions—extends agent capabilities. |
+| `RetryManager` | Handles retries with exponential backoff—ensures resilience for async operations. |
+| `PineconeManager` | Vector store integration with Pinecone—persists RAG data externally. |
+| `LocalVectorStore` | In-memory vector store—lightweight RAG option without external dependencies. |
+| `OpenAIAdapter` | Integration with OpenAi. |
+| `GeminiAdapter` | Integration with Gemini. |
+| `DeepSeekAdapter` | Integration with DeepSeek. (UNSTABLE) |
+| `AnthropicAdapter` | Integration with Anthropic. |
+| `HFAdapter` | Integration with Hugging Face. |
+
+## API Reference
+
+`Agent`
+
+**Constructor**
+
+```bash
+new Agent(adapter, { tools = [], memory = null, defaultConfig = {}, description = "", rag = null, retryManager = new RetryManager() })
+```
+
+- **adapter**: Provider adapter instance (e.g., OpenAIAdapter).
+- **tools**: Array of Tool instances for function calling.
+- **memory**: Optional Memory instance for conversation context.
+- **defaultConfig**: Config options (e.g., { model, temperature, maxTokens }).
+- **description**: System prompt or agent role description.
+- **rag**: Optional RAG instance for retrieval-augmented generation.
+- **retryManager**: Optional RetryManager for retry logic (defaults to 3 retries).
+
+**Methods**
+
+- `async sendMessage(userMessage, config = {})`
+Sends a message to the agent, using RAG if enabled. Returns the response or tool result.
+        - `userMessage`: String input.
+        - `config`: `{ model, temperature, maxTokens, useRag }`—`useRag` toggles RAG (default: `true` if `rag` present).
+        - Returns: `Promise<string>`.
+
+- `async _handleToolCall(toolCall)`
+Internal—executes a tool call if detected. Returns tool result.
+
+- `async analyzeImage(imageData, config = {})`
+Analyzes an image if supported by the adapter. Returns analysis result.
+        - `imageData`: Buffer or URL/base64 string.
+        - Returns: `Promise<string>`.
+
+- `async generateImage(userPrompt, config = {})`
+Generates an image from text if supported. Returns image data.
+        - Returns: `Promise<string|Buffer>` (e.g., URL or base64).
+
+`Task`
+
+**Constructor**
+
+```bash
+new Task({ description, name, agent, tools, guardrail, input, expectedOutput, dependsOn = [], rag = null, timeout, retries, retryManager = new RetryManager() })
+```
+
+- **description**: Task goal (string).
+- **name**: Optional identifier.
+- **agent**: `Agent` instance to execute the task.
+- **tools**: Array of `Tool` instances (overrides agent tools).
+- **guardrail**: Optional validation function.
+- **input**: Initial data (any).
+- **expectedOutput**: Expected result description.
+- **dependsOn**: Array of task names this depends on.
+- **rag**: Optional `RAG` instance for context.
+- **timeout, retries**: Placeholders (not implemented). (DEPRECATED)
+- **retryManager**: Optional retry logic (defaults to 3 retries).
+
+**Methods**
+
+- `async run(context = {})`
+Executes the task with context from dependencies and RAG. Returns output or throws on failure.
+        - `context`: Object with dependency outputs.
+        - Returns: `Promise<any>`.
+
+- `async _buildPrompt(context = {})`
+Builds the prompt with description, RAG context, dependencies, and input. Returns string.
+
+`Orchestrator`
+
+**Constructor**
+
+```bash
+new Orchestrator({ tasks, agents = [], process = "sequential", verbose = false, errorPolicy = "throw", retries = 0, rag = null })
+```
+
+- **tasks**: Array of `Task` instances.
+- **agents**: Optional pool of agents.
+- **process**: `"sequential"`, `"parallel"`, or `"hierarchical"`.
+- **verbose**: Logs execution details if `true`.
+- **errorPolicy**: `"throw"` or `"skip"` on failure.
+- **retries**: Number of retries (task-level).
+- **rag**: Optional shared `RAG` instance.
+
+**Methods**
+
+- `async kickoff(inputs = {})`
+Executes tasks based on `process`. Returns `{ raw, tasksOutput }`.
+        - `inputs`: Initial context object.
+        - Returns: `Promise<object>`.
+
+
+`RAG`
+
+**Constructor**
+
+```bash
+new RAG({ adapter, vectorStore, indexName, chunkSize = 500, topK = 5, namespace, retryManager = new RetryManager() })
+```
+
+- **adapter**: LLM adapter for embeddings/generation.
+- **vectorStore**: Vector store (e.g., `PineconeManager`, `LocalVectorStore`).
+- **indexName**: Required for vector store operations.
+- **chunkSize, topK, namespace**: RAG config.
+- **retryManager**: Retry logic (defaults to 3 retries).
+
+**Methods**
+
+- `async query(prompt, options = {})`
+Retrieves context and generates a response. Returns string.
+
+- `async search(query, options = {})`
+Retrieves text chunks. Returns `string[]`.
+
+- `chunk(text, chunkSize)`
+Splits text into chunks. Returns `string[]`.
+
+- `async index(documents, options = {})`
+Indexes text into the vector store. Returns `string[]` (IDs).
+
+- `async delete(options = {})`
+Deletes vectors or namespace. Returns void.
+
+- `async listIndexes()`
+Lists all indexes. Returns `string[]`.
+
+- `async updateIndex(options = {})`
+Updates index settings. Returns void.
