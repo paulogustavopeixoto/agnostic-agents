@@ -8,9 +8,9 @@ const { HFAdapter } = require('./src/llm/huggingFace');
 const { AnthropicAdapter } = require('./src/llm/Anthropic');
 const { DeepSeekAdapter } = require('./src/llm/deepSeek');
 const { PineconeManager } = require('./src/db/PineconeManager');
-const { Flow } = require('./src/execution/Flow');
-const { Task } = require('./src/execution/Task');
-const { Orchestrator } = require('./src/execution/Orchestrator');
+const { RAG } = require('./src/rag/RAG');
+const { Task } = require('./src/workflow/Task');
+const { Orchestrator } = require('./src/workflow/Orchestrator');
 const { encodeBase64 } = require('./src/utils');
 const { chunkText } = require('./src/utils');
 const { repairJsonOutput } = require('./src/utils');
@@ -25,7 +25,7 @@ module.exports = {
   HFAdapter,
   DeepSeekAdapter,
   PineconeManager,
-  Flow,
+  RAG,
   Task,
   Orchestrator,
   chunkText,
