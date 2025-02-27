@@ -81,15 +81,18 @@ class OpenAIAdapter {
       size,
     });
 
-    const imageUrl = response.data[0].url;
     if (!returnBase64) {
-      return imageUrl;
+      return response.data.map(img => img.url);
     }
 
     const axios = (await import("axios")).default;
-    const imageResponse = await axios.get(imageUrl, { responseType: "arraybuffer" });
-    const base64 = Buffer.from(imageResponse.data, "binary").toString("base64");
-    return `data:image/png;base64,${base64}`;
+    const base64Array = [];
+    for (const image of response.data) {
+      const imageResponse = await axios.get(image.url, { responseType: "arraybuffer" });
+      const base64 = Buffer.from(imageResponse.data, "binary").toString("base64");
+      base64Array.push(`data:image/png;base64,${base64}`);
+    }
+    return base64Array;
   }
 
   async analyzeImage(imageData, config = {}) {
