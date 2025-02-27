@@ -72,12 +72,12 @@ class OpenAIAdapter {
     return choice.content;
   }
 
-  async generateImage(promptObject, { model = "dall-e-3", size = "1024x1024", returnBase64 = false } = {}) {
+  async generateImage(promptObject, { model = "dall-e-3", size = "1024x1024", returnBase64 = false, n = 1 } = {}) {
     const prompt = `${promptObject.system ? `${promptObject.system}\n` : ""}${promptObject.context}${promptObject.user || ""}`.trim();
     const response = await this.openai.images.generate({
       model,
       prompt,
-      n: 1,
+      n,
       size,
     });
 
