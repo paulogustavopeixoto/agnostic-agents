@@ -51,7 +51,7 @@ class RAG {
     const response = await this.retryManager.execute(() => 
       this.adapter.generateText(fullPrompt, options.adapterOptions || {})
     );
-    return response.message;
+    return response;
   }
 
   /**

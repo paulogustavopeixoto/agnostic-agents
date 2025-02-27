@@ -63,9 +63,10 @@ class Agent {
       const toolResult = await this.retryManager.execute(() => 
         this._handleToolCall(result.toolCall)
       );
-      result = await this.retryManager.execute(() => 
+      const toolCompletion = await this.retryManager.execute(() => 
         this.adapter.generateToolResult(promptObject, result.toolCall, toolResult, finalConfig)
       );
+      result = { message: toolCompletion };
     }
 
     if (this.memory) {
