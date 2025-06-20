@@ -41,7 +41,7 @@ async function repairJsonOutput(agent, rawOutput) {
   `.trim();
 
   // The agent's .generateText() (or .sendMessage()) returns a string
-  const repairResponse = await agent.generateText(repairPrompt);
+  const repairResponse = await agent.sendMessage(repairPrompt);
   const repairedCleaned = removeJsonCodeFence(repairResponse);
 
   // 4) Second attempt: parse the repaired JSON

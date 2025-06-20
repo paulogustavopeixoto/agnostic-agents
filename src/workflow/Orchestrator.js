@@ -45,7 +45,7 @@ class Orchestrator {
     for (const task of this.tasks) {
       if (this.verbose) console.log(`Running task: ${task.name}`);
       if (!task.agent && this.agents.length) task.agent = this.agents[0];
-      if (this.rag && !task.rag) task.rag = this.rag; // Inject RAG if not set
+      if (this.rag && !task.rag) task.rag = this.rag; 
       task.input = context;
       let output;
       for (let attempt = 0; attempt <= this.retries; attempt++) {
