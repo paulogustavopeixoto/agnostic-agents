@@ -2,6 +2,8 @@
 const { Agent } = require("../agent/Agent");
 const { RAG } = require("../rag/RAG");
 const { RetryManager } = require('../utils/RetryManager');
+const { Tool } = require('../agent/Tool');
+const { MCPTool } = require('../tools/MCPTool');
 
 class Task {
   /**
@@ -31,12 +33,17 @@ class Task {
     rag = null,
     timeout,
     retries,
-    retryManager = new RetryManager({ retries: 3, baseDelay: 1000, maxDelay: 10000 })
+    retryManager = new RetryManager({ retries: 3, baseDelay: 1000, maxDelay: 10000 }),
+    mcpClient = null
   }) {
     this.name = name || "untitledTask";
     this.description = description;
     this.agent = agent;
-    this.tools = tools || [];
+    this.tools = tools.map(tool => {
+      if (tool instanceof Tool) return tool; // Includes MCPTool
+      if (tool.mcpConfig) return new MCPTool({ ...tool.mcpConfig, mcpClient });
+      return new Tool(tool);
+    });
     this.guardrail = guardrail;
     this.input = input;
     this.expectedOutput = expectedOutput;

@@ -14,9 +14,15 @@ class Orchestrator {
    * @param {number} [options.retries=0] - Number of retries for failed tasks
    * @param {RAG} [options.rag] - Optional RAG instance for shared retrieval context
    */
-  constructor({ tasks, agents = [], process = "sequential", verbose = false, errorPolicy = "throw", retries = 0, rag = null }) {
-    this.tasks = tasks || [];
-    this.agents = agents;
+  constructor({ tasks, agents = [], process = "sequential", verbose = false, errorPolicy = "throw", retries = 0, rag = null, mcpClient = null }) {
+    this.tasks = tasks.map(task => {
+      if (mcpClient && !task.mcpClient) task.mcpClient = mcpClient;
+      return task;
+    });
+    this.agents = agents.map(agent => {
+      if (mcpClient && !agent.mcpClient) agent.mcpClient = mcpClient;
+      return agent;
+    });
     this.process = process;
     this.verbose = verbose;
     this.errorPolicy = errorPolicy;
