@@ -29,6 +29,14 @@ class BaseProvider {
   async embedChunks(chunks, options) {
     throw new Error('embedChunks not implemented');
   }
+
+  async transcribeAudio(audioData, config = {}) {
+    throw new Error('transcribeAudio must be implemented by subclass');
+  }
+
+  async generateAudio(text, config = {}) {
+    throw new Error('generateAudio must be implemented by subclass');
+  }
 }
 
 module.exports = { BaseProvider };
