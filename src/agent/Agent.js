@@ -55,33 +55,43 @@ class Agent {
   async sendMessage(userMessage, config = {}) {
     const finalConfig = { ...this.defaultConfig, ...config };
     const promptObject = this._buildSystemPrompt(userMessage);
-
+    let messages = [
+      { role: 'system', content: promptObject.system },
+      { role: 'user', content: promptObject.context + promptObject.user }
+    ];
     let result;
-    if (this.rag && config.useRag !== false) { // Use RAG if present and not disabled
-      result = await this.retryManager.execute(() => 
-        this.rag.query(userMessage, { adapterOptions: finalConfig })
-      );
-    } else {
-      result = await this.retryManager.execute(() => 
-        this.adapter.generateText(promptObject, { ...finalConfig, tools: this.tools })
-      );
-    }
+    while (true) {
+      if (this.rag && config.useRag !== false) {
+        result = await this.retryManager.execute(() =>
+          this.rag.query(userMessage, { adapterOptions: finalConfig })
+        );
+      } else {
+        result = await this.retryManager.execute(() =>
+          this.adapter.generateText(promptObject, { ...finalConfig, tools: this.tools })
+        );
+      }
 
-    if (!this.rag && result.toolCall) { // Skip tool calls with RAG (handled internally)
-      const toolResult = await this.retryManager.execute(() => 
+      if (!result.toolCall || this.rag) break;
+
+      const toolResult = await this.retryManager.execute(() =>
         this._handleToolCall(result.toolCall)
       );
-      const toolCompletion = await this.retryManager.execute(() => 
-        this.adapter.generateToolResult(promptObject, result.toolCall, toolResult, finalConfig)
+      messages.push(
+        {
+          role: 'assistant',
+          content: '',
+          function_call: { name: result.toolCall.name, arguments: JSON.stringify(result.toolCall.arguments) }
+        },
+        { role: 'function', name: result.toolCall.name, content: JSON.stringify(toolResult) }
       );
-      result = { message: toolCompletion };
+      promptObject.user += `\nTool ${result.toolCall.name} result: ${JSON.stringify(toolResult)}`;
     }
 
     if (this.memory) {
       this.memory.store(userMessage, result);
     }
 
-    return result;
+    return result.message || result;
   }
 
   /**
