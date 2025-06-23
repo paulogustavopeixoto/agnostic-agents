@@ -1,85 +1,168 @@
-// src/providers/huggingFace.js
+// src/llm/huggingFace.js
 const { HfInference } = require('@huggingface/inference');
+const { BaseProvider } = require('./BaseProvider');
 
-class HFAdapter {
+class HFAdapter extends BaseProvider {
   /**
    * @param {string} apiKey - Hugging Face API key
    * @param {object} options - Model selection options
+   * @param {string} [options.textModel] - e.g., "mistralai/Mixtral-8x7B-Instruct-v0.1"
+   * @param {string} [options.visionModel] - e.g., "Salesforce/blip-image-captioning-base"
+   * @param {string} [options.imageGenModel] - e.g., "black-forest-labs/Flux.1-dev"
+   * @param {number} [options.maxRetries=3] - Number of retries (passed to RetryManager)
    */
   constructor(apiKey, options = {}) {
+    super(options); // Initialize BaseProvider with retryManager
     this.apiKey = apiKey;
     this.inference = new HfInference(apiKey);
-    this.textModel = options.textModel || "mistralai/Mixtral-8x7B-Instruct-v0.1"; // Updated to a current model
-    this.visionModel = options.visionModel || "Salesforce/blip-image-captioning-base"; // Better default for image-to-text
+    this.textModel = options.textModel || "mistralai/Mixtral-8x7B-Instruct-v0.1";
+    this.visionModel = options.visionModel || "Salesforce/blip-image-captioning-base";
     this.imageGenModel = options.imageGenModel || "black-forest-labs/Flux.1-dev";
   }
 
   /**
-   * Generate text (no native function calling support).
+   * Generate text with simulated tool calling via prompt instructions.
+   * @param {object|array} promptObject - Prompt object {system, context, user} or message array
+   * @param {object} options - {model, temperature, tools, maxTokens}
+   * @returns {Promise<object>} - {message: string, toolCalls?: array}
    */
-  async generateText(promptObject, { temperature = 0.7, maxNewTokens = 12000, tools = [] } = {}) {
-    const fullPrompt = `${promptObject.system ? `${promptObject.system}\n` : ""}${promptObject.context}${promptObject.user || ""}`.trim();
+  async generateText(promptObject, { model, temperature = 0.7, tools = [], maxTokens = 12000 } = {}) {
+    return await this.retryManager.execute(async () => {
+      const messages = Array.isArray(promptObject) ? promptObject : [
+        ...(promptObject.system ? [{ role: "system", content: promptObject.system }] : []),
+        ...(promptObject.context ? [{ role: "user", content: promptObject.context }] : []),
+        ...(promptObject.user ? [{ role: "user", content: promptObject.user }] : [])
+      ];
 
-    // Hugging Face doesn’t natively support function calling via tools
-    // Tools are ignored; use prompt-based instructions instead
-    if (tools.length > 0) {
-      console.warn("HFAdapter: Tools are not natively supported. Use prompt instructions for function-like behavior.");
-    }
+      let fullPrompt = messages.map(msg => `${msg.role === "system" ? "System" : "User"}: ${msg.content}`).join("\n");
+      if (tools.length > 0) {
+        const toolDescriptions = tools.map(t => JSON.stringify(t.toOpenAIFunction())).join("\n");
+        fullPrompt += `\nAvailable Tools:\n${toolDescriptions}\nTo call a tool, respond with JSON: {"toolCall": {"name": "tool_name", "arguments": {...}, "id": "tool_use_<timestamp>"}}`;
+      }
 
-    const result = await this.inference.textGeneration({
-      model: this.textModel,
-      inputs: fullPrompt,
-      parameters: {
-        max_new_tokens: maxNewTokens,
-        temperature,
-      },
+      const result = await this.inference.textGeneration({
+        model: model || this.textModel,
+        inputs: fullPrompt,
+        parameters: { max_new_tokens: maxTokens, temperature },
+      });
+
+      try {
+        const parsed = JSON.parse(result.generated_text);
+        if (parsed.toolCall) {
+          return {
+            message: "",
+            toolCalls: [{ ...parsed.toolCall, id: parsed.toolCall.id || `tool_use_${Date.now()}` }]
+          };
+        }
+      } catch (err) {
+        // Not a JSON tool call; return as text
+        console.warn("HFAdapter: Failed to parse tool call response; treating as text:", err.message);
+      }
+      return { message: result.generated_text };
     });
-    return { message: result.generated_text };
   }
 
   /**
-   * Second pass for tool results via prompt injection.
+   * Handle a second pass for tool call results via prompt injection.
+   * @param {object|array} promptObject - Prompt object or message array
+   * @param {object} toolCall - Tool call details {name, arguments, id}
+   * @param {any} toolResult - Tool execution result
+   * @param {object} config - {model, temperature, maxTokens}
+   * @returns {Promise<string>} - Final response
    */
   async generateToolResult(promptObject, toolCall, toolResult, config = {}) {
-    const fullPrompt = `${promptObject.system ? `${promptObject.system}\n` : ""}${promptObject.context}${promptObject.user || ""}`.trim();
-    const toolPrompt = `${fullPrompt}\n\nTool ${toolCall.name} returned: ${JSON.stringify(toolResult)}\nPlease continue.`;
-    const result = await this.inference.textGeneration({
-      model: this.textModel,
-      inputs: toolPrompt,
-      parameters: {
-        max_new_tokens: config.maxNewTokens || 12000,
-        temperature: config.temperature || 0.7,
-      },
+    return await this.retryManager.execute(async () => {
+      const messages = Array.isArray(promptObject) ? promptObject : [
+        ...(promptObject.system ? [{ role: "system", content: promptObject.system }] : []),
+        ...(promptObject.context ? [{ role: "user", content: promptObject.context }] : []),
+        ...(promptObject.user ? [{ role: "user", content: promptObject.user }] : []),
+        {
+          role: "assistant",
+          content: JSON.stringify({ toolCall: { name: toolCall.name, arguments: toolCall.arguments, id: toolCall.id } })
+        },
+        {
+          role: "function",
+          content: JSON.stringify(toolResult)
+        }
+      ];
+
+      const fullPrompt = messages.map(msg => `${msg.role === "system" ? "System" : msg.role === "function" ? "Tool Result" : "User"}: ${msg.content}`).join("\n") +
+        "\nPlease provide a final answer using the tool result.";
+
+      const result = await this.inference.textGeneration({
+        model: config.model || this.textModel,
+        inputs: fullPrompt,
+        parameters: {
+          max_new_tokens: config.maxTokens || 12000,
+          temperature: config.temperature || 0.7,
+        },
+      });
+      return result.generated_text;
     });
-    return result.generated_text;
   }
 
   /**
-   * Generate an image using a text-to-image model (e.g., Stable Diffusion).
+   * Generate an image using a text-to-image model (e.g., Flux.1).
+   * @param {object|array} promptObject - Prompt object or message array
+   * @param {object} config - {model, maxTokens}
+   * @returns {Promise<Buffer|string>} - Image as Buffer or base64
    */
   async generateImage(promptObject, config = {}) {
-    const fullPrompt = `${promptObject.system ? `${promptObject.system}\n` : ""}${promptObject.context}${promptObject.user || ""}`.trim();
-    const result = await this.inference.textToImage({
-      model: this.imageGenModel,
-      inputs: fullPrompt,
+    return await this.retryManager.execute(async () => {
+      const prompt = Array.isArray(promptObject)
+        ? promptObject.filter(msg => msg.role === "user").map(msg => msg.content).join("\n")
+        : `${promptObject.system ? `${promptObject.system}\n` : ""}${promptObject.context}${promptObject.user || ""}`.trim();
+
+      const result = await this.inference.textToImage({
+        model: config.model || this.imageGenModel,
+        inputs: prompt,
+      });
+      return result; // Buffer or base64
     });
-    // Result is typically a Buffer or base64 string
-    return result; // Caller can handle as Buffer or base64
   }
 
   /**
    * Analyze an image using an image-to-text model (e.g., BLIP).
+   * @param {string|Buffer} imageData - URL, base64, or Buffer
+   * @param {object} config - {prompt, model, maxTokens}
+   * @returns {Promise<string>} - Image analysis result
    */
   async analyzeImage(imageData, config = {}) {
-    const promptObject = config.prompt || { user: "Describe this image." };
-    const fullPrompt = `${promptObject.system ? `${promptObject.system}\n` : ""}${promptObject.context}${promptObject.user || "Describe this image."}`.trim();
-    const result = await this.inference.imageToText({
-      model: this.visionModel,
-      data: imageData,
-      parameters: { prompt: fullPrompt }, // Pass prompt if supported by model
+    return await this.retryManager.execute(async () => {
+      const promptObject = config.prompt || { user: "Describe this image." };
+      const prompt = Array.isArray(promptObject)
+        ? promptObject.filter(msg => msg.role === "user").map(msg => msg.content).join("\n")
+        : `${promptObject.system ? `${promptObject.system}\n` : ""}${promptObject.context}${promptObject.user || "Describe this image."}`.trim();
+
+      const result = await this.inference.imageToText({
+        model: config.model || this.visionModel,
+        data: imageData,
+        parameters: { prompt },
+      });
+      return result[0]?.generated_text || "No description generated.";
     });
-    // Result is typically an array like [{ generated_text: "..." }]
-    return result[0]?.generated_text || "No description generated.";
+  }
+
+  /**
+   * Generate embeddings for text chunks.
+   * @param {string[]} chunks - Array of text chunks
+   * @param {object} options - {model}
+   * @returns {Promise<object[]>} - Array of embedding objects
+   */
+  async embedChunks(chunks, { model = "sentence-transformers/all-MiniLM-L6-v2" } = {}) {
+    if (!Array.isArray(chunks) || !chunks.length || chunks.some(c => typeof c !== 'string' || !c.trim())) {
+      throw new Error("embedChunks requires a non-empty array of non-empty strings.");
+    }
+    return await this.retryManager.execute(async () => {
+      const embeddings = await Promise.all(chunks.map(async (chunk) => {
+        const result = await this.inference.featureExtraction({
+          model,
+          inputs: chunk
+        });
+        return result;
+      }));
+      return embeddings;
+    });
   }
 }
 
