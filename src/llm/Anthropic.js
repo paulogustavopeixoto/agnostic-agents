@@ -1,5 +1,6 @@
 // src/providers/Anthropic.js
 const { Anthropic } = require('@anthropic-ai/sdk');
+const { RetryManager } = require('../utils/RetryManager');
 
 class AnthropicAdapter {
   /**
@@ -17,6 +18,11 @@ class AnthropicAdapter {
       timeout: options.timeout || 600000,
     });
     this.model = options.model || 'claude-3-5-sonnet-20240620'; // Updated default to a current model
+    this.retryManager = options.retryManager || new RetryManager({
+      retries: options.maxRetries || 3, // Align with library default
+      baseDelay: 1000,
+      maxDelay: 10000
+    });
   }
 
   /**
@@ -24,40 +30,42 @@ class AnthropicAdapter {
    */
   async generateText(promptObject, { model, temperature = 1, tools = [] } = {}) {
     const anthropicTools = tools.map((tool) => tool.toAnthropicTool());
-
-    const messages = [];
-    if (promptObject.context) messages.push({ role: "user", content: promptObject.context });
-    if (promptObject.user) messages.push({ role: "user", content: promptObject.user });
+    let messages = Array.isArray(promptObject) ? promptObject : [];
+    if (!Array.isArray(promptObject)) {
+      if (promptObject.context) messages.push({ role: "user", content: promptObject.context });
+      if (promptObject.user) messages.push({ role: "user", content: promptObject.user });
+    }
 
     const params = {
       model: model || this.model,
-      system: promptObject.system || undefined, // Use native system parameter
+      system: Array.isArray(promptObject) ? undefined : promptObject.system || undefined,
       messages,
       max_tokens: 1024,
       temperature,
       tools: anthropicTools.length > 0 ? anthropicTools : undefined,
     };
 
-    const response = await this.client.messages.create(params);
+    const response = await this.retryManager.execute(() => this.client.messages.create(params));
 
     let textContent = '';
-    let toolCall = null;
+    const toolCalls = [];
 
     if (Array.isArray(response.content)) {
       for (const block of response.content) {
         if (block.type === 'text') {
           textContent += block.text;
         } else if (block.type === 'tool_use') {
-          toolCall = {
+          toolCalls.push({
             name: block.name,
-            arguments: block.arguments,
-          };
+            arguments: block.input,
+            id: block.id
+          });
         }
       }
     }
 
-    if (toolCall) {
-      return { message: '', toolCall };
+    if (toolCalls.length > 0) {
+      return { message: '', toolCalls }; // Return array of tool calls
     }
     return { message: textContent.trim() };
   }

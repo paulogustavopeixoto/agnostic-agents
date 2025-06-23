@@ -53,7 +53,6 @@ class Tool {
   
     /**
      * Convert this tool’s definition to Gemini-style function declaration.
-     * This is just conceptual. You’d adapt it to match Google Generative AI’s format.
      */
     toGeminiFunctionDeclaration() {
       return {

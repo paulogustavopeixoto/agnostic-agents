@@ -55,11 +55,12 @@ class Agent {
   async sendMessage(userMessage, config = {}) {
     const finalConfig = { ...this.defaultConfig, ...config };
     const promptObject = this._buildSystemPrompt(userMessage);
-    let messages = [
+    let messages = Array.isArray(promptObject) ? promptObject : [
       { role: 'system', content: promptObject.system },
       { role: 'user', content: promptObject.context + promptObject.user }
     ];
     let result;
+
     while (true) {
       if (this.rag && config.useRag !== false) {
         result = await this.retryManager.execute(() =>
@@ -71,20 +72,23 @@ class Agent {
         );
       }
 
-      if (!result.toolCall || this.rag) break;
+      if (!result.toolCalls?.length && !result.toolCall) break;
 
-      const toolResult = await this.retryManager.execute(() =>
-        this._handleToolCall(result.toolCall)
-      );
-      messages.push(
-        {
-          role: 'assistant',
-          content: '',
-          function_call: { name: result.toolCall.name, arguments: JSON.stringify(result.toolCall.arguments) }
-        },
-        { role: 'function', name: result.toolCall.name, content: JSON.stringify(toolResult) }
-      );
-      promptObject.user += `\nTool ${result.toolCall.name} result: ${JSON.stringify(toolResult)}`;
+      const toolCalls = result.toolCalls || [result.toolCall];
+      for (const toolCall of toolCalls) {
+        const toolResult = await this.retryManager.execute(() =>
+          this._handleToolCall(toolCall)
+        );
+        messages.push(
+          {
+            role: 'assistant',
+            content: '',
+            function_call: { name: toolCall.name, arguments: JSON.stringify(toolCall.arguments) }
+          },
+          { role: 'function', name: toolCall.name, content: JSON.stringify(toolResult) }
+        );
+        promptObject.user += `\nTool ${toolCall.name} result: ${JSON.stringify(toolResult)}`;
+      }
     }
 
     if (this.memory) {
