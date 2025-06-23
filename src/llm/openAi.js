@@ -163,17 +163,53 @@ class OpenAIAdapter extends BaseProvider {
         throw new Error("Unsupported imageData format. Must be a URL, base64 string, or Buffer.");
       }
 
-      const messages = Array.isArray(promptObject) ? promptObject : [
-        ...(promptObject.system ? [{ role: "system", content: promptObject.system }] : []),
-        ...(promptObject.context ? [{ role: "user", content: promptObject.context }] : []),
-        {
+      // Build messages array
+      const messages = [];
+      if (Array.isArray(promptObject)) {
+        // Extract text content from prompt messages
+        for (const msg of promptObject) {
+          if (msg.role === "system") {
+            messages.push({ role: "system", content: msg.content });
+          } else if (msg.role === "user") {
+            messages.push({
+              role: "user",
+              content: [
+                { type: "text", text: typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content) },
+              ],
+            });
+          }
+        }
+      } else {
+        // Handle object-based prompt
+        if (promptObject.system) {
+          messages.push({ role: "system", content: promptObject.system });
+        }
+        if (promptObject.context) {
+          messages.push({ role: "user", content: [{ type: "text", text: promptObject.context }] });
+        }
+        messages.push({
           role: "user",
           content: [
             { type: "text", text: promptObject.user || "What's in this image?" },
+          ],
+        });
+      }
+
+      // Add image to the last user message
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage.role === "user") {
+        lastMessage.content.push({
+          type: "image_url",
+          image_url: { url: dataUrl, detail: "high" },
+        });
+      } else {
+        messages.push({
+          role: "user",
+          content: [
             { type: "image_url", image_url: { url: dataUrl, detail: "high" } },
           ],
-        }
-      ];
+        });
+      }
 
       const response = await this.openai.chat.completions.create({
         model,

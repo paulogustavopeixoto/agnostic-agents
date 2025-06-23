@@ -16,6 +16,7 @@ const { RetryManager } = require('./src/utils');
 const { encodeBase64 } = require('./src/utils');
 const { chunkText } = require('./src/utils');
 const { repairJsonOutput } = require('./src/utils');
+const { MCPTool } = require('./src/tools/MCPTool');
 
 module.exports = {
   Agent,
@@ -35,4 +36,5 @@ module.exports = {
   chunkText,
   repairJsonOutput,
   encodeBase64,
+  MCPTool
 };
