@@ -1,5 +1,7 @@
 // src/agent/Agent.js
 const { RetryManager } = require('../utils/RetryManager');
+const { Tool } = require('./Tool');
+const { MCPTool } = require('../tools/MCPTool');
 
 class Agent {
   /**
@@ -18,15 +20,21 @@ class Agent {
     defaultConfig = {}, 
     description = "", 
     rag = null, 
-    retryManager = new RetryManager({ retries: 3, baseDelay: 1000, maxDelay: 10000 }) 
+    retryManager = new RetryManager({ retries: 3, baseDelay: 1000, maxDelay: 10000 }),
+    mcpClient = null
   } = {}) {
     this.adapter = adapter;
-    this.tools = tools;
+    this.tools = tools.map(tool => {
+      if (tool instanceof Tool) return tool; // Includes MCPTool
+      if (tool.mcpConfig) return new MCPTool({ ...tool.mcpConfig, mcpClient });
+      return new Tool(tool); // Fallback for plain objects
+    });
     this.memory = memory;
     this.defaultConfig = defaultConfig;
     this.description = description;
     this.rag = rag;
-    this.retryManager = retryManager; // New: RetryManager for resilience
+    this.retryManager = retryManager;
+    this.mcpClient = mcpClient;
   }
 
   // Helper to build the system prompt from description and user input
