@@ -8,11 +8,7 @@ class OpenAIAdapter {
   }
 
   async generateText(promptObject, { model = "gpt-4o-mini", temperature = 0.7, tools = [] } = {}) {
-    const openAIFunctions = tools.map((tool) => ({
-      name: tool.name,
-      description: tool.description,
-      parameters: tool.parameters,
-    }));
+    const openAIFunctions = tools.map(tool => tool.toOpenAIFunction());
 
     const messages = [];
     if (promptObject.system) messages.push({ role: "system", content: promptObject.system });

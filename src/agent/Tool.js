@@ -41,13 +41,13 @@ class Tool {
      * Providers can interpret `strict` or other fields as needed.
      */
     toOpenAIFunction() {
+      if (!this.parameters || typeof this.parameters !== 'object') {
+        throw new Error(`Invalid parameters for tool ${this.name}`);
+      }
       return {
         name: this.name,
         description: this.description,
-        parameters: this.parameters,
-        // "strict" is an OpenAI 2023-06 function-calling feature.
-        // If needed, you can handle it like:
-        // "strict": this.strict
+        parameters: this.parameters
       };
     }
   
