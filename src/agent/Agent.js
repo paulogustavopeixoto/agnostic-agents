@@ -168,6 +168,40 @@ class Agent {
       this.adapter.generateAudio(text, finalConfig)
     );
   }
+
+  /**
+   * Analyze a video and generate a description (if the adapter supports it).
+   * @param {Buffer|string} videoData - Video data as a Buffer, URL, or file path
+   * @param {object} [config] - Configuration options {model, prompt, maxTokens}
+   * @returns {Promise<string>} - Video description text
+   */
+  async analyzeVideo(videoData, config = {}) {
+    const finalConfig = { ...this.defaultConfig, ...config };
+    const userPrompt = config.prompt || "Describe this video.";
+    const promptObject = this._buildSystemPrompt(userPrompt);
+
+    return await this.retryManager.execute(() =>
+      this.adapter.analyzeVideo(videoData, {
+        ...finalConfig,
+        prompt: promptObject,
+      })
+    );
+  }
+
+  /**
+   * Generate a video from text (if the adapter supports it).
+   * @param {string} text - Text prompt for video generation
+   * @param {object} [config] - Configuration options {model, format, duration}
+   * @returns {Promise<Buffer|string>} - Video data as a Buffer or URL
+   */
+  async generateVideo(text, config = {}) {
+    const finalConfig = { ...this.defaultConfig, ...config };
+    const promptObject = this._buildSystemPrompt(text);
+
+    return await this.retryManager.execute(() =>
+      this.adapter.generateVideo(promptObject.user, finalConfig)
+    );
+  }
 }
 
 module.exports = { Agent };

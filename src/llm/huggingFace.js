@@ -164,6 +164,74 @@ class HFAdapter extends BaseProvider {
       return embeddings;
     });
   }
+
+  async transcribeAudio(audioData, config = {}) {
+    throw new Error('Audio transcription not supported by HuggingFaceAdapter');
+  }
+
+  async generateAudio(text, config = {}) {
+    throw new Error('Audio generation not supported by HuggingFaceAdapter');
+  }
+
+  /**
+   * Analyze a video and generate a description.
+   * @param {Buffer|string} videoData - Video data as a Buffer, URL, or file path
+   * @param {object} [options] - Configuration options {model, prompt, maxTokens}
+   * @returns {Promise<string>} - Video description text
+   */
+  async analyzeVideo(videoData, config = {}) {
+    return await this.retryManager.execute(async () => {
+      const model = config.model || 'microsoft/git-large-videocaption'; // Hypothetical model
+      const promptObject = config.prompt || { user: 'Describe this video.' };
+      let data;
+
+      if (Buffer.isBuffer(videoData)) {
+        const tempPath = path.join(__dirname, `temp-video-${Date.now()}.mp4`);
+        fs.writeFileSync(tempPath, videoData);
+        data = fs.readFileSync(tempPath);
+        fs.unlinkSync(tempPath);
+      } else if (typeof videoData === 'string') {
+        if (videoData.startsWith('http') || videoData.startsWith('file://')) {
+          const response = await fetch(videoData);
+          data = Buffer.from(await response.arrayBuffer());
+        } else {
+          const ext = path.extname(videoData).toLowerCase().slice(1);
+          const supportedFormats = ['mp4', 'avi', 'mov', 'webm'];
+          if (!supportedFormats.includes(ext)) {
+            throw new Error(`Unsupported file format: ${ext}. Supported formats: ${supportedFormats.join(', ')}`);
+          }
+          data = fs.readFileSync(videoData);
+        }
+      } else {
+        throw new Error('Unsupported videoData format. Must be a URL, file path, or Buffer.');
+      }
+
+      const response = await fetch(`${this.baseUrl}/${model}`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+        body: data,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Hugging Face API error: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      return result[0]?.generated_text || promptObject.user;
+    });
+  }
+
+  /**
+   * Generate a video from text.
+   * @param {string} text - Text prompt for video generation
+   * @param {object} [options] - Configuration options {model, format, duration}
+   * @returns {Promise<Buffer|string>} - Video data as a Buffer or URL
+   */
+  async generateVideo(text, config = {}) {
+    throw new Error('Video generation not supported by HuggingFaceAdapter');
+  }
 }
 
 module.exports = { HFAdapter };

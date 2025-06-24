@@ -314,6 +314,26 @@ class OpenAIAdapter extends BaseProvider {
       return buffer;
     });
   }
+
+  /**
+   * Analyze a video and generate a description.
+   * @param {Buffer|string} videoData - Video data as a Buffer, URL, or file path
+   * @param {object} [options] - Configuration options {model, prompt, maxTokens}
+   * @returns {Promise<string>} - Video description text
+   */
+  async analyzeVideo(videoData, config = {}) {
+    throw new Error('Video analysis not supported by OpenAIAdapter');
+  }
+
+  /**
+   * Generate a video from text.
+   * @param {string} text - Text prompt for video generation
+   * @param {object} [options] - Configuration options {model, format, duration}
+   * @returns {Promise<Buffer|string>} - Video data as a Buffer or URL
+   */
+  async generateVideo(text, config = {}) {
+    throw new Error('Video generation not supported by OpenAIAdapter');
+  }
 }
 
 module.exports = { OpenAIAdapter };

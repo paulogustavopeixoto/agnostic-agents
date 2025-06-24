@@ -131,31 +131,118 @@ class GeminiAdapter extends BaseProvider {
     return response;
   }
 
-  async transcribeAudio(audioData, config = {}) {
+  /**
+   * Analyze a video and generate a description.
+   * @param {Buffer|string} videoData - Video data as a Buffer, URL, or file path
+   * @param {object} [options] - Configuration options {model, prompt, maxTokens}
+   * @returns {Promise<string>} - Video description text
+   */
+  async analyzeVideo(videoData, config = {}) {
     return await this.retryManager.execute(async () => {
-      const modelName = config.model || this.model;
-      const model = this.genAI.getGenerativeModel({ model: modelName });
+      const model = this.genAI.getGenerativeModel({ model: config.model || this.model });
+      const promptObject = config.prompt || { user: 'Describe this video.' };
+      const maxTokens = config.maxTokens || 1024;
+      const supportedFormats = ['mp4', 'mov', 'mpeg', 'avi', 'webm'];
+      let videoContent;
 
-      let audioContent;
-      if (Buffer.isBuffer(audioData)) {
-        audioContent = { inlineData: { mimeType: 'audio/wav', data: audioData.toString('base64') } };
-      } else if (typeof audioData === 'string' && (audioData.startsWith('http') || audioData.startsWith('file://'))) {
-        audioContent = { fileData: { uri: audioData, mimeType: 'audio/wav' } };
+      if (Buffer.isBuffer(videoData)) {
+        const tempPath = path.join(__dirname, `temp-video-${Date.now()}.mp4`);
+        fs.writeFileSync(tempPath, videoData);
+        videoContent = {
+          fileData: {
+            fileUri: `file://${tempPath}`,
+            mimeType: 'video/mp4',
+          },
+        };
+        fs.unlinkSync(tempPath);
+      } else if (typeof videoData === 'string') {
+        if (videoData.startsWith('http') || videoData.startsWith('file://')) {
+          videoContent = {
+            fileData: {
+              fileUri: videoData,
+              mimeType: 'video/mp4',
+            },
+          };
+        } else {
+          const ext = path.extname(videoData).toLowerCase().slice(1);
+          if (!supportedFormats.includes(ext)) {
+            throw new Error(`Unsupported file format: ${ext}. Supported formats: ${supportedFormats.join(', ')}`);
+          }
+          videoContent = {
+            fileData: {
+              fileUri: `file://${videoData}`,
+              mimeType: `video/${ext === 'mov' ? 'mov' : 'mp4'}`,
+            },
+          };
+        }
       } else {
-        throw new Error('Unsupported audioData format. Must be a URL, file path, or Buffer.');
+        throw new Error('Unsupported videoData format. Must be a URL, file path, or Buffer.');
       }
 
+      const promptParts = [];
+      if (promptObject.system) promptParts.push(promptObject.system);
+      if (promptObject.context) promptParts.push(promptObject.context);
+      promptParts.push(promptObject.user || 'Describe this video.');
+
       const response = await model.generateContent([
-        { text: 'Transcribe this audio.' },
-        audioContent,
+        ...promptParts.map(text => ({ text })),
+        videoContent,
       ]);
 
-      return response.response.text();
+      return response.response.candidates[0].content.parts[0].text || '';
     });
   }
 
-  async generateAudio(text, config = {}) {
-    throw new Error('Audio generation not supported by GeminiAdapter');
+  /**
+   * Generate a video from text.
+   * @param {string} text - Text prompt for video generation
+   * @param {object} [options] - Configuration options {model, format, duration}
+   * @returns {Promise<Buffer>} - Video data as a Buffer
+   */
+  async generateVideo(text, config = {}) {
+    return await this.retryManager.execute(async () => {
+      const model = config.model || 'veo-2.0-generate-001';
+      const format = config.format || 'mp4';
+      const duration = config.duration || 10; // Default duration in seconds
+      const aspectRatio = config.aspectRatio || '16:9';
+
+      // Start video generation operation
+      let operation = await this.genAI.models.generateVideos({
+        model,
+        prompt: text,
+        config: {
+          personGeneration: config.personGeneration || 'dont_allow',
+          aspectRatio,
+        },
+      });
+
+      // Poll until operation is complete
+      while (!operation.done) {
+        await new Promise(resolve => setTimeout(resolve, 10000)); // Wait 10 seconds
+        operation = await this.genAI.operations.getVideosOperation({
+          operation,
+        });
+      }
+
+      if (!operation.response?.generatedVideos?.length) {
+        throw new Error('No video generated');
+      }
+
+      // Fetch the first generated video
+      const videoUri = operation.response.generatedVideos[0].video?.uri;
+      if (!videoUri) {
+        throw new Error('No video URI returned');
+      }
+
+      const response = await fetch(`${videoUri}&key=${this.genAI.apiKey}`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch video: ${response.statusText}`);
+      }
+
+      // Convert response body to Buffer
+      const arrayBuffer = await response.arrayBuffer();
+      return Buffer.from(arrayBuffer);
+    });
   }
 }
 

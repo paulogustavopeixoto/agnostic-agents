@@ -1,6 +1,8 @@
-// examples/geminiExample.js
+// examples/gemini-test.js
 const { Agent, Tool, GeminiAdapter, MCPTool } = require('../index');
 require('dotenv').config();
+const fs = require('fs');
+const path = require('path');
 
 // Mock Memory class (replace with `Memory` if implemented)
 class MockMemory {
@@ -28,6 +30,7 @@ const startMockMCPServer = () => {
 (async () => {
   // Start mock MCP server
   let server;
+  let tempAudioPath;
   try {
     server = startMockMCPServer();
   } catch (error) {
@@ -44,7 +47,6 @@ const startMockMCPServer = () => {
     const gemini = new GeminiAdapter(process.env.GEMINI_API_KEY);
 
     // 2) Define tools
-    // Weather tool for function calling
     const getWeatherTool = new Tool({
       name: 'get_weather',
       description: 'Get current temperature for a given location.',
@@ -56,12 +58,10 @@ const startMockMCPServer = () => {
         required: ['location'],
       },
       implementation: async ({ location }) => {
-        // Mock weather API response
         return { location, temperature: '18°C' };
       },
     });
 
-    // MCP tool for remote execution
     const mcpSearchTool = new MCPTool({
       name: 'web_search',
       description: 'Search the web for information.',
@@ -116,20 +116,77 @@ const startMockMCPServer = () => {
     const textChunks = ['The quick brown fox jumps over the lazy dog.', 'Hello world!'];
     try {
       const embeddings = await gemini.embedChunks(textChunks, {
-        model: 'text-embedding-004', // Adjust based on Gemini API
+        model: 'text-embedding-004',
       });
       console.log('Embeddings Sample (first chunk, first 5 values):', embeddings[0].embedding.slice(0, 5));
       console.log('Embedding Dimensions:', embeddings[0].embedding.length);
     } catch (error) {
-      console.warn('Embeddings not supported by GeminiAdapter:', error.message);
+      console.warn('Embeddings failed:', error.message);
     }
 
-  } catch (error) {
+    // Test 5: Transcribe Audio
+    console.log('\n=== Test 5: Transcribe Audio ===');
+    const audioAgent = new Agent(gemini, {
+      description: 'You’re an audio transcription assistant.',
+      defaultConfig: { model: 'gemini-1.5-pro' },
+    });
+    tempAudioPath = path.join(__dirname, 'sample.mp3'); // Replace with a real audio file
+    try {
+      const audioData = fs.readFileSync(tempAudioPath);
+      const transcription = await audioAgent.transcribeAudio(audioData, {
+        model: 'gemini-1.5-pro',
+      });
+      console.log('Transcription:', transcription);
+    } catch (error) {
+      console.warn('Audio transcription failed:', error.message);
+    }
+
+    // Test 6: Analyze Video
+    console.log('\n=== Test 6: Analyze Video ===');
+    const videoAgent = new Agent(gemini, {
+      description: 'You’re a video analysis assistant.',
+      defaultConfig: { model: 'gemini-1.5-pro' },
+    });
+    const videoPath = path.join(__dirname, 'sample.mp4'); // Replace with a real video file
+    try {
+      const videoData = fs.readFileSync(videoPath);
+      const videoAnalysis = await videoAgent.analyzeVideo(videoData, {
+        prompt: 'Describe the content and key scenes in this video.',
+        maxTokens: 512,
+      });
+      console.log('Video Analysis:', videoAnalysis);
+    } catch (error) {
+      console.warn('Video analysis failed:', error.message);
+    }
+
+    // Test 7: Generate Video
+    console.log('\n=== Test 7: Generate Video ===');
+    try {
+      const videoBuffer = await videoAgent.generateVideo('A futuristic cityscape at sunset.', {
+        model: 'veo-2.0-generate-001',
+        format: 'mp4',
+        duration: 10,
+        aspectRatio: '16:9',
+        personGeneration: 'dont_allow',
+      });
+      const outputPath = path.join(__dirname, 'generated-video.mp4');
+      fs.writeFileSync(outputPath, videoBuffer);
+      console.log('Generated Video saved to:', outputPath);
+    } catch (error) {
+      console.warn('Video generation failed:', error.message);
+    }
+
+  } catch (err) {
     console.error('Test Error:', {
-      message: error.message,
-      stack: error.stack,
+      message: err.message || 'Unknown error',
+      stack: err.stack,
     });
   } finally {
+    // Clean up temporary audio file
+    if (tempAudioPath && fs.existsSync(tempAudioPath)) {
+      // Uncomment if you want to clean up
+      // fs.unlinkSync(tempAudioPath);
+    }
     // Close mock MCP server
     if (server) {
       server.close(() => console.log('Mock MCP server closed.'));
