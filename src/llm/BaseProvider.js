@@ -61,6 +61,26 @@ class BaseProvider {
   async generateAudio(text, config = {}) {
     throw new Error('generateAudio must be implemented by subclass');
   }
+
+  /**
+   * Analyze a video and generate a description.
+   * @param {Buffer|string} videoData - Video data as a Buffer, URL, or file path
+   * @param {object} [options] - Configuration options {model, prompt, maxTokens}
+   * @returns {Promise<string>} - Video description text
+   */
+  async analyzeVideo(videoData, config = {}) {
+    throw new Error('analyzeVideo must be implemented by subclass');
+  }
+
+  /**
+   * Generate a video from text.
+   * @param {string} text - Text prompt for video generation
+   * @param {object} [options] - Configuration options {model, format, duration}
+   * @returns {Promise<Buffer|string>} - Video data as a Buffer or URL
+   */
+  async generateVideo(text, config = {}) {
+    throw new Error('generateVideo must be implemented by subclass');
+  }
 }
 
 module.exports = { BaseProvider };
