@@ -143,6 +143,20 @@ class AnthropicAdapter extends BaseProvider {
   async embedChunks(chunks, options = {}) {
     throw new Error("Anthropic does not support embeddings.");
   }
+
+  /**
+   * Anthropic doesn’t support Audio transcription.
+   */
+  async transcribeAudio(audioData, config = {}) {
+    throw new Error('Audio transcription not supported by AnthropicAdapter');
+  }
+
+  /**
+   * Anthropic doesn’t support Audio generation.
+   */
+  async generateAudio(text, config = {}) {
+    throw new Error('Audio generation not supported by AnthropicAdapter');
+  }
 }
 
 module.exports = { AnthropicAdapter };

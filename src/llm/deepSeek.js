@@ -134,6 +134,14 @@ class DeepSeekAdapter extends BaseProvider {
       return response.data;
     });
   }
+
+  async transcribeAudio(audioData, config = {}) {
+    throw new Error('Audio transcription not supported by DeepSeekAdapter');
+  }
+
+  async generateAudio(text, config = {}) {
+    throw new Error('Audio generation not supported by DeepSeekAdapter');
+  }
 }
 
 module.exports = { DeepSeekAdapter };

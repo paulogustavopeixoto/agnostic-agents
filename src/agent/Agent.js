@@ -142,6 +142,32 @@ class Agent {
       this.adapter.generateImage(promptObject, finalConfig)
     );
   }
+
+  /**
+   * Transcribe audio data to text (if the adapter supports it).
+   * @param {Buffer|string} audioData - Audio data as a Buffer, URL, or file path
+   * @param {object} [config] - Configuration options {model, language}
+   * @returns {Promise<string>} - Transcribed text
+   */
+  async transcribeAudio(audioData, config = {}) {
+    const finalConfig = { ...this.defaultConfig, ...config };
+    return await this.retryManager.execute(() =>
+      this.adapter.transcribeAudio(audioData, finalConfig)
+    );
+  }
+
+  /**
+   * Generate audio from text (text-to-speech, if the adapter supports it).
+   * @param {string} text - Text to convert to audio
+   * @param {object} [config] - Configuration options {model, voice, format}
+   * @returns {Promise<Buffer>} - Audio data as a Buffer
+   */
+  async generateAudio(text, config = {}) {
+    const finalConfig = { ...this.defaultConfig, ...config };
+    return await this.retryManager.execute(() =>
+      this.adapter.generateAudio(text, finalConfig)
+    );
+  }
 }
 
 module.exports = { Agent };

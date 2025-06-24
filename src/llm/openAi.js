@@ -1,6 +1,9 @@
 // src/llm/OpenAi.js
 const { OpenAI } = require("openai");
 const { BaseProvider } = require('./BaseProvider');
+const { RetryManager } = require('../utils/RetryManager');
+const fs = require('fs');
+const path = require('path');
 
 class OpenAIAdapter extends BaseProvider {
   /**
@@ -14,6 +17,7 @@ class OpenAIAdapter extends BaseProvider {
     this.apiKey = apiKey;
     this.openai = new OpenAI({ apiKey });
     this.model = options.model || "gpt-4o-mini";
+    this.retryManager = new RetryManager({ retries: 3, baseDelay: 1000, maxDelay: 10000 });
   }
 
   /**
@@ -238,6 +242,76 @@ class OpenAIAdapter extends BaseProvider {
         encoding_format: "float",
       });
       return response.data;
+    });
+  }
+
+  /**
+   * Transcribe audio data to text.
+   * @param {Buffer|string} audioData - Audio data as a Buffer, URL, or file path
+   * @param {object} [options] - Configuration options {model, language}
+   * @returns {Promise<string>} - Transcribed text
+   */
+  async transcribeAudio(audioData, config = {}) {
+    return await this.retryManager.execute(async () => {
+      const model = config.model || 'whisper-1';
+      const supportedFormats = ['flac', 'm4a', 'mp3', 'mp4', 'mpeg', 'mpga', 'oga', 'ogg', 'wav', 'webm'];
+      let audioFile;
+      let tempPath;
+
+      if (Buffer.isBuffer(audioData)) {
+        tempPath = path.join(__dirname, `temp-audio-${Date.now()}.mp3`);
+        fs.writeFileSync(tempPath, audioData);
+        audioFile = fs.createReadStream(tempPath);
+      } else if (typeof audioData === 'string') {
+        if (audioData.startsWith('http') || audioData.startsWith('file://')) {
+          audioFile = audioData;
+        } else {
+          const ext = path.extname(audioData).toLowerCase().slice(1);
+          if (!supportedFormats.includes(ext)) {
+            throw new Error(`Unsupported file format: ${ext}. Supported formats: ${supportedFormats.join(', ')}`);
+          }
+          audioFile = fs.createReadStream(audioData);
+        }
+      } else {
+        throw new Error('Unsupported audioData format. Must be a URL, file path, or Buffer.');
+      }
+
+      try {
+        const response = await this.openai.audio.transcriptions.create({
+          model,
+          file: audioFile,
+          language: config.language || 'en',
+        });
+        return response.text;
+      } finally {
+        if (tempPath && fs.existsSync(tempPath)) {
+          fs.unlinkSync(tempPath);
+        }
+      }
+    });
+  }
+
+  /**
+   * Generate audio from text (text-to-speech).
+   * @param {string} text - Text to convert to audio
+   * @param {object} [options] - Configuration options {model, voice, format}
+   * @returns {Promise<Buffer>} - Audio data as a Buffer
+   */
+  async generateAudio(text, config = {}) {
+    return await this.retryManager.execute(async () => {
+      const model = config.model || 'tts-1';
+      const voice = config.voice || 'alloy';
+      const format = config.format || 'mp3';
+
+      const response = await this.openai.audio.speech.create({
+        model,
+        voice,
+        input: text,
+        response_format: format,
+      });
+
+      const buffer = Buffer.from(await response.arrayBuffer());
+      return buffer;
     });
   }
 }

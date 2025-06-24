@@ -1,6 +1,8 @@
-// examples/openaiExample.js
+// examples/openai-test.js
 const { Agent, Tool, OpenAIAdapter, MCPTool } = require('../index');
 require('dotenv').config();
+const fs = require('fs');
+const path = require('path');
 
 // Mock Memory class (replace with `Memory` if implemented)
 class MockMemory {
@@ -44,7 +46,6 @@ const startMockMCPServer = () => {
     const openai = new OpenAIAdapter(process.env.OPENAI_API_KEY);
 
     // 2) Define tools
-    // Weather tool for function calling
     const getWeatherTool = new Tool({
       name: 'get_weather',
       description: 'Get current temperature for a given location.',
@@ -56,12 +57,10 @@ const startMockMCPServer = () => {
         required: ['location'],
       },
       implementation: async ({ location }) => {
-        // Mock weather API response
         return { location, temperature: '18°C' };
       },
     });
 
-    // MCP tool for remote execution
     const mcpSearchTool = new MCPTool({
       name: 'web_search',
       description: 'Search the web for information.',
@@ -134,6 +133,41 @@ const startMockMCPServer = () => {
     });
     console.log('Embeddings Sample (first chunk, first 5 values):', embeddings[0].embedding.slice(0, 5));
     console.log('Embedding Dimensions:', embeddings[0].embedding.length);
+
+    // Test 6: Generate Audio
+    console.log('\n=== Test 6: Generate Audio ===');
+    const audioAgent = new Agent(openai, {
+      description: 'You’re an audio processing assistant.',
+      defaultConfig: { model: 'tts-1' },
+    });
+    const textToSpeech = 'Hello, this is a test of text-to-speech.';
+    const audioBuffer = await audioAgent.generateAudio(textToSpeech, {
+      model: 'tts-1',
+      voice: 'alloy',
+      format: 'mp3',
+    });
+    const tempAudioPath = path.join(__dirname, `temp-audio-${Date.now()}.mp3`);
+    fs.writeFileSync(tempAudioPath, audioBuffer);
+    console.log('Generated Audio saved to:', tempAudioPath);
+
+    // Test 7: Transcribe Audio
+    console.log('\n=== Test 7: Transcribe Audio ===');
+    try {
+      const audioData = fs.readFileSync(tempAudioPath);
+      const transcription = await audioAgent.transcribeAudio(audioData, {
+        model: 'whisper-1',
+        language: 'en',
+      });
+      console.log('Transcription:', transcription);
+    } catch (error) {
+      console.warn('Audio transcription failed:', error.message);
+    } finally {
+      // Clean up temporary audio file
+      if (tempAudioPath && fs.existsSync(tempAudioPath)) {
+        fs.unlinkSync(tempAudioPath);
+      }
+    }
+
 
   } catch (error) {
     console.error('Test Error:', {

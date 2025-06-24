@@ -130,6 +130,33 @@ class GeminiAdapter extends BaseProvider {
 
     return response;
   }
+
+  async transcribeAudio(audioData, config = {}) {
+    return await this.retryManager.execute(async () => {
+      const modelName = config.model || this.model;
+      const model = this.genAI.getGenerativeModel({ model: modelName });
+
+      let audioContent;
+      if (Buffer.isBuffer(audioData)) {
+        audioContent = { inlineData: { mimeType: 'audio/wav', data: audioData.toString('base64') } };
+      } else if (typeof audioData === 'string' && (audioData.startsWith('http') || audioData.startsWith('file://'))) {
+        audioContent = { fileData: { uri: audioData, mimeType: 'audio/wav' } };
+      } else {
+        throw new Error('Unsupported audioData format. Must be a URL, file path, or Buffer.');
+      }
+
+      const response = await model.generateContent([
+        { text: 'Transcribe this audio.' },
+        audioContent,
+      ]);
+
+      return response.response.text();
+    });
+  }
+
+  async generateAudio(text, config = {}) {
+    throw new Error('Audio generation not supported by GeminiAdapter');
+  }
 }
 
 module.exports = { GeminiAdapter };
