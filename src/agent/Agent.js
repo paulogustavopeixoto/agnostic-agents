@@ -7,7 +7,7 @@ class Agent {
   /**
    * @param {object} adapter - An instance of your provider adapter (OpenAIAdapter, GeminiAdapter, HFAdapter, etc.)
    * @param {object} options
-   * @param {array}  options.tools - If using function calling
+   * @param {Tool[] | ToolRegistry} options.tools - Array of tools or a ToolRegistry instance
    * @param {object} options.memory - Optional memory instance
    * @param {object} options.defaultConfig - e.g. { model, temperature, maxTokens }
    * @param {string} options.description - Optional system instructions or agent description
@@ -24,17 +24,35 @@ class Agent {
     mcpClient = null
   } = {}) {
     this.adapter = adapter;
-    this.tools = tools.map(tool => {
-      if (tool instanceof Tool) return tool; // Includes MCPTool
-      if (tool.mcpConfig) return new MCPTool({ ...tool.mcpConfig, mcpClient });
-      return new Tool(tool); // Fallback for plain objects
-    });
+    if (tools.list && typeof tools.list === 'function') {
+      // It's a ToolRegistry instance
+      this.toolRegistry = tools;
+      this.tools = this.toolRegistry.list();
+    } else {
+      this.toolRegistry = null;
+      this.tools = tools.map(tool => tool instanceof Tool ? tool : new Tool(tool));
+    }
     this.memory = memory;
     this.defaultConfig = defaultConfig;
     this.description = description;
     this.rag = rag;
     this.retryManager = retryManager;
     this.mcpClient = mcpClient;
+  }
+
+  /**
+   * Dynamically add more tools at runtime.
+   * @param {Tool | Tool[] | ToolRegistry} tools 
+   */
+  registerTools(tools) {
+    if (tools.list && typeof tools.list === 'function') {
+      // ToolRegistry
+      this.toolRegistry = tools;
+      this.tools = tools.list();
+    } else {
+      const array = Array.isArray(tools) ? tools : [tools];
+      this.tools.push(...array);
+    }
   }
 
   // Helper to build the system prompt from description and user input
