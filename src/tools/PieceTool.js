@@ -4,37 +4,19 @@ const { Tool } = require('../agent/Tool');
 
 /**
  * PieceTool
- * A generic tool adapter for Activepieces integrations.
- * 
- * Converts any Activepieces action into a callable Tool instance.
- * Handles dynamic authentication key injection to support
- * pieces that expect credentials in different formats (auth object, propsValue, etc.).
- * 
- * Example usage:
- * 
- * const slackSendMessage = new PieceTool({
- *   pieceName: 'slack',
- *   actionKey: 'send_channel_message',
- *   action: slack._actions['send_channel_message'](),
- *   authToken: process.env.SLACK_ACCESS_TOKEN,
- * });
- * 
- * const result = await slackSendMessage.call({
- *   channel: '#general',
- *   message: 'Hello from AI!',
- * });
+ * Converts an Activepieces action into a universal Tool definition,
+ * with support for function calling, metadata extraction, semantic aliases,
+ * authentication handling, and example generation.
  */
 class PieceTool extends Tool {
-
-    /**
+  /**
    * @param {object} config
-   * @param {string} config.pieceName - Name of the piece (e.g. 'slack').
-   * @param {string} config.actionKey - Name of the action inside the piece.
-   * @param {object} config.action - The action object (factory output, not the factory itself).
-   * @param {string|object} config.authToken - Authentication token (string or key-value map).
+   * @param {string} config.pieceName - The piece name (e.g., 'slack').
+   * @param {string} config.actionKey - The action key inside the piece (e.g., 'send_channel_message').
+   * @param {object} config.action - The action function (already instantiated, not the factory itself).
+   * @param {string|object} config.authToken - The authentication token or object.
    */
   constructor({ pieceName, actionKey, action, authToken }) {
-    console.log("authToken: ", authToken);
     const name = PieceTool.normalizeName(pieceName, actionKey);
     const description = action.description || action.displayName || name;
     const parameters = PieceTool.mapPropsToJsonSchema(action.props);
@@ -47,10 +29,16 @@ class PieceTool extends Tool {
       let lastError = null;
 
       for (const key of authKeysToTry) {
-        const authAttempt = { [key]: authContext[key] || authContext.access_token || authContext.token || authContext.api_key || authContext.bearer_token || authContext.key };
-        console.log("authAttempt: ", authAttempt);
-        
-        // 🔥 Also inject into props in case the piece requires it there
+        const authAttempt = {
+          [key]:
+            authContext[key] ||
+            authContext.access_token ||
+            authContext.token ||
+            authContext.api_key ||
+            authContext.bearer_token ||
+            authContext.key,
+        };
+
         const propsWithAuth = {
           ...args,
           [key]: authAttempt[key],
@@ -63,26 +51,27 @@ class PieceTool extends Tool {
             store: {},
           });
 
-          // ✅ Success
           return result;
-
         } catch (err) {
           const errorMessage = err?.message || err?.data?.error || '';
 
-          // 🔥 If error suggests auth failure, try next key
-          if (errorMessage.includes('not_authed') || errorMessage.includes('invalid_auth') || errorMessage.includes('missing_auth')) {
+          if (
+            errorMessage.includes('not_authed') ||
+            errorMessage.includes('invalid_auth') ||
+            errorMessage.includes('missing_auth')
+          ) {
             console.warn(`[PieceTool] Auth with key "${key}" failed: ${errorMessage}`);
             lastError = err;
             continue;
           }
 
-          // 🔥 Other error, not auth — throw it
-          throw err;
+          throw err; // Other errors not related to auth
         }
       }
 
-      // 🚫 If none of the keys worked, throw last error
-      throw new Error(`[PieceTool] All auth attempts failed for ${name}: ${lastError?.message || lastError}`);
+      throw new Error(
+        `[PieceTool] All auth attempts failed for ${name}: ${lastError?.message || lastError}`
+      );
     };
 
     super({
@@ -96,13 +85,26 @@ class PieceTool extends Tool {
     this.actionKey = actionKey;
     this.action = action;
     this.authContext = authContext;
+    this.requiresAuth = !!authToken;
   }
 
   /**
-   * Normalize tool name to camelCase format based on piece and action.
-   * @param {string} pieceName 
-   * @param {string} actionKey 
-   * @returns {string}
+   * Export tool metadata for use by AI agents, function calling, or UI generation.
+   * Includes name, description, parameters, and auth requirement.
+   * @returns {object} Metadata object
+   */
+  toMetadata() {
+    return {
+      name: this.name,
+      description: this.description,
+      parameters: this.parameters,
+      requiresAuth: this.requiresAuth,
+      examples: PieceTool.generateExample(this.parameters),
+    };
+  }
+
+  /**
+   * Normalize tool name to camelCase from pieceName_actionKey
    */
   static normalizeName(pieceName, actionKey) {
     const str = `${pieceName}_${actionKey}`;
@@ -112,9 +114,7 @@ class PieceTool extends Tool {
   }
 
   /**
-   * Convert piece action props into JSON schema.
-   * @param {object} props 
-   * @returns {object} JSON Schema object
+   * Convert Activepieces props into JSON Schema with semantic alias injection.
    */
   static mapPropsToJsonSchema(props = {}) {
     const properties = {};
@@ -124,6 +124,7 @@ class PieceTool extends Tool {
       properties[key] = {
         type: PieceTool.mapPropertyType(prop),
         description: prop.description || prop.displayName || '',
+        aliases: PieceTool.getAliases(key),
       };
       if (prop.required) {
         required.push(key);
@@ -138,9 +139,7 @@ class PieceTool extends Tool {
   }
 
   /**
-   * Map Activepieces property types to JSON Schema types.
-   * @param {object} prop 
-   * @returns {string} JSON schema type
+   * Map Activepieces prop types to JSON Schema types.
    */
   static mapPropertyType(prop) {
     const typeMap = {
@@ -156,9 +155,7 @@ class PieceTool extends Tool {
   }
 
   /**
-   * Normalize the auth token input into an auth context object.
-   * @param {string|object} rawAuth - Token string or an auth object.
-   * @returns {object} Normalized auth object
+   * Normalize auth input: token string → key-value object.
    */
   static normalizeAuth(rawAuth) {
     if (!rawAuth) return {};
@@ -170,6 +167,59 @@ class PieceTool extends Tool {
       bearer_token: rawAuth,
       key: rawAuth,
     };
+  }
+
+  /**
+   * Lookup aliases for common parameter names.
+   */
+  static getAliases(paramName) {
+    const aliasMap = {
+      channel: ['conversation_id', 'chatId'],
+      message: ['text', 'body', 'content'],
+      user: ['user_id', 'recipient', 'handle'],
+      file: ['file_id', 'filePath'],
+      thread: ['thread_id', 'thread_ts'],
+    };
+    return aliasMap[paramName] || [];
+  }
+
+  /**
+   * Generate a dummy example input based on parameter schema.
+   */
+  static generateExample(parameters) {
+    const example = {};
+    const props = parameters?.properties || {};
+
+    for (const [key, schema] of Object.entries(props)) {
+      switch (schema.type) {
+        case 'string':
+          if (key.toLowerCase().includes('channel')) {
+            example[key] = '#general';
+          } else if (key.toLowerCase().includes('message') || key.toLowerCase().includes('text')) {
+            example[key] = 'Hello world!';
+          } else if (key.toLowerCase().includes('user')) {
+            example[key] = '@username';
+          } else if (key.toLowerCase().includes('file')) {
+            example[key] = 'file-id-or-path';
+          } else {
+            example[key] = 'sample-text';
+          }
+          break;
+        case 'number':
+          example[key] = 123;
+          break;
+        case 'boolean':
+          example[key] = true;
+          break;
+        case 'object':
+          example[key] = { key: 'value' };
+          break;
+        default:
+          example[key] = 'example';
+      }
+    }
+
+    return example;
   }
 }
 

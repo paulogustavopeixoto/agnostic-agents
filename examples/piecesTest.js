@@ -1,21 +1,24 @@
-const { PieceTool } = require('../src/tools/PieceTool');
 const { slack } = require('@activepieces/piece-slack');
+const { PieceLoader } = require('../src/tools/PieceLoader');
 require('dotenv').config();
 
-
-const slackSendMessage = new PieceTool({
+const slackTools = PieceLoader.load({
   pieceName: 'slack',
-  actionKey: 'send_channel_message',
-  action: slack._actions['send_channel_message'],
+  piece: slack,
   authToken: process.env.SLACK_ACCESS_TOKEN,
 });
 
-(async () => {
-  const result = await slackSendMessage.call({
-    channel: '#general',
-    message: 'Hello from AI agent!',
-    text: 'Hello from AI agent!',
-  });
+console.log('Loaded Slack Tools:');
+slackTools.forEach(tool => {
+  console.log(JSON.stringify(tool.toMetadata(), null, 2));
+});
 
+// Example run:
+(async () => {
+  const sendMessageTool = slackTools.find(t => t.name === 'slackSendChannelMessage');
+  const result = await sendMessageTool.call({
+    channel: '#general',
+    text: 'Hello from AI using PieceLoader!',
+  });
   console.log('Result:', result);
 })();
