@@ -36,5 +36,5 @@ module.exports = {
   chunkText,
   repairJsonOutput,
   encodeBase64,
-  MCPTool
+  MCPTool,
 };

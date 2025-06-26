@@ -1,5 +1,5 @@
 // examples/openai-test.js
-const { Agent, Tool, OpenAIAdapter, MCPTool } = require('../index');
+const { Agent, Tool, OpenAIAdapter, MCPTool, N8nTool } = require('../index');
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
@@ -30,6 +30,8 @@ const startMockMCPServer = () => {
 (async () => {
   // Start mock MCP server
   let server;
+  let tempAudioPath;
+  let tempVideoPath;
   try {
     server = startMockMCPServer();
   } catch (error) {
@@ -75,15 +77,40 @@ const startMockMCPServer = () => {
       apiKey: 'test-key',
     });
 
-    // Test 1: Generate Text with Function Calling and MCP
-    console.log('\n=== Test 1: Generate Text with Function Calling and MCP ===');
+    let slackWorkflow;
+    try {
+      slackWorkflow = JSON.parse(fs.readFileSync(path.join(__dirname, 'workflows/slack_workflow.json')));
+    } catch (error) {
+      console.warn('Failed to load slack_workflow.json:', error.message);
+    }
+
+    const slackNotificationTool = new N8nTool({
+      name: 'slack_notification',
+      description: 'Send a notification to a Slack channel via n8n.',
+      parameters: {
+        type: 'object',
+        properties: {
+          message: { type: 'string', description: 'Message to send to Slack' },
+        },
+        required: ['message'],
+      },
+      workflow: slackWorkflow,
+      credentials: {
+        slackApi: {
+          accessToken: process.env.SLACK_ACCESS_TOKEN,
+        },
+      },
+    });
+
+    // Test 1: Generate Text with Function Calling, MCP, and n8n
+    console.log('\n=== Test 1: Generate Text with Function Calling, MCP, and n8n ===');
     const agentWithTools = new Agent(openai, {
-      tools: [getWeatherTool, mcpSearchTool],
+      tools: [getWeatherTool, mcpSearchTool, slackNotificationTool],
       memory: new MockMemory(),
-      description: 'You’re a versatile assistant handling weather and web searches.',
+      description: 'You’re a versatile assistant handling weather, web searches, and Slack notifications.',
       defaultConfig: { model: 'gpt-4o-mini', temperature: 0.7, maxTokens: 1024 },
     });
-    const functionCallPrompt = 'Get the weather in Paris, France, and search for recent AI news.';
+    const functionCallPrompt = 'Get the weather in Paris, France, search for recent AI news, and send a Slack notification with the summary.';
     const functionCallResponse = await agentWithTools.sendMessage(functionCallPrompt);
     console.log('Function Call Response:', functionCallResponse);
 
@@ -146,7 +173,7 @@ const startMockMCPServer = () => {
       voice: 'alloy',
       format: 'mp3',
     });
-    const tempAudioPath = path.join(__dirname, `temp-audio-${Date.now()}.mp3`);
+    tempAudioPath = path.join(__dirname, `temp-audio-${Date.now()}.mp3`);
     fs.writeFileSync(tempAudioPath, audioBuffer);
     console.log('Generated Audio saved to:', tempAudioPath);
 
@@ -161,13 +188,40 @@ const startMockMCPServer = () => {
       console.log('Transcription:', transcription);
     } catch (error) {
       console.warn('Audio transcription failed:', error.message);
-    } finally {
-      // Clean up temporary audio file
-      if (tempAudioPath && fs.existsSync(tempAudioPath)) {
-        fs.unlinkSync(tempAudioPath);
-      }
     }
 
+    // Test 8: Analyze Video
+    console.log('\n=== Test 8: Analyze Video ===');
+    const videoAgent = new Agent(openai, {
+      description: 'You’re a video analysis assistant.',
+      defaultConfig: { model: 'gpt-4o-mini' },
+    });
+    tempVideoPath = path.join(__dirname, 'sample.mp4'); // Replace with a real video file
+    try {
+      const videoData = fs.readFileSync(tempVideoPath);
+      const videoAnalysis = await videoAgent.analyzeVideo(videoData, {
+        prompt: 'Describe the content and key scenes in this video.',
+        maxTokens: 512,
+      });
+      console.log('Video Analysis:', videoAnalysis);
+    } catch (error) {
+      console.warn('Video analysis failed (expected for OpenAI):', error.message);
+    }
+
+    // Test 9: Generate Video
+    console.log('\n=== Test 9: Generate Video ===');
+    try {
+      const videoBuffer = await videoAgent.generateVideo('A futuristic cityscape at sunset.', {
+        model: 'dall-e-3', // Hypothetical model
+        format: 'mp4',
+        duration: 10,
+      });
+      const outputPath = path.join(__dirname, 'generated-video.mp4');
+      fs.writeFileSync(outputPath, videoBuffer);
+      console.log('Generated Video saved to:', outputPath);
+    } catch (error) {
+      console.warn('Video generation failed (expected for OpenAI):', error.message);
+    }
 
   } catch (error) {
     console.error('Test Error:', {
@@ -175,6 +229,13 @@ const startMockMCPServer = () => {
       stack: error.stack,
     });
   } finally {
+    // Clean up temporary files
+    if (tempAudioPath && fs.existsSync(tempAudioPath)) {
+      fs.unlinkSync(tempAudioPath);
+    }
+    if (tempVideoPath && fs.existsSync(tempVideoPath)) {
+      // fs.unlinkSync(tempVideoPath); // Uncomment to clean up
+    }
     // Close mock MCP server
     if (server) {
       server.close(() => console.log('Mock MCP server closed.'));

@@ -27,6 +27,9 @@
     "jest": "^29.7.0"
   },
   "dependencies": {
+    "@activepieces/piece-github": "^0.5.2",
+    "@activepieces/piece-notion": "^0.3.3",
+    "@activepieces/piece-slack": "^0.9.2",
     "@anthropic-ai/sdk": "^0.35.0",
     "@google/generative-ai": "^0.21.0",
     "@huggingface/inference": "^3.0.0",

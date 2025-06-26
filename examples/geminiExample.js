@@ -1,5 +1,5 @@
 // examples/gemini-test.js
-const { Agent, Tool, GeminiAdapter, MCPTool } = require('../index');
+const { Agent, Tool, GeminiAdapter, MCPTool, N8nTool } = require('../index');
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
@@ -31,6 +31,7 @@ const startMockMCPServer = () => {
   // Start mock MCP server
   let server;
   let tempAudioPath;
+  let tempVideoPath;
   try {
     server = startMockMCPServer();
   } catch (error) {
@@ -76,15 +77,34 @@ const startMockMCPServer = () => {
       apiKey: 'test-key',
     });
 
-    // Test 1: Generate Text with Function Calling and MCP
-    console.log('\n=== Test 1: Generate Text with Function Calling and MCP ===');
+    const slackWorkflow = JSON.parse(fs.readFileSync(path.join(__dirname, 'workflows/slack_workflow.json')));
+    const slackNotificationTool = new N8nTool({
+      name: 'slack_notification',
+      description: 'Send a notification to a Slack channel via n8n.',
+      parameters: {
+        type: 'object',
+        properties: {
+          message: { type: 'string', description: 'Message to send to Slack' },
+        },
+        required: ['message'],
+      },
+      workflow: slackWorkflow,
+      credentials: {
+        slackApi: {
+          accessToken: process.env.SLACK_ACCESS_TOKEN // Replace with your Slack token
+        }
+      }
+    });
+
+    // Test 1: Generate Text with Function Calling, MCP, and n8n
+    console.log('\n=== Test 1: Generate Text with Function Calling, MCP, and n8n ===');
     const agentWithTools = new Agent(gemini, {
-      tools: [getWeatherTool, mcpSearchTool],
+      tools: [getWeatherTool, mcpSearchTool, slackNotificationTool],
       memory: new MockMemory(),
-      description: 'You’re a versatile assistant handling weather and web searches.',
+      description: 'You’re a versatile assistant handling weather, web searches, and Slack notifications.',
       defaultConfig: { model: 'gemini-1.5-pro', temperature: 0.7, maxTokens: 1024 },
     });
-    const functionCallPrompt = 'Get the weather in Paris, France, and search for recent AI news.';
+    const functionCallPrompt = 'Get the weather in Paris, France, search for recent AI news, and send a Slack notification with the summary.';
     const functionCallResponse = await agentWithTools.sendMessage(functionCallPrompt);
     console.log('Function Call Response:', functionCallResponse);
 
@@ -147,9 +167,9 @@ const startMockMCPServer = () => {
       description: 'You’re a video analysis assistant.',
       defaultConfig: { model: 'gemini-1.5-pro' },
     });
-    const videoPath = path.join(__dirname, 'sample.mp4'); // Replace with a real video file
+    tempVideoPath = path.join(__dirname, 'sample.mp4'); // Replace with a real video file
     try {
-      const videoData = fs.readFileSync(videoPath);
+      const videoData = fs.readFileSync(tempVideoPath);
       const videoAnalysis = await videoAgent.analyzeVideo(videoData, {
         prompt: 'Describe the content and key scenes in this video.',
         maxTokens: 512,
@@ -182,10 +202,12 @@ const startMockMCPServer = () => {
       stack: err.stack,
     });
   } finally {
-    // Clean up temporary audio file
+    // Clean up temporary files
     if (tempAudioPath && fs.existsSync(tempAudioPath)) {
-      // Uncomment if you want to clean up
-      // fs.unlinkSync(tempAudioPath);
+      // fs.unlinkSync(tempAudioPath); // Uncomment to clean up
+    }
+    if (tempVideoPath && fs.existsSync(tempVideoPath)) {
+      // fs.unlinkSync(tempVideoPath); // Uncomment to clean up
     }
     // Close mock MCP server
     if (server) {
