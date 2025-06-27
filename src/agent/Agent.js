@@ -2,6 +2,8 @@
 const { RetryManager } = require('../utils/RetryManager');
 const { Tool } = require('./Tool');
 const { MCPTool } = require('../tools/MCPTool');
+const { MissingInfoResolver } = require('./MissingInfoResolver');
+const { ToolValidator } = require('../utils/ToolValidator');
 
 class Agent {
   /**
@@ -21,7 +23,8 @@ class Agent {
     description = "", 
     rag = null, 
     retryManager = new RetryManager({ retries: 3, baseDelay: 1000, maxDelay: 10000 }),
-    mcpClient = null
+    mcpClient = null,
+    askUser = null
   } = {}) {
     this.adapter = adapter;
     if (tools.list && typeof tools.list === 'function') {
@@ -38,6 +41,12 @@ class Agent {
     this.rag = rag;
     this.retryManager = retryManager;
     this.mcpClient = mcpClient;
+    this.validator = new ToolValidator();
+    this.resolver = new MissingInfoResolver({
+      memory: this.memory,
+      rag: this.rag,
+      askUser: askUser,  
+    });
   }
 
   /**
@@ -122,9 +131,24 @@ class Agent {
    * @returns {Promise<any>} - Tool execution result
    */
   async _handleToolCall(toolCall) {
-    const toolInstance = this.tools.find((t) => t.name === toolCall.name);
-    if (!toolInstance) throw new Error(`Tool ${toolCall.name} not found.`);
-    return await toolInstance.call(toolCall.arguments || {});
+    const toolInstance = this.tools.find(t => t.name === toolCall.name);
+    if (!toolInstance) {
+      throw new Error(`Tool ${toolCall.name} not found.`);
+    }
+
+    try {
+      const resolvedArgs = await this.resolver.resolve(toolInstance, toolCall.arguments || {});
+      const result = await toolInstance.call(resolvedArgs);
+      return result;
+    } catch (err) {
+      console.warn(`[Agent] Tool "${toolCall.name}" failed with error:`, err);
+
+      return {
+        success: false,
+        error: err.message,
+        suggestion: `I couldn't execute "${toolCall.name}". This tool might need manual setup or isn't fully supported yet.`,
+      };
+    }
   }
 
   /**

@@ -1,26 +1,12 @@
-// src/tools/PieceTool.js
-
 const { Tool } = require('../agent/Tool');
+const { BaseAppSpec } = require('./specs/BaseAppSpec'); 
 
-/**
- * PieceTool
- * Converts an Activepieces action into a universal Tool definition,
- * with support for function calling, metadata extraction, semantic aliases,
- * authentication handling, and example generation.
- */
 class PieceTool extends Tool {
-  /**
-   * @param {object} config
-   * @param {string} config.pieceName - The piece name (e.g., 'slack').
-   * @param {string} config.actionKey - The action key inside the piece (e.g., 'send_channel_message').
-   * @param {object} config.action - The action function (already instantiated, not the factory itself).
-   * @param {string|object} config.authToken - The authentication token or object.
-   */
-  constructor({ pieceName, actionKey, action, authToken }) {
+  constructor({ pieceName, actionKey, action, authToken, spec = new BaseAppSpec() }) {
     const name = PieceTool.normalizeName(pieceName, actionKey);
     const description = action.description || action.displayName || name;
-    const parameters = PieceTool.mapPropsToJsonSchema(action.props);
 
+    const parameters = PieceTool.mapPropsToJsonSchema(action.props, spec);
     const authContext = PieceTool.normalizeAuth(authToken);
 
     const implementation = async (args) => {
@@ -39,19 +25,21 @@ class PieceTool extends Tool {
             authContext.key,
         };
 
-        const propsWithAuth = {
+        const argsWithAuth = {
           ...args,
           [key]: authAttempt[key],
         };
 
+        const transformedArgs = spec.transformArgs(actionKey, argsWithAuth);
+
         try {
           const result = await action.run({
-            propsValue: propsWithAuth,
+            propsValue: transformedArgs,
             auth: authAttempt,
             store: {},
           });
 
-          return result;
+          return spec.transformResult(actionKey, result);
         } catch (err) {
           const errorMessage = err?.message || err?.data?.error || '';
 
@@ -65,7 +53,7 @@ class PieceTool extends Tool {
             continue;
           }
 
-          throw err; // Other errors not related to auth
+          throw err;
         }
       }
 
@@ -86,12 +74,11 @@ class PieceTool extends Tool {
     this.action = action;
     this.authContext = authContext;
     this.requiresAuth = !!authToken;
+    this.spec = spec;
   }
 
   /**
-   * Export tool metadata for use by AI agents, function calling, or UI generation.
-   * Includes name, description, parameters, and auth requirement.
-   * @returns {object} Metadata object
+   * ✅ Metadata export
    */
   toMetadata() {
     return {
@@ -104,7 +91,7 @@ class PieceTool extends Tool {
   }
 
   /**
-   * Normalize tool name to camelCase from pieceName_actionKey
+   * 🔥 Name normalization
    */
   static normalizeName(pieceName, actionKey) {
     const str = `${pieceName}_${actionKey}`;
@@ -114,9 +101,9 @@ class PieceTool extends Tool {
   }
 
   /**
-   * Convert Activepieces props into JSON Schema with semantic alias injection.
+   * 🔥 Parameter mapping with alias support
    */
-  static mapPropsToJsonSchema(props = {}) {
+  static mapPropsToJsonSchema(props = {}, spec = new BaseAppSpec()) {
     const properties = {};
     const required = [];
 
@@ -124,7 +111,7 @@ class PieceTool extends Tool {
       properties[key] = {
         type: PieceTool.mapPropertyType(prop),
         description: prop.description || prop.displayName || '',
-        aliases: PieceTool.getAliases(key),
+        aliases: [...(PieceTool.getDefaultAliases(key) || []), ...(spec.getAliases()?.[key] || [])],
       };
       if (prop.required) {
         required.push(key);
@@ -138,9 +125,6 @@ class PieceTool extends Tool {
     };
   }
 
-  /**
-   * Map Activepieces prop types to JSON Schema types.
-   */
   static mapPropertyType(prop) {
     const typeMap = {
       SHORT_TEXT: 'string',
@@ -150,13 +134,11 @@ class PieceTool extends Tool {
       DROPDOWN: 'string',
       DATE_TIME: 'string',
       JSON: 'object',
+      OBJECT: 'object',
     };
     return typeMap[prop.type] || 'string';
   }
 
-  /**
-   * Normalize auth input: token string → key-value object.
-   */
   static normalizeAuth(rawAuth) {
     if (!rawAuth) return {};
     if (typeof rawAuth === 'object') return rawAuth;
@@ -169,10 +151,7 @@ class PieceTool extends Tool {
     };
   }
 
-  /**
-   * Lookup aliases for common parameter names.
-   */
-  static getAliases(paramName) {
+  static getDefaultAliases(paramName) {
     const aliasMap = {
       channel: ['conversation_id', 'chatId'],
       message: ['text', 'body', 'content'],
@@ -183,9 +162,6 @@ class PieceTool extends Tool {
     return aliasMap[paramName] || [];
   }
 
-  /**
-   * Generate a dummy example input based on parameter schema.
-   */
   static generateExample(parameters) {
     const example = {};
     const props = parameters?.properties || {};
