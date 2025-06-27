@@ -20,9 +20,12 @@ _____/\\\\\\\\\________/\\\\\\\\\\\\__/\\\\\_____/\\\_______/\\\\\__________/\\\
 ### Key Features
 
 - **Provider-Agnostic**: Switch between LLM providers with minimal changes.
-- **RAG Support**: Augment agents and tasks with retrieval from vector stores (e.g., Pinecone or local).
-- **Task Orchestration**: Execute tasks sequentially, in parallel, or hierarchically.
-- **Resilience**: Built-in retry logic for handling transient API failures.
+- **Function Calling**: Automatic conversion to native function schemas (OpenAI functions, Anthropic tools, Gemini functions).
+- **Dynamic Validation & Auto-Fill**: Validate arguments against a universal tool schema, auto-resolve via memory, RAG, or user prompts.
+- **RAG + Tool Hybrid**: Augment agents and tasks with retrieval from vector stores (e.g., Pinecone or local).
+- **Error Recovery**: Retry, adjust, clarify—failures aren’t the end of the conversation.
+- **Auth Management**: API keys per tool, with scalable credential handling (OAuth-ready design).
+- **Tool Metadata Normalization**: Unified JSON schema for all tools—consistent validation, function export, and LLM interaction.
 - **Extensibility**: Easily add new adapters, tools, or vector stores.
 
 ## Installation
