@@ -73,6 +73,14 @@ class Agent {
     };
   }
 
+  // Helper to format error messages for LLMs
+  _formatErrorForLLM(toolName, error) {
+    const errorMessage = error.message || String(error);
+
+    return `⚠️ The tool "${toolName}" failed with error:\n"${errorMessage}".\n` +
+          `Would you like me to try again with different parameters or take another action?`;
+  }
+
   /**
    * Generic text-based prompt method with optional RAG retrieval.
    * @param {string} userMessage - The user's input message
@@ -102,18 +110,42 @@ class Agent {
       if (!result.toolCalls?.length && !result.toolCall) break;
 
       const toolCalls = result.toolCalls || [result.toolCall];
+
       for (const toolCall of toolCalls) {
-        const toolResult = await this.retryManager.execute(() =>
-          this._handleToolCall(toolCall)
-        );
+        let toolResult;
+
+        try {
+          toolResult = await this.retryManager.execute(() =>
+            this._handleToolCall(toolCall)
+          );
+        } catch (err) {
+          console.warn(`[Agent] Tool "${toolCall.name}" failed with error:`, err);
+
+          const errorMsg = this._formatErrorForLLM(toolCall.name, err);
+          messages.push({ role: 'assistant', content: errorMsg });
+
+          // Add the error to user context so the LLM can reason about it
+          promptObject.user += `\nTool "${toolCall.name}" failed with error: ${err.message}\n`;
+
+          continue; // Let the loop continue to LLM for the next suggestion
+        }
+
         messages.push(
           {
             role: 'assistant',
             content: '',
-            function_call: { name: toolCall.name, arguments: JSON.stringify(toolCall.arguments) }
+            function_call: {
+              name: toolCall.name,
+              arguments: JSON.stringify(toolCall.arguments)
+            }
           },
-          { role: 'function', name: toolCall.name, content: JSON.stringify(toolResult) }
+          {
+            role: 'function',
+            name: toolCall.name,
+            content: JSON.stringify(toolResult)
+          }
         );
+
         promptObject.user += `\nTool ${toolCall.name} result: ${JSON.stringify(toolResult)}`;
       }
     }

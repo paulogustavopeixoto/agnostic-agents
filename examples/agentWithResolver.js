@@ -55,7 +55,7 @@ const agent = new Agent(openai, {
 (async () => {
   try {
     const response = await agent.sendMessage(
-      `Post ‘Daily standup starts in 5 minutes’ in #general.`
+      `Post ‘Hello everyone’ in a channel called #not_a_real_channel`
     );
 
     console.log('🧠 Agent Response:', response);
