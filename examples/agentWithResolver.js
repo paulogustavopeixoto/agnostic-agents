@@ -55,8 +55,7 @@ const agent = new Agent(openai, {
 (async () => {
   try {
     const response = await agent.sendMessage(
-      `Post ‘Daily standup starts in 5 minutes’ in #general.
-`
+      `Post ‘Daily standup starts in 5 minutes’ in #general.`
     );
 
     console.log('🧠 Agent Response:', response);
