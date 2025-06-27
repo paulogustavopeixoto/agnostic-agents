@@ -90,10 +90,12 @@ class Agent {
   async sendMessage(userMessage, config = {}) {
     const finalConfig = { ...this.defaultConfig, ...config };
     const promptObject = this._buildSystemPrompt(userMessage);
+
     let messages = Array.isArray(promptObject) ? promptObject : [
       { role: 'system', content: promptObject.system },
       { role: 'user', content: promptObject.context + promptObject.user }
     ];
+    
     let result;
 
     while (true) {
