@@ -40,14 +40,12 @@ class MissingInfoResolver {
       }
 
       for (const missingField of validation.missingFields) {
-        let value = null;
-
-        // 🧠 1. Try memory
-        value = this.memory?.get(missingField);
+        // First try entity memory
+        let value = await this.memory?.get(missingField);
         if (value) {
-          console.log(`[Resolver] Found "${missingField}" in memory: ${value}`);
-          currentArgs[missingField] = value;
-          continue;
+            console.log(`[Resolver] Found "${missingField}" in memory: ${value}`);
+            currentArgs[missingField] = value;
+            continue;
         }
 
         // 📚 2. Try RAG

@@ -49,6 +49,32 @@ class Agent {
     });
   }
 
+  async _retrieveMemoryContext(userMessage) {
+    const facts = [];
+
+    // 1. Pull all active entities
+    for (const key in this.memory.entities) {
+      const value = this.memory.getEntity(key);
+      if (value) {
+        facts.push(`${key}: ${value}`);
+      }
+    }
+
+    // 2. Semantic search (optional)
+    if (this.memory.vectorStore) {
+      const semantic = await this.memory.searchSemanticMemory(userMessage);
+      if (semantic) {
+        facts.push(`Related info: ${semantic}`);
+      }
+    }
+
+    if (facts.length) {
+      return `Here is what I remember:\n` + facts.join('\n') + '\n';
+    }
+
+    return '';
+  }
+
   /**
    * Dynamically add more tools at runtime.
    * @param {Tool | Tool[] | ToolRegistry} tools 
@@ -65,11 +91,17 @@ class Agent {
   }
 
   // Helper to build the system prompt from description and user input
-  _buildSystemPrompt(userPrompt = "") {
+  async _buildSystemPrompt(userPrompt = "") {
+    const memoryContext = this.memory ? await this._retrieveMemoryContext(userPrompt) : "";
+
+    const system = this.description || "";
+    const context = (this.memory ? this.memory.getContext() : "") + memoryContext;
+    const user = userPrompt || "";
+
     return {
-      system: this.description || "",
-      context: this.memory ? this.memory.getContext() : "",
-      user: userPrompt || "",
+      system,
+      context,
+      user,
     };
   }
 
@@ -89,12 +121,22 @@ class Agent {
    */
   async sendMessage(userMessage, config = {}) {
     const finalConfig = { ...this.defaultConfig, ...config };
-    const promptObject = this._buildSystemPrompt(userMessage);
+    const promptObject = await this._buildSystemPrompt(userMessage);
 
-    let messages = Array.isArray(promptObject) ? promptObject : [
-      { role: 'system', content: promptObject.system },
-      { role: 'user', content: promptObject.context + promptObject.user }
-    ];
+    const messages = [];
+
+    if (promptObject.system) {
+      messages.push({ role: 'system', content: promptObject.system });
+    }
+
+    const userContent = (promptObject.context || '') + (promptObject.user || '');
+    if (userContent.trim()) {
+      messages.push({ role: 'user', content: userContent });
+    }
+
+    if (messages.length === 0) {
+      throw new Error("Cannot send empty prompt: No messages in the array.");
+    }
     
     let result;
 
@@ -153,7 +195,7 @@ class Agent {
     }
 
     if (this.memory) {
-      this.memory.store(userMessage, result);
+      this.memory.storeConversation(userMessage, result.message || JSON.stringify(result));
     }
 
     return result.message || result;
