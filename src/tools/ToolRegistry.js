@@ -7,73 +7,51 @@
 
 class ToolRegistry {
   constructor() {
-    /** @type {Map<string, Tool>} */
     this.tools = new Map();
+    this.triggers = new Map();
   }
 
-  /**
-   * Register one or more tools.
-   * @param {Tool | Tool[]} toolOrArray 
-   */
-  register(toolOrArray) {
-    const tools = Array.isArray(toolOrArray) ? toolOrArray : [toolOrArray];
-
+  register({ tools = [], triggers = {} }) {
+    // Register tools
     for (const tool of tools) {
-      if (!tool.name) {
+      if (!tool?.name) {
         console.warn('[ToolRegistry] Tool missing name, skipping:', tool);
         continue;
       }
       this.tools.set(tool.name, tool);
     }
+
+    // Register triggers
+    for (const [name, trigger] of Object.entries(triggers)) {
+      if (!name) {
+        console.warn('[ToolRegistry] Trigger missing name, skipping:', trigger);
+        continue;
+      }
+      this.triggers.set(name, trigger);
+    }
   }
 
-  /**
-   * Find a tool by its name.
-   * @param {string} name 
-   * @returns {Tool | undefined}
-   */
-  findByName(name) {
+  findToolByName(name) {
     return this.tools.get(name);
   }
 
-  /**
-   * Find all tools from a given piece (e.g., 'slack').
-   * @param {string} pieceName 
-   * @returns {Tool[]}
-   */
-  findByPiece(pieceName) {
-    return Array.from(this.tools.values()).filter(tool => 
-      tool.pieceName === pieceName
-    );
+  findTriggerByName(name) {
+    return this.triggers.get(name);
   }
 
-  /**
-   * Search tools by partial name or description.
-   * @param {string} query 
-   * @returns {Tool[]}
-   */
-  search(query) {
-    const lowerQuery = query.toLowerCase();
-    return Array.from(this.tools.values()).filter(tool => 
-      tool.name.toLowerCase().includes(lowerQuery) ||
-      tool.description.toLowerCase().includes(lowerQuery)
-    );
-  }
-
-  /**
-   * List all tools.
-   * @returns {Tool[]}
-   */
-  list() {
+  listTools() {
     return Array.from(this.tools.values());
   }
 
-  /**
-   * Export metadata for all tools.
-   * @returns {object[]} Array of metadata objects.
-   */
+  listTriggers() {
+    return Array.from(this.triggers.entries()).map(([name, trig]) => ({
+      name,
+      ...trig
+    }));
+  }
+
   toMetadata() {
-    return this.list().map(tool => tool.toMetadata());
+    return this.listTools().map(tool => tool.toMetadata());
   }
 }
 

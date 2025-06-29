@@ -1,0 +1,609 @@
+{
+  "baseUrl": "https://api.cal.com/v1",
+  "auth": {
+    "type": "query",
+    "key": "apiKey"
+  },
+  "endpoints": {
+    "/attendees_list": {
+      "path": "/attendees",
+      "method": "GET",
+      "description": "List all attendees",
+      "queryParams": [],
+      "requiresAuth": true
+    },
+    "/attendees_get": {
+      "path": "/attendees/{id}",
+      "method": "GET",
+      "description": "Retrieve a specific attendee by ID",
+      "queryParams": ["id"],
+      "requiresAuth": true
+    },
+    "/attendees_create": {
+      "path": "/attendees",
+      "method": "POST",
+      "description": "Create a new attendee",
+      "bodyParams": ["bookingId", "email", "name", "timeZone"],
+      "requiresAuth": true
+    },
+    "/attendees_update": {
+      "path": "/attendees/{id}",
+      "method": "PATCH",
+      "description": "Update an attendee by ID",
+      "bodyParams": ["email", "name", "timeZone"],
+      "queryParams": ["id"],
+      "requiresAuth": true
+    },
+    "/attendees_delete": {
+      "path": "/attendees/{id}",
+      "method": "DELETE",
+      "description": "Delete an attendee by ID",
+      "queryParams": ["id"],
+      "requiresAuth": true
+    },
+    "/availabilities_list": {
+      "path": "/availabilities/{id}",
+      "method": "GET",
+      "description": "Get availability by ID",
+      "queryParams": ["id"],
+      "requiresAuth": true
+    },
+    "/availabilities_create": {
+      "path": "/availabilities",
+      "method": "POST",
+      "description": "Create new availability",
+      "bodyParams": ["scheduleId", "days", "startTime", "endTime"],
+      "requiresAuth": true
+    },
+    "/availabilities_update": {
+      "path": "/availabilities/{id}",
+      "method": "PATCH",
+      "description": "Update availability by ID",
+      "bodyParams": ["scheduleId", "days", "startTime", "endTime"],
+      "queryParams": ["id"],
+      "requiresAuth": true
+    },
+    "/availabilities_delete": {
+      "path": "/availabilities/{id}",
+      "method": "DELETE",
+      "description": "Delete availability by ID",
+      "queryParams": ["id"],
+      "requiresAuth": true
+    },
+    "/booking-references_list": {
+      "path": "/booking-references",
+      "method": "GET",
+      "description": "List booking references",
+      "queryParams": [],
+      "requiresAuth": true
+    },
+    "/booking-references_get": {
+      "path": "/booking-references/{id}",
+      "method": "GET",
+      "description": "Retrieve booking reference by ID",
+      "queryParams": ["id"],
+      "requiresAuth": true
+    },
+    "/booking-references_create": {
+      "path": "/booking-references",
+      "method": "POST",
+      "description": "Create a new booking reference",
+      "bodyParams": [
+        "type",
+        "uid",
+        "meetingId",
+        "meetingPassword",
+        "meetingUrl",
+        "bookingId",
+        "externalCalendarId",
+        "deleted",
+        "credentialId"
+      ],
+      "requiresAuth": true
+    },
+    "/booking-references_update": {
+      "path": "/booking-references/{id}",
+      "method": "PATCH",
+      "description": "Update booking reference by ID",
+      "bodyParams": [
+        "type",
+        "meetingId",
+        "meetingPassword",
+        "externalCalendarId",
+        "deleted",
+        "credentialId"
+      ],
+      "queryParams": ["id"],
+      "requiresAuth": true
+    },
+    "/booking-references_delete": {
+      "path": "/booking-references/{id}",
+      "method": "DELETE",
+      "description": "Delete booking reference by ID",
+      "queryParams": ["id"],
+      "requiresAuth": true
+    },
+    "/bookings_create": {
+      "path": "/bookings",
+      "method": "POST",
+      "description": "Create a new booking",
+      "bodyParams": [
+        "eventTypeId",
+        "start",
+        "end",
+        "responses",
+        "timeZone",
+        "language",
+        "title",
+        "description",
+        "status",
+        "metadata"
+      ],
+      "requiresAuth": true
+    },
+    "/bookings_get": {
+      "path": "/bookings/{id}",
+      "method": "GET",
+      "description": "Retrieve booking details by ID",
+      "queryParams": ["id"],
+      "requiresAuth": true
+    },
+    "/bookings_update": {
+      "path": "/bookings/{id}",
+      "method": "PATCH",
+      "description": "Update booking details by ID",
+      "queryParams": ["id"],
+      "bodyParams": [
+        "title",
+        "start",
+        "end",
+        "status"
+      ],
+      "requiresAuth": true
+    },
+    "/bookings_cancel": {
+      "path": "/bookings/{id}/cancel",
+      "method": "DELETE",
+      "description": "Cancel a booking by ID",
+      "queryParams": ["id"],
+      "requiresAuth": true
+    },
+    "/bookings_recordings": {
+      "path": "/bookings/{id}/recordings",
+      "method": "GET",
+      "description": "Retrieve recordings for a booking by ID",
+      "queryParams": ["id"],
+      "requiresAuth": true
+    },
+    "/bookings_transcripts_list": {
+      "path": "/bookings/{id}/transcripts",
+      "method": "GET",
+      "description": "List transcripts for a booking",
+      "queryParams": ["id"],
+      "requiresAuth": true
+    },
+    "/bookings_transcripts_get": {
+      "path": "/bookings/{id}/transcripts/{recordingId}",
+      "method": "GET",
+      "description": "Retrieve a specific transcript for a booking by recording ID",
+      "queryParams": ["id", "recordingId"],
+      "requiresAuth": true
+    },
+    "/credential-sync_list": {
+      "path": "/credential-sync",
+      "method": "GET",
+      "description": "Retrieve current credential sync settings",
+      "queryParams": [],
+      "requiresAuth": true
+    },
+    "/credential-sync_create": {
+      "path": "/credential-sync",
+      "method": "POST",
+      "description": "Create new credential sync entry",
+      "bodyParams": ["encryptedKey", "appSlug"],
+      "requiresAuth": true
+    },
+    "/credential-sync_update": {
+      "path": "/credential-sync",
+      "method": "PATCH",
+      "description": "Update an existing credential sync entry",
+      "bodyParams": ["encryptedKey"],
+      "requiresAuth": true
+    },
+    "/credential-sync_delete": {
+      "path": "/credential-sync",
+      "method": "DELETE",
+      "description": "Delete credential sync entry",
+      "queryParams": [],
+      "requiresAuth": true
+    },
+    "/destination-calendars_list": {
+      "path": "/destination-calendars",
+      "method": "GET",
+      "description": "List all destination calendars",
+      "queryParams": [],
+      "requiresAuth": true
+    },
+    "/destination-calendars_create": {
+      "path": "/destination-calendars",
+      "method": "POST",
+      "description": "Create a destination calendar mapping",
+      "bodyParams": ["integration", "externalId", "eventTypeId", "bookingId", "userId"],
+      "requiresAuth": true
+    },
+    "/destination-calendars_get": {
+      "path": "/destination-calendars/{id}",
+      "method": "GET",
+      "description": "Retrieve a specific destination calendar by ID",
+      "queryParams": ["id"],
+      "requiresAuth": true
+    },
+    "/destination-calendars_update": {
+      "path": "/destination-calendars/{id}",
+      "method": "PATCH",
+      "description": "Update a destination calendar by ID",
+      "queryParams": ["id"],
+      "bodyParams": ["integration", "externalId", "eventTypeId", "bookingId"],
+      "requiresAuth": true
+    },
+    "/destination-calendars_delete": {
+      "path": "/destination-calendars/{id}",
+      "method": "DELETE",
+      "description": "Delete a destination calendar by ID",
+      "queryParams": ["id"],
+      "requiresAuth": true
+    },
+    "/event-types_list": {
+      "path": "/event-types",
+      "method": "GET",
+      "description": "List all event types",
+      "queryParams": [],
+      "requiresAuth": true
+    },
+    "/event-types_create": {
+      "path": "/event-types",
+      "method": "POST",
+      "description": "Create a new event type",
+      "bodyParams": [
+        "title",
+        "slug",
+        "length",
+        "hidden",
+        "position",
+        "eventName",
+        "timeZone",
+        "scheduleId",
+        "periodType",
+        "periodStartDate",
+        "periodEndDate",
+        "periodDays",
+        "periodCountCalendarDays",
+        "requiresConfirmation",
+        "recurringEvent",
+        "disableGuests",
+        "hideCalendarNotes",
+        "minimumBookingNotice",
+        "beforeEventBuffer",
+        "afterEventBuffer",
+        "price",
+        "currency",
+        "slotInterval",
+        "successRedirectUrl",
+        "description",
+        "metadata"
+      ],
+      "requiresAuth": true
+    },
+    "/event-types_get": {
+      "path": "/event-types/{id}",
+      "method": "GET",
+      "description": "Get event type by ID",
+      "queryParams": ["id"],
+      "requiresAuth": true
+    },
+    "/event-types_delete": {
+      "path": "/event-types/{id}",
+      "method": "DELETE",
+      "description": "Delete event type by ID",
+      "queryParams": ["id"],
+      "requiresAuth": true
+    },
+    "/event-types_update": {
+      "path": "/event-types/{id}",
+      "method": "PATCH",
+      "description": "Update event type by ID",
+      "queryParams": ["id"],
+      "bodyParams": ["length", "requiresConfirmation", "summary", "value"],
+      "requiresAuth": true
+    },
+    "/teams_event-types_list": {
+      "path": "/teams/{teamId}/event-types",
+      "method": "GET",
+      "description": "List event types for a specific team",
+      "queryParams": ["teamId"],
+      "requiresAuth": true
+    },
+    "/memberships_list": {
+      "path": "/memberships",
+      "method": "GET",
+      "description": "List memberships",
+      "queryParams": [],
+      "requiresAuth": true
+    },
+    "/memberships_create": {
+      "path": "/memberships",
+      "method": "POST",
+      "description": "Create a new membership",
+      "bodyParams": ["userId", "teamId", "role"],
+      "requiresAuth": true
+    },
+    "/memberships_get": {
+      "path": "/memberships/{userId}_{teamId}",
+      "method": "GET",
+      "description": "Get membership by userId and teamId",
+      "queryParams": ["userId", "teamId"],
+      "requiresAuth": true
+    },
+    "/memberships_delete": {
+      "path": "/memberships/{userId}_{teamId}",
+      "method": "DELETE",
+      "description": "Delete membership by userId and teamId",
+      "queryParams": ["userId", "teamId"],
+      "requiresAuth": true
+    },
+    "/memberships_update": {
+      "path": "/memberships/{userId}_{teamId}",
+      "method": "PATCH",
+      "description": "Update membership by userId and teamId",
+      "queryParams": ["userId", "teamId"],
+      "bodyParams": ["role"],
+      "requiresAuth": true
+    },
+    "/payments_list": {
+      "path": "/payments",
+      "method": "GET",
+      "description": "List payments",
+      "queryParams": [],
+      "requiresAuth": true
+    },
+    "/payments_get": {
+      "path": "/payments/{id}",
+      "method": "GET",
+      "description": "Get payment by ID",
+      "queryParams": ["id"],
+      "requiresAuth": true
+    },
+    "/schedules_list": {
+      "path": "/schedules",
+      "method": "GET",
+      "description": "List schedules",
+      "queryParams": [],
+      "requiresAuth": true
+    },
+    "/schedules_create": {
+      "path": "/schedules",
+      "method": "POST",
+      "description": "Create a new schedule",
+      "bodyParams": ["name", "timeZone"],
+      "requiresAuth": true
+    },
+    "/schedules_get": {
+      "path": "/schedules/{id}",
+      "method": "GET",
+      "description": "Get schedule by ID",
+      "queryParams": ["id"],
+      "requiresAuth": true
+    },
+    "/schedules_delete": {
+      "path": "/schedules/{id}",
+      "method": "DELETE",
+      "description": "Delete schedule by ID",
+      "queryParams": ["id"],
+      "requiresAuth": true
+    },
+    "/schedules_update": {
+      "path": "/schedules/{id}",
+      "method": "PATCH",
+      "description": "Update schedule by ID",
+      "queryParams": ["id"],
+      "bodyParams": ["name", "timeZone"],
+      "requiresAuth": true
+    },
+    "/selected-calendars_list": {
+      "path": "/selected-calendars",
+      "method": "GET",
+      "description": "List selected calendars",
+      "queryParams": [],
+      "requiresAuth": true
+    },
+    "/selected-calendars_create": {
+      "path": "/selected-calendars",
+      "method": "POST",
+      "description": "Create a selected calendar",
+      "bodyParams": ["integration", "externalId"],
+      "requiresAuth": true
+    },
+    "/selected-calendars_get": {
+      "path": "/selected-calendars/{userId}_{integration}_{externalId}",
+      "method": "GET",
+      "description": "Get a selected calendar",
+      "queryParams": ["userId", "integration", "externalId"],
+      "requiresAuth": true
+    },
+    "/selected-calendars_delete": {
+      "path": "/selected-calendars/{userId}_{integration}_{externalId}",
+      "method": "DELETE",
+      "description": "Delete a selected calendar",
+      "queryParams": ["userId", "integration", "externalId"],
+      "requiresAuth": true
+    },
+    "/selected-calendars_update": {
+      "path": "/selected-calendars/{userId}_{integration}_{externalId}",
+      "method": "PATCH",
+      "description": "Update a selected calendar",
+      "queryParams": ["userId", "integration", "externalId"],
+      "bodyParams": [],
+      "requiresAuth": true
+    },
+    "/slots_list": {
+      "path": "/slots",
+      "method": "GET",
+      "description": "List available slots",
+      "queryParams": [],
+      "requiresAuth": true
+    },
+    "/teams_list": {
+      "path": "/teams",
+      "method": "GET",
+      "description": "List teams",
+      "queryParams": [],
+      "requiresAuth": true
+    },
+    "/teams_create": {
+      "path": "/teams",
+      "method": "POST",
+      "description": "Create a team",
+      "bodyParams": [
+        "name",
+        "slug",
+        "hideBookATeamMember",
+        "brandColor",
+        "darkBrandColor",
+        "timeZone",
+        "weekStart",
+        "isPrivate",
+        "ownerId",
+        "parentId"
+      ],
+      "requiresAuth": true
+    },
+    "/teams_get": {
+      "path": "/teams/{teamId}",
+      "method": "GET",
+      "description": "Get team by ID",
+      "queryParams": ["teamId"],
+      "requiresAuth": true
+    },
+    "/teams_delete": {
+      "path": "/teams/{teamId}",
+      "method": "DELETE",
+      "description": "Delete team by ID",
+      "queryParams": ["teamId"],
+      "requiresAuth": true
+    },
+    "/teams_update": {
+      "path": "/teams/{teamId}",
+      "method": "PATCH",
+      "description": "Update team by ID",
+      "queryParams": ["teamId"],
+      "bodyParams": ["name", "slug"],
+      "requiresAuth": true
+    },
+    "/users_list": {
+      "path": "/users",
+      "method": "GET",
+      "description": "List all users",
+      "queryParams": [],
+      "requiresAuth": true
+    },
+    "/users_create": {
+      "path": "/users",
+      "method": "POST",
+      "description": "Create a new user",
+      "bodyParams": [
+        "email",
+        "username",
+        "weekStart",
+        "brandColor",
+        "darkBrandColor",
+        "timeZone",
+        "theme",
+        "timeFormat",
+        "locale"
+      ],
+      "requiresAuth": true
+    },
+    "/users_get": {
+      "path": "/users/{userId}",
+      "method": "GET",
+      "description": "Get user by ID",
+      "queryParams": ["userId"],
+      "requiresAuth": true
+    },
+    "/users_delete": {
+      "path": "/users/{userId}",
+      "method": "DELETE",
+      "description": "Delete user by ID",
+      "queryParams": ["userId"],
+      "requiresAuth": true
+    },
+    "/users_update": {
+      "path": "/users/{userId}",
+      "method": "PATCH",
+      "description": "Update user by ID",
+      "queryParams": ["userId"],
+      "bodyParams": [
+        "email",
+        "username",
+        "weekStart",
+        "brandColor",
+        "darkBrandColor",
+        "timeZone",
+        "theme",
+        "timeFormat",
+        "locale"
+      ],
+      "requiresAuth": true
+    },
+    "/webhooks_list": {
+      "path": "/webhooks",
+      "method": "GET",
+      "description": "List all webhooks",
+      "queryParams": [],
+      "requiresAuth": true
+    },
+    "/webhooks_create": {
+      "path": "/webhooks",
+      "method": "POST",
+      "description": "Create a new webhook",
+      "bodyParams": [
+        "subscriberUrl",
+        "eventTriggers",
+        "active",
+        "payloadTemplate",
+        "eventTypeId",
+        "secret"
+      ],
+      "requiresAuth": true
+    },
+    "/webhooks_get": {
+      "path": "/webhooks/{id}",
+      "method": "GET",
+      "description": "Get webhook by ID",
+      "queryParams": ["id"],
+      "requiresAuth": true
+    },
+    "/webhooks_delete": {
+      "path": "/webhooks/{id}",
+      "method": "DELETE",
+      "description": "Delete webhook by ID",
+      "queryParams": ["id"],
+      "requiresAuth": true
+    },
+    "/webhooks_update": {
+      "path": "/webhooks/{id}",
+      "method": "PATCH",
+      "description": "Update webhook by ID",
+      "queryParams": ["id"],
+      "bodyParams": [
+        "subscriberUrl",
+        "eventTriggers",
+        "active",
+        "payloadTemplate",
+        "eventTypeId",
+        "secret"
+      ],
+      "requiresAuth": true
+    }
+  }
+}

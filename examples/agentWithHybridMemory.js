@@ -50,17 +50,14 @@ const memory = new Memory({
 
 // ✅ Pre-store some entity knowledge (simulate prior knowledge)
 memory.setEntity('assistant', 'Sarah'); // persistent fact
-memory.setEntity('favorite_channel', 'C0123456789'); // a Slack channel ID (fake example)
+memory.setEntity('favorite_channel', 'C093E89DD4J'); // a Slack channel ID (fake example)
 
 // ✅ Initialize Agent
 const agent = new Agent(openai, {
   tools: registry.list(),
   memory,
   description: `
-    You are a helpful personal assistant. 
-    Only use tools/functions if available and applicable. 
-    You remember facts like who the assistant is, favorite channels, or workspace IDs.
-    If a required value is not found in memory, ask the user.
+    You are a helpful personal assistant.
   `,
   askUser: createConsoleAskUser(),
 });

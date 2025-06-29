@@ -27,13 +27,22 @@ class Agent {
     askUser = null
   } = {}) {
     this.adapter = adapter;
-    if (tools.list && typeof tools.list === 'function') {
+    if (tools?.listTools && typeof tools.listTools === 'function') {
       // It's a ToolRegistry instance
       this.toolRegistry = tools;
-      this.tools = this.toolRegistry.list();
-    } else {
+      this.tools = this.toolRegistry.listTools();
+    } else if (Array.isArray(tools)) {
+      // It's a raw array of tools
       this.toolRegistry = null;
-      this.tools = tools.map(tool => tool instanceof Tool ? tool : new Tool(tool));
+      this.tools = tools;
+    } else if (tools?.tools) {
+      // If passing { tools, triggers } object directly
+      this.toolRegistry = null;
+      this.tools = tools.tools;
+    } else {
+      throw new Error(
+        '[Agent] Invalid tools input. Must be ToolRegistry instance, array, or { tools, triggers } object.'
+      );
     }
     this.memory = memory;
     this.defaultConfig = defaultConfig;

@@ -27,7 +27,10 @@
     "jest": "^29.7.0"
   },
   "dependencies": {
+    "@activepieces/piece-cal-com": "^0.3.3",
+    "@activepieces/piece-calendly": "^0.3.5",
     "@activepieces/piece-github": "^0.5.2",
+    "@activepieces/piece-gmail": "^0.8.2",
     "@activepieces/piece-notion": "^0.3.3",
     "@activepieces/piece-slack": "^0.9.2",
     "@anthropic-ai/sdk": "^0.35.0",

@@ -10,56 +10,66 @@ class PieceTool extends Tool {
     const authContext = PieceTool.normalizeAuth(authToken);
 
     const implementation = async (args) => {
-      const authKeysToTry = ['access_token', 'token', 'api_key', 'bearer_token', 'key'];
+        const authKeysToTry = ['access_token', 'token', 'api_key', 'bearer_token', 'key'];
 
-      let lastError = null;
+        let lastError = null;
 
-      for (const key of authKeysToTry) {
-        const authAttempt = {
-          [key]:
-            authContext[key] ||
-            authContext.access_token ||
-            authContext.token ||
-            authContext.api_key ||
-            authContext.bearer_token ||
-            authContext.key,
-        };
+        const transformedArgs = spec.transformArgs(actionKey, args);
 
-        const argsWithAuth = {
-          ...args,
-          [key]: authAttempt[key],
-        };
+        const isApiSpecStyle = action.run.length === 2; // (params, context) signature
 
-        const transformedArgs = spec.transformArgs(actionKey, argsWithAuth);
+        for (const key of authKeysToTry) {
+            const authAttempt = {
+            [key]:
+                authContext[key] ||
+                authContext.access_token ||
+                authContext.token ||
+                authContext.api_key ||
+                authContext.bearer_token ||
+                authContext.key,
+            };
 
-        try {
-          const result = await action.run({
-            propsValue: transformedArgs,
-            auth: authAttempt,
-            store: {},
-          });
+            const argsWithAuth = {
+            ...transformedArgs,
+            [key]: authAttempt[key],
+            };
 
-          return spec.transformResult(actionKey, result);
-        } catch (err) {
-          const errorMessage = err?.message || err?.data?.error || '';
+            try {
+            let result;
 
-          if (
-            errorMessage.includes('not_authed') ||
-            errorMessage.includes('invalid_auth') ||
-            errorMessage.includes('missing_auth')
-          ) {
-            console.warn(`[PieceTool] Auth with key "${key}" failed: ${errorMessage}`);
-            lastError = err;
-            continue;
-          }
+            if (isApiSpecStyle) {
+                // 🔥 API Spec style: run(params, context)
+                result = await action.run(argsWithAuth, { authToken: authAttempt[key] });
+            } else {
+                // 🔥 Piece native style: run({ propsValue, auth, store })
+                result = await action.run({
+                propsValue: argsWithAuth,
+                auth: authAttempt,
+                store: {},
+                });
+            }
 
-          throw err;
+            return spec.transformResult(actionKey, result);
+            } catch (err) {
+            const errorMessage = err?.message || err?.data?.error || '';
+
+            if (
+                errorMessage.includes('not_authed') ||
+                errorMessage.includes('invalid_auth') ||
+                errorMessage.includes('missing_auth')
+            ) {
+                console.warn(`[PieceTool] Auth with key "${key}" failed: ${errorMessage}`);
+                lastError = err;
+                continue;
+            }
+
+            throw err;
+            }
         }
-      }
 
-      throw new Error(
-        `[PieceTool] All auth attempts failed for ${name}: ${lastError?.message || lastError}`
-      );
+        throw new Error(
+            `[PieceTool] All auth attempts failed for ${this.name}: ${lastError?.message || lastError}`
+        );
     };
 
     super({
@@ -111,7 +121,10 @@ class PieceTool extends Tool {
       properties[key] = {
         type: PieceTool.mapPropertyType(prop),
         description: prop.description || prop.displayName || '',
-        aliases: [...(PieceTool.getDefaultAliases(key) || []), ...(spec.getAliases()?.[key] || [])],
+        aliases: [
+            ...(PieceTool.getDefaultAliases(key) || []), 
+            ...((spec?.getAliases?.()?.[key]) || [])
+        ],
       };
       if (prop.required) {
         required.push(key);
