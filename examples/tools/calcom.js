@@ -5,11 +5,11 @@ const path = require('path');
 
 const { calcom } = require('@activepieces/piece-cal-com');
 
-const { ToolRegistry } = require('../../src/tools/ToolRegistry');
-const { PieceLoader } = require('../../src/tools/PieceLoader');
+const { ToolRegistry } = require('../../src/tools/adapters/ToolRegistry');
+const { PieceLoader } = require('../../src/tools/adapters/ApiLoader');
 const { Agent } = require('../../src/agent/Agent');
 const { OpenAIAdapter } = require('../../src/llm/openAi');
-const { CalcomSpec } = require('../../src/tools/specs/CalcomSpec');
+const { CalcomSpec } = require('../../src/tools/integrations/calcom/CalcomSpec');
 const { createConsoleAskUser } = require('../../src/utils/ConsoleAskUser');
 
 // 🔥 Load Cal.com API spec
@@ -28,6 +28,7 @@ const { tools, triggers } = PieceLoader.load({
 });
 
 registry.register({ tools, triggers });
+const askUser = createConsoleAskUser();
 
 console.log('🔧 Registered Tools:', registry.listTools().map(t => t.name));
 
@@ -35,14 +36,19 @@ console.log('🔧 Registered Tools:', registry.listTools().map(t => t.name));
 const agent = new Agent(new OpenAIAdapter(process.env.OPENAI_API_KEY), {
   tools: registry,
   description: 'You are an AI assistant that works with Cal.com API and native tools.',
-  askUser: createConsoleAskUser(),
+  askUser: askUser,
 });
 
 // ▶️ Run it
 (async () => {
-  const response = await agent.sendMessage(
-    `Block my calendar next tuesday full day.`
-  );
-
-  console.log('🧠 Agent Response:', response);
+  try {
+    const response = await agent.sendMessage(
+      `create two bookings for the day after tomorrow in lisbon timezone and list all bookings that day.Today is the 1st of july 2025. My name is Paulo and the email is paulogustavopeixoto@gmail.com. The event id is 977760`
+    );
+    console.log('🧠 Agent Response:', response);
+  } catch (err) {
+    console.error('❌ Error:', err);
+  } finally {
+    askUser.close(); // 🔥 Cleanly close readline
+  }
 })();
