@@ -20,6 +20,7 @@ const { repairJsonOutput } = require('./src/utils');
 const { MCPTool } = require('./src/mcp/MCPTool');
 const { MCPClient } = require('./src/mcp/MCPClient');
 const { OpenAPILoader } = require('./src/api/OpenAPILoader');
+const { ApiLoader } = require('./src/api/ApiLoader');
 
 module.exports = {
   Agent,
@@ -42,5 +43,6 @@ module.exports = {
   MCPTool,
   MCPClient,
   OpenAPILoader,
-  MCPDiscoveryLoader
+  MCPDiscoveryLoader,
+  ApiLoader
 };
