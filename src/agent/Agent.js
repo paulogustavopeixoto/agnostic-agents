@@ -333,6 +333,22 @@ class Agent {
       this.adapter.generateVideo(promptObject.user, finalConfig)
     );
   }
+
+  async init() {
+  if (this.mcpClient && typeof this.mcpClient.toTools === "function") {
+    try {
+      const mcpTools = await this.mcpClient.toTools();
+      if (Array.isArray(mcpTools) && mcpTools.length > 0) {
+        this.tools.push(...mcpTools);
+        console.log("[Agent] MCP tools loaded:", mcpTools.map(t => t.name));
+      }
+    } catch (err) {
+      console.warn("[Agent] Failed to load MCP tools:", err.message);
+    }
+  }
 }
+}
+
+
 
 module.exports = { Agent };

@@ -1,5 +1,5 @@
 // src/tools/adapters/MCPTool.js
-const { Tool } = require('./Tool');
+const { Tool } = require('../tools/adapters/Tool');
 
 class MCPTool extends Tool {
   constructor({ name, description, parameters, endpoint, apiKey, mcpClient, strict = true }) {
