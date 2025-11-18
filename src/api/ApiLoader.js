@@ -1,5 +1,5 @@
 // src/tools/adapters/ApiLoader.js
-const { ApiTool } = require('../tools/adapters/ApiTool');
+const { ApiTool } = require('./ApiTool');
 
 function normalizeType(type) {
   const valid = ['string', 'number', 'integer', 'boolean', 'object', 'array'];

@@ -2,8 +2,8 @@
 const { Agent } = require("../agent/Agent");
 const { RAG } = require("../rag/RAG");
 const { RetryManager } = require('../utils/RetryManager');
-const { Tool } = require('../agent/Tool');
-const { MCPTool } = require('../tools/MCPTool');
+const { Tool } = require('../tools/adapters/Tool');
+const { MCPTool } = require('../mcp/MCPTool');
 
 class Task {
   /**
