@@ -1,14 +1,18 @@
 // src/agent/Memory.js
+const { EventEmitter } = require('events');
 
-class Memory {
+class Memory extends EventEmitter {
   constructor({ vectorStore = null, adapter = null } = {}) {
+    super();
     this.conversation = [];
-    this.entities = {}; // { key: { value, expiresAt } }
+    this.entities = {};
     this.vectorStore = vectorStore;
     this.adapter = adapter;
   }
 
-  /** Helper to generate embedding from adapter */
+  /** ----------------------
+   * Embedding Helper
+   ------------------------ */
   async _getEmbedding(text) {
     if (!this.adapter?.embedChunks) {
       throw new Error('Adapter does not support embedChunks');
@@ -22,6 +26,7 @@ class Memory {
    ------------------------ */
   storeConversation(userMessage, agentResponse) {
     this.conversation.push({ user: userMessage, agent: agentResponse });
+    this.emit('conversationUpdate', { user: userMessage, agent: agentResponse });
   }
 
   getContext() {
@@ -35,19 +40,24 @@ class Memory {
    ------------------------ */
   setEntity(key, value, ttlMs = null) {
     const expiresAt = ttlMs ? Date.now() + ttlMs : null;
-    this.entities[key.toLowerCase()] = { value, expiresAt };
+    const k = key.toLowerCase();
+    this.entities[k] = { value, expiresAt };
+
+    this.emit('memoryUpdate', { type: 'entity', key, value, expiresAt });
 
     console.log(`[EntityMemory] Stored "${key}" → "${value}" (TTL: ${ttlMs ? ttlMs / 1000 + 's' : 'Forever'})`);
   }
 
   getEntity(key) {
-    const item = this.entities[key.toLowerCase()];
+    const k = key.toLowerCase();
+    const item = this.entities[k];
     if (!item) return null;
 
     const now = Date.now();
     if (item.expiresAt && item.expiresAt < now) {
       console.log(`[EntityMemory] "${key}" has expired. Removing.`);
-      delete this.entities[key.toLowerCase()];
+      delete this.entities[k];
+      this.emit('memoryExpire', { type: 'entity', key });
       return null;
     }
 
@@ -57,11 +67,11 @@ class Memory {
   /** ----------------------
    * Semantic Memory (Vector DB)
    ------------------------ */
-  async storeSemanticMemory(key, value, metadata = {}) {
+  async storeSemanticMemory(fact, metadata = {}) {
     if (!this.vectorStore) return;
 
-    const id = `${key}-${Date.now()}`;
-    const embedding = await this._getEmbedding(`${key}: ${value}`);
+    const id = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+    const embedding = await this._getEmbedding(fact);
 
     await this.vectorStore.upsert({
       vectors: [
@@ -69,15 +79,16 @@ class Memory {
           id,
           values: embedding,
           metadata: {
-            key,
-            value,
+            fact,
             ...metadata
           }
         }
       ]
     });
 
-    console.log(`[SemanticMemory] Stored: "${key}" → "${value}"`);
+    this.emit('memoryUpdate', { type: 'semantic', fact, id });
+
+    console.log(`[SemanticMemory] Stored fact: "${fact}"`);
   }
 
   async searchSemanticMemory(query, topK = 3) {
@@ -90,14 +101,38 @@ class Memory {
       topK,
     });
 
-    if (!matches?.length) return null;
+    if (!matches?.length) {
+      console.log(`[SemanticMemory] No matches found for "${query}".`);
+      return null;
+    }
 
     const topMatch = matches[0];
-    const { metadata } = topMatch;
+    const { metadata, score } = topMatch;
 
-    console.log(`[SemanticMemory] Retrieved for "${query}":`, metadata);
+    console.log(`[SemanticMemory] Top match for "${query}" (score ${score}):`, metadata);
 
-    return metadata?.value || null;
+    return metadata?.fact || null;
+  }
+
+  async searchAll(query, topK = 3) {
+    if (!this.vectorStore) return [];
+
+    const embedding = await this._getEmbedding(query);
+
+    const { matches } = await this.vectorStore.query({
+      vector: embedding,
+      topK,
+    });
+
+    if (!matches?.length) {
+      console.log(`[SemanticMemory] No matches found for "${query}".`);
+      return [];
+    }
+
+    return matches.map(match => ({
+      fact: match.metadata?.fact,
+      score: match.score,
+    }));
   }
 
   /** ----------------------
@@ -105,16 +140,12 @@ class Memory {
    ------------------------ */
   async get(key) {
     const fromEntity = this.getEntity(key);
-    if (fromEntity) {
-      return fromEntity;
-    }
+    if (fromEntity) return fromEntity;
 
     const fromSemantic = await this.searchSemanticMemory(key);
-    if (fromSemantic) {
-      return fromSemantic;
-    }
+    if (fromSemantic) return fromSemantic;
 
-    return null; // Signal missing
+    return null;
   }
 
   /** ----------------------
@@ -124,7 +155,8 @@ class Memory {
     this.setEntity(key, value, ttlMs);
 
     if (persist && this.vectorStore) {
-      await this.storeSemanticMemory(key, value);
+      const fact = `${key} is ${value}`;
+      await this.storeSemanticMemory(fact);
     }
   }
 
@@ -133,20 +165,24 @@ class Memory {
    ------------------------ */
   clearConversation() {
     this.conversation = [];
+    this.emit('memoryClear', { type: 'conversation' });
   }
 
   clearEntities() {
     this.entities = {};
+    this.emit('memoryClear', { type: 'entity' });
   }
 
   async clearSemanticMemory() {
     await this.vectorStore?.deleteAll();
+    this.emit('memoryClear', { type: 'semantic' });
   }
 
   async clearAll() {
     this.clearConversation();
     this.clearEntities();
     await this.clearSemanticMemory();
+    this.emit('memoryClear', { type: 'all' });
   }
 }
 

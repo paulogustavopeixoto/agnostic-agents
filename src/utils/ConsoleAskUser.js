@@ -1,3 +1,4 @@
+// src/utils/ConsoleAskUser.js
 const readline = require('readline');
 
 function createConsoleAskUser() {
@@ -6,13 +7,19 @@ function createConsoleAskUser() {
     output: process.stdout,
   });
 
-  return (field, tool) => {
+  const ask = (field, tool) => {
     return new Promise((resolve) => {
       rl.question(`🤖 I need "${field}" to run "${tool.name}". Please provide: `, (answer) => {
         resolve(answer);
       });
     });
   };
+
+  ask.close = () => {
+    rl.close();
+  };
+
+  return ask;
 }
 
 module.exports = { createConsoleAskUser };

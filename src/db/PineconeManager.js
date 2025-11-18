@@ -1,3 +1,4 @@
+// src/db/PineconeManager.js
 const { Pinecone } = require('@pinecone-database/pinecone');
 
 class PineconeManager {

@@ -1,7 +1,7 @@
 // src/agent/Agent.js
 const { RetryManager } = require('../utils/RetryManager');
-const { Tool } = require('./Tool');
-const { MCPTool } = require('../tools/MCPTool');
+const { Tool } = require('../tools/adapters/Tool');
+const { MCPTool } = require('../mcp/MCPTool');
 const { MissingInfoResolver } = require('./MissingInfoResolver');
 const { ToolValidator } = require('../utils/ToolValidator');
 
@@ -27,16 +27,17 @@ class Agent {
     askUser = null
   } = {}) {
     this.adapter = adapter;
+
     if (tools?.listTools && typeof tools.listTools === 'function') {
-      // It's a ToolRegistry instance
+      // ToolRegistry instance
       this.toolRegistry = tools;
       this.tools = this.toolRegistry.listTools();
     } else if (Array.isArray(tools)) {
-      // It's a raw array of tools
+      // Raw array of tools
       this.toolRegistry = null;
       this.tools = tools;
     } else if (tools?.tools) {
-      // If passing { tools, triggers } object directly
+      // { tools, triggers } object
       this.toolRegistry = null;
       this.tools = tools.tools;
     } else {
@@ -44,6 +45,7 @@ class Agent {
         '[Agent] Invalid tools input. Must be ToolRegistry instance, array, or { tools, triggers } object.'
       );
     }
+
     this.memory = memory;
     this.defaultConfig = defaultConfig;
     this.description = description;
@@ -54,7 +56,8 @@ class Agent {
     this.resolver = new MissingInfoResolver({
       memory: this.memory,
       rag: this.rag,
-      askUser: askUser,  
+      askUser: askUser,
+      tools: this.tools,
     });
   }
 
@@ -102,8 +105,9 @@ class Agent {
   // Helper to build the system prompt from description and user input
   async _buildSystemPrompt(userPrompt = "") {
     const memoryContext = this.memory ? await this._retrieveMemoryContext(userPrompt) : "";
-
-    const system = this.description || "";
+    const now = new Date();
+    const dateString = now.toUTCString();
+    const system = (this.description || '') + `\nCurrent date and time is: ${dateString}\n`;
     const context = (this.memory ? this.memory.getContext() : "") + memoryContext;
     const user = userPrompt || "";
 
@@ -220,10 +224,10 @@ class Agent {
     if (!toolInstance) {
       throw new Error(`Tool ${toolCall.name} not found.`);
     }
-
+    console.log(`[Agent] Executing tool: ${toolCall.name} with args:`, toolCall.arguments);
     try {
       const resolvedArgs = await this.resolver.resolve(toolInstance, toolCall.arguments || {});
-      const result = await toolInstance.call(resolvedArgs);
+      const result = await toolInstance.call(resolvedArgs, { props: toolInstance.props });
       return result;
     } catch (err) {
       console.warn(`[Agent] Tool "${toolCall.name}" failed with error:`, err);

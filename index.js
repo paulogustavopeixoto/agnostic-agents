@@ -1,6 +1,7 @@
 // index.js
 const { Agent } = require('./src/agent/Agent');
-const { Tool } = require('./src/agent/Tool');
+const { Tool } = require('./src/tools/adapters/Tool');
+const { MCPDiscoveryLoader } = require('./src/tools/adapters/MCPDiscoveryLoader');
 const { Memory } = require('./src/agent/Memory'); 
 const { OpenAIAdapter } = require('./src/llm/openAi');
 const { GeminiAdapter } = require('./src/llm/gemini');
@@ -16,7 +17,9 @@ const { RetryManager } = require('./src/utils');
 const { encodeBase64 } = require('./src/utils');
 const { chunkText } = require('./src/utils');
 const { repairJsonOutput } = require('./src/utils');
-const { MCPTool } = require('./src/tools/MCPTool');
+const { MCPTool } = require('./src/mcp/MCPTool');
+const { MCPClient } = require('./src/mcp/MCPClient');
+const { OpenAPILoader } = require('./src/api/OpenAPILoader');
 
 module.exports = {
   Agent,
@@ -37,4 +40,7 @@ module.exports = {
   repairJsonOutput,
   encodeBase64,
   MCPTool,
+  MCPClient,
+  OpenAPILoader,
+  MCPDiscoveryLoader
 };

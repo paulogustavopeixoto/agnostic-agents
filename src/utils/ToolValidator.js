@@ -1,3 +1,4 @@
+// src/utils/ToolValidator.js
 const Ajv = require('ajv');
 
 class ToolValidator {
@@ -10,6 +11,7 @@ class ToolValidator {
    * Supports nested validation.
    */
   validate(tool, args = {}) {
+    console.log(`[VALIDATOR] Validating args: ${JSON.stringify(args, null, 4)}`)
     const validate = this.ajv.compile(tool.parameters);
     const valid = validate(args);
 

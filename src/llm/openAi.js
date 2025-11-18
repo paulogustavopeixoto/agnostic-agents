@@ -1,4 +1,4 @@
-// src/llm/OpenAi.js
+// src/llm/openAi.js
 const { OpenAI } = require("openai");
 const { BaseProvider } = require('./BaseProvider');
 const { RetryManager } = require('../utils/RetryManager');

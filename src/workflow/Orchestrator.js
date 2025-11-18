@@ -1,4 +1,4 @@
-// src/orchestrator/Orchestrator.js
+// src/workflow/Orchestrator.js
 const { Agent } = require("../agent/Agent");
 const { Task } = require("./Task");
 const { RAG } = require("../rag/RAG");

@@ -1,3 +1,4 @@
+// src/utils/encodeBase64.js
 const fs = require('fs');
 
 /**
@@ -9,4 +10,3 @@ async function encodeBase64(imagePath) {
 }
 
 module.exports = { encodeBase64 };
-// Then pass "data:image/png;base64,<base64String>" or something similar
