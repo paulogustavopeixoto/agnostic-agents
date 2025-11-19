@@ -1,6 +1,6 @@
 require('dotenv').config();
 
-const { OpenAIAdapter } = require('../src/llm/openAi');
+const { OpenAIAdapter } = require('../src/llm/OpenAi');
 const { ToolRegistry } = require('../src/tools/adapters/ToolRegistry');
 const { Planner } = require('../src/planner/Planner');
 const { PlanExecutor } = require('../src/planner/PlanExecutor');
