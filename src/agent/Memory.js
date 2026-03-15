@@ -45,7 +45,6 @@ class Memory extends EventEmitter {
 
     this.emit('memoryUpdate', { type: 'entity', key, value, expiresAt });
 
-    console.log(`[EntityMemory] Stored "${key}" → "${value}" (TTL: ${ttlMs ? ttlMs / 1000 + 's' : 'Forever'})`);
   }
 
   getEntity(key) {
@@ -55,7 +54,6 @@ class Memory extends EventEmitter {
 
     const now = Date.now();
     if (item.expiresAt && item.expiresAt < now) {
-      console.log(`[EntityMemory] "${key}" has expired. Removing.`);
       delete this.entities[k];
       this.emit('memoryExpire', { type: 'entity', key });
       return null;
@@ -87,8 +85,6 @@ class Memory extends EventEmitter {
     });
 
     this.emit('memoryUpdate', { type: 'semantic', fact, id });
-
-    console.log(`[SemanticMemory] Stored fact: "${fact}"`);
   }
 
   async searchSemanticMemory(query, topK = 3) {
@@ -102,14 +98,11 @@ class Memory extends EventEmitter {
     });
 
     if (!matches?.length) {
-      console.log(`[SemanticMemory] No matches found for "${query}".`);
       return null;
     }
 
     const topMatch = matches[0];
     const { metadata, score } = topMatch;
-
-    console.log(`[SemanticMemory] Top match for "${query}" (score ${score}):`, metadata);
 
     return metadata?.fact || null;
   }
@@ -125,7 +118,6 @@ class Memory extends EventEmitter {
     });
 
     if (!matches?.length) {
-      console.log(`[SemanticMemory] No matches found for "${query}".`);
       return [];
     }
 

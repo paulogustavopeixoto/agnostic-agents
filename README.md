@@ -111,10 +111,15 @@ The agent validates tool arguments against `parameters`, applies schema defaults
 
 ## Examples
 
+- `npm run example:local-tool`
+- `npm run example:local-rag`
+- `npm run example:local-rag-tool`
 - `npm run example:openai`
 - `npm run example:gemini`
 
 Additional examples live in [`examples/`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples).
+
+Maintained `v1` examples are documented in [`examples/README.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples/README.md).
 
 ## Current v1 scope
 
@@ -127,8 +132,35 @@ This package currently targets:
 
 Some adapters expose extra audio, image, or video methods, but support varies by provider.
 
+## Adapter capabilities
+
+Each adapter exposes `getCapabilities()` with the normalized capability map:
+
+- `generateText`
+- `toolCalling`
+- `embeddings`
+- `imageAnalysis`
+- `imageGeneration`
+- `audioTranscription`
+- `audioGeneration`
+- `videoAnalysis`
+- `videoGeneration`
+
+Use this to decide whether to expose optional features in your app.
+
 ## Development
 
 ```bash
 npm test
 ```
+
+Available test commands:
+
+```bash
+npm run test:unit
+npm run test:integration
+npm run test:live
+npm run test:all
+```
+
+Live tests use `.env` keys and only run when `RUN_LIVE_API_TESTS=1` is set by the script. Provider-account limitations such as quota, billing, or model availability are treated as skippable smoke-test conditions rather than framework failures.

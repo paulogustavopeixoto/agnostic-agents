@@ -11,6 +11,7 @@ const { LocalVectorStore } = require('../src/db/LocalVectorStore');
 const { MCPClient } = require('../src/mcp/MCPClient');
 const { OpenAPILoader } = require('../src/api/OpenAPILoader');
 const { ApiLoader } = require('../src/api/ApiLoader');
+const { ToolValidator } = require('../src/utils/ToolValidator');
 
 describe('Package/module unit tests', () => {
   afterEach(() => {
@@ -57,6 +58,18 @@ describe('Package/module unit tests', () => {
       input_schema: tool.parameters,
     });
     await expect(tool.call({ expression: '1+1' })).resolves.toEqual({ result: '1+1' });
+  });
+
+  test('ToolValidator rejects malformed schemas', () => {
+    const validator = new ToolValidator();
+    const malformedTool = {
+      name: 'broken',
+      parameters: {
+        type: 'not-a-real-json-schema-type',
+      },
+    };
+
+    expect(() => validator.validate(malformedTool, {})).toThrow();
   });
 
   test('Memory supports entities, conversation context, semantic lookup, and clearing', async () => {

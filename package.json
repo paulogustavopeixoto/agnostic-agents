@@ -3,6 +3,16 @@
   "version": "1.0.39",
   "description": "A Node.js package for multi-LLM agent support",
   "main": "index.js",
+  "files": [
+    "index.js",
+    "src",
+    "examples",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "directories": {
     "example": "examples",
     "test": "tests"
@@ -10,11 +20,15 @@
   "scripts": {
     "test": "jest",
     "test:unit": "jest --runInBand",
+    "test:integration": "jest --runInBand tests/agent.test.js tests/package.unit.test.js tests/examples.unit.test.js",
     "test:live": "RUN_LIVE_API_TESTS=1 jest --runInBand tests/live",
     "test:all": "npm run test:unit && npm run test:live",
     "test:watch": "jest --watch",
     "example:openai": "node examples/openaiExample.js",
-    "example:gemini": "node examples/geminiExample.js"
+    "example:gemini": "node examples/geminiExample.js",
+    "example:local-tool": "node examples/localToolExample.js",
+    "example:local-rag": "node examples/localRagExample.js",
+    "example:local-rag-tool": "node examples/localRagToolExample.js"
   },
   "repository": {
     "type": "git",

@@ -7,7 +7,15 @@ const path = require('path');
 
 class GeminiAdapter extends BaseProvider {
   constructor(apiKey, config = {}) {
-    super();
+    super({
+      capabilities: {
+        toolCalling: true,
+        embeddings: true,
+        imageAnalysis: true,
+        videoAnalysis: true,
+        videoGeneration: true,
+      },
+    });
     this.genAI = new GoogleGenerativeAI(apiKey);
     this.model = config.model || 'gemini-1.5-pro'; // Initialize model
     this.retryManager = new RetryManager({ retries: 3, baseDelay: 1000, maxDelay: 10000 });

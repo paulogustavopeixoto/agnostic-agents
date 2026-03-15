@@ -2,8 +2,27 @@
 const { RetryManager } = require('../utils/RetryManager');
 
 class BaseProvider {
-  constructor({ retryManager = new RetryManager({ retries: 3, baseDelay: 1000, maxDelay: 10000 }) } = {}) {
+  constructor({
+    retryManager = new RetryManager({ retries: 3, baseDelay: 1000, maxDelay: 10000 }),
+    capabilities = {},
+  } = {}) {
     this.retryManager = retryManager;
+    this.capabilities = {
+      generateText: true,
+      toolCalling: false,
+      embeddings: false,
+      imageAnalysis: false,
+      imageGeneration: false,
+      audioTranscription: false,
+      audioGeneration: false,
+      videoAnalysis: false,
+      videoGeneration: false,
+      ...capabilities,
+    };
+  }
+
+  getCapabilities() {
+    return { ...this.capabilities };
   }
 
   /**

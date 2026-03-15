@@ -248,6 +248,55 @@ describe('Agent', () => {
     );
   });
 
+  test('supports combined RAG context and tool execution in the same run', async () => {
+    const rag = {
+      search: jest.fn().mockResolvedValue(['Lisbon is windy today.']),
+    };
+    const tool = new Tool({
+      name: 'get_weather',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string' },
+        },
+        required: ['query'],
+      },
+      implementation: async () => ({ forecast: 'Sunny', temperatureC: 21 }),
+    });
+
+    mockAdapter.generateText = jest.fn()
+      .mockResolvedValueOnce({
+        message: '',
+        toolCalls: [{ name: 'get_weather', arguments: { query: 'Lisbon weather' }, id: 'tool_use_1' }],
+      })
+      .mockResolvedValueOnce({
+        message: 'Grounded answer with tool data',
+      });
+
+    const agent = new Agent(mockAdapter, { tools: [tool], rag, retryManager });
+    const response = await agent.sendMessage('What should I know about Lisbon and the weather?');
+
+    expect(response).toBe('Grounded answer with tool data');
+    expect(rag.search).toHaveBeenCalled();
+    expect(mockAdapter.generateText).toHaveBeenNthCalledWith(
+      1,
+      expect.arrayContaining([
+        expect.objectContaining({
+          role: 'user',
+          content: expect.stringContaining('Retrieved context:\nLisbon is windy today.'),
+        }),
+      ]),
+      expect.objectContaining({ tools: [tool] })
+    );
+    expect(mockAdapter.generateText).toHaveBeenNthCalledWith(
+      2,
+      expect.arrayContaining([
+        expect.objectContaining({ role: 'function', name: 'get_weather' }),
+      ]),
+      expect.objectContaining({ tools: [tool] })
+    );
+  });
+
   test('analyzes images with a resolved prompt object', async () => {
     const agent = new Agent(mockAdapter);
     await expect(agent.analyzeImage('mock-image-data', { prompt: 'Describe this' })).resolves.toBe(

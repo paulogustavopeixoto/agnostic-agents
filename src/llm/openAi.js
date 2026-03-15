@@ -13,7 +13,17 @@ class OpenAIAdapter extends BaseProvider {
    * @param {number} [options.maxRetries=3] - Number of retries (passed to RetryManager)
    */
   constructor(apiKey, options = {}) {
-    super(options); // Initialize BaseProvider with retryManager
+    super({
+      ...options,
+      capabilities: {
+        toolCalling: true,
+        embeddings: true,
+        imageAnalysis: true,
+        imageGeneration: true,
+        audioTranscription: true,
+        audioGeneration: true,
+      },
+    });
     this.apiKey = apiKey;
     this.openai = new OpenAI({ apiKey });
     this.model = options.model || "gpt-4o-mini";
@@ -57,7 +67,6 @@ class OpenAIAdapter extends BaseProvider {
             }],
           };
         } catch (err) {
-          console.error("Failed to parse function_call arguments:", err);
           return {
             message: choice.content || "",
             toolCalls: [{ name: choice.function_call.name, arguments: {}, id: `tool_use_${Date.now()}` }],

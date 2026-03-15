@@ -14,7 +14,16 @@ class HFAdapter extends BaseProvider {
    * @param {number} [options.maxRetries=3] - Number of retries (passed to RetryManager)
    */
   constructor(apiKey, options = {}) {
-    super(options); // Initialize BaseProvider with retryManager
+    super({
+      ...options,
+      capabilities: {
+        toolCalling: true,
+        embeddings: true,
+        imageAnalysis: true,
+        imageGeneration: true,
+        videoAnalysis: true,
+      },
+    });
     this.apiKey = apiKey;
     this.inference = new HfInference(apiKey);
     this.textModel = options.textModel || "mistralai/Mixtral-8x7B-Instruct-v0.1";

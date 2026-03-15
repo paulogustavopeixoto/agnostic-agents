@@ -11,7 +11,12 @@ class AnthropicAdapter extends BaseProvider {
    * @param {number} [options.timeout=600000] - Timeout in milliseconds (not used; handled by RetryManager)
    */
   constructor(apiKey, options = {}) {
-    super(options); // Initialize BaseProvider with retryManager
+    super({
+      ...options,
+      capabilities: {
+        toolCalling: true,
+      },
+    });
     this.apiKey = apiKey;
     this.client = new Anthropic({ apiKey }); // Remove built-in retries
     this.model = options.model || 'claude-3-5-sonnet-20240620';

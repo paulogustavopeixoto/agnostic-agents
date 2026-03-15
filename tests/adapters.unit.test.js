@@ -65,6 +65,32 @@ describe('Adapter unit tests', () => {
       });
     });
 
+    test('generateText falls back to empty arguments when tool call JSON is invalid', async () => {
+      const adapter = disableRetries(new OpenAIAdapter('test-key'));
+      adapter.openai = {
+        chat: {
+          completions: {
+            create: jest.fn().mockResolvedValue({
+              choices: [{
+                message: {
+                  content: 'fallback',
+                  function_call: {
+                    name: 'lookup',
+                    arguments: '{bad json',
+                  },
+                },
+              }],
+            }),
+          },
+        },
+      };
+
+      await expect(adapter.generateText([{ role: 'user', content: 'Use a tool' }])).resolves.toEqual({
+        message: 'fallback',
+        toolCalls: [{ name: 'lookup', arguments: {}, id: expect.any(String) }],
+      });
+    });
+
     test('generateToolResult returns final assistant text', async () => {
       const adapter = disableRetries(new OpenAIAdapter('test-key'));
       adapter.openai = {
@@ -382,6 +408,59 @@ describe('Adapter unit tests', () => {
       await expect(adapter.generateAudio('x')).rejects.toThrow(
         'Audio generation not supported by DeepSeekAdapter'
       );
+    });
+
+    test('generateText falls back to empty arguments when tool call JSON is invalid', async () => {
+      const adapter = disableRetries(new DeepSeekAdapter('test-key'));
+      adapter.openai = {
+        chat: {
+          completions: {
+            create: jest.fn().mockResolvedValue({
+              choices: [{
+                message: {
+                  content: 'fallback',
+                  function_call: {
+                    name: 'lookup',
+                    arguments: '{bad json',
+                  },
+                },
+              }],
+            }),
+          },
+        },
+      };
+
+      await expect(adapter.generateText({ user: 'hi' })).resolves.toEqual({
+        message: 'fallback',
+        toolCalls: [{ name: 'lookup', arguments: {}, id: expect.any(String) }],
+      });
+    });
+  });
+
+  describe('Adapter capability contract', () => {
+    test('all adapters expose the normalized capability map', () => {
+      const adapters = [
+        new OpenAIAdapter('test-key'),
+        new GeminiAdapter('test-key'),
+        new AnthropicAdapter('test-key'),
+        new HFAdapter('test-key'),
+        new DeepSeekAdapter('test-key'),
+      ];
+
+      for (const adapter of adapters) {
+        const capabilities = adapter.getCapabilities();
+        expect(capabilities).toEqual(expect.objectContaining({
+          generateText: true,
+          toolCalling: expect.any(Boolean),
+          embeddings: expect.any(Boolean),
+          imageAnalysis: expect.any(Boolean),
+          imageGeneration: expect.any(Boolean),
+          audioTranscription: expect.any(Boolean),
+          audioGeneration: expect.any(Boolean),
+          videoAnalysis: expect.any(Boolean),
+          videoGeneration: expect.any(Boolean),
+        }));
+      }
     });
   });
 });
