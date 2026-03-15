@@ -164,3 +164,7 @@ npm run test:all
 ```
 
 Live tests use `.env` keys and only run when `RUN_LIVE_API_TESTS=1` is set by the script. Provider-account limitations such as quota, billing, or model availability are treated as skippable smoke-test conditions rather than framework failures.
+
+Detailed command and environment documentation is available in [`docs/testing.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/testing.md).
+
+Package publish contents are documented in [`docs/package-audit.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/package-audit.md).

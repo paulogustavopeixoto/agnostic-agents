@@ -5,3 +5,5 @@ build/
 .env
 *.log
 ROADMAP.md
+coverage/
+*.tgz

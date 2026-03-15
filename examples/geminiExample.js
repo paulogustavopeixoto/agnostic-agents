@@ -8,7 +8,7 @@ async function main() {
   }
 
   const adapter = new GeminiAdapter(process.env.GEMINI_API_KEY, {
-    model: 'gemini-1.5-pro',
+    model: process.env.GEMINI_TEST_MODEL || 'gemini-2.0-flash',
   });
 
   const calculatorTool = new Tool({
