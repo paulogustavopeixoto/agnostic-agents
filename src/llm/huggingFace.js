@@ -1,6 +1,8 @@
 // src/llm/huggingFace.js
 const { HfInference } = require('@huggingface/inference');
 const { BaseProvider } = require('./BaseProvider');
+const fs = require('fs');
+const path = require('path');
 
 class HFAdapter extends BaseProvider {
   /**
@@ -18,6 +20,7 @@ class HFAdapter extends BaseProvider {
     this.textModel = options.textModel || "mistralai/Mixtral-8x7B-Instruct-v0.1";
     this.visionModel = options.visionModel || "Salesforce/blip-image-captioning-base";
     this.imageGenModel = options.imageGenModel || "black-forest-labs/Flux.1-dev";
+    this.baseUrl = options.baseUrl || 'https://api-inference.huggingface.co/models';
   }
 
   /**

@@ -16,13 +16,15 @@
 async function chunkText(text, chunkSize = 1000, overlap = 100, numChunks = null) {
   if (typeof text !== 'string' || !text.trim()) return [""];
   const cleanText = text.trim();
+  const safeChunkSize = Math.max(1, chunkSize);
+  const safeOverlap = Math.max(0, Math.min(overlap, safeChunkSize - 1));
 
   if (numChunks != null && Number.isInteger(numChunks) && numChunks > 0) {
     const chunks = [];
     const L = cleanText.length;
-    const x = (L + (numChunks - 1) * overlap) / numChunks;
+    const x = (L + (numChunks - 1) * safeOverlap) / numChunks;
     for (let i = 0; i < numChunks; i++) {
-      const start = Math.floor(i * (x - overlap));
+      const start = Math.floor(i * (x - safeOverlap));
       let end = (i === numChunks - 1) ? L : Math.floor(start + x);
       chunks.push(cleanText.slice(start, end));
     }
@@ -31,10 +33,10 @@ async function chunkText(text, chunkSize = 1000, overlap = 100, numChunks = null
     const chunks = [];
     let start = 0;
     while (start < cleanText.length) {
-      const end = Math.min(start + chunkSize, cleanText.length);
+      const end = Math.min(start + safeChunkSize, cleanText.length);
       const chunk = cleanText.slice(start, end);
       chunks.push(chunk);
-      start += (chunkSize - overlap);
+      start += (safeChunkSize - safeOverlap);
     }
     return chunks.length ? chunks : [cleanText]; // Fallback to full text if no chunks
   }

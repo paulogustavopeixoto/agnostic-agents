@@ -1,257 +1,247 @@
-// src/agent/Agent.js
 const { RetryManager } = require('../utils/RetryManager');
-const { Tool } = require('../tools/adapters/Tool');
-const { MCPTool } = require('../mcp/MCPTool');
 const { MissingInfoResolver } = require('./MissingInfoResolver');
-const { ToolValidator } = require('../utils/ToolValidator');
+const {
+  AdapterCapabilityError,
+  InvalidToolCallError,
+  ToolExecutionError,
+  ToolNotFoundError,
+} = require('../errors');
 
 class Agent {
   /**
-   * @param {object} adapter - An instance of your provider adapter (OpenAIAdapter, GeminiAdapter, HFAdapter, etc.)
+   * @param {object} adapter - Provider adapter with generateText/analyzeImage/etc.
    * @param {object} options
-   * @param {Tool[] | ToolRegistry} options.tools - Array of tools or a ToolRegistry instance
-   * @param {object} options.memory - Optional memory instance
-   * @param {object} options.defaultConfig - e.g. { model, temperature, maxTokens }
-   * @param {string} options.description - Optional system instructions or agent description
-   * @param {object} [options.rag] - Optional RAG instance for retrieval-augmented generation
-   * @param {object} [options.retryManager] - Optional RetryManager instance for error handling (defaults to 3 retries)
+   * @param {Array|object} [options.tools] - Tool array, ToolRegistry instance, or { tools, triggers }
+   * @param {object|null} [options.memory]
+   * @param {object} [options.defaultConfig]
+   * @param {string} [options.description]
+   * @param {object|null} [options.rag]
+   * @param {RetryManager} [options.retryManager]
+   * @param {object|null} [options.mcpClient]
+   * @param {Function|null} [options.askUser]
    */
-  constructor(adapter, { 
-    tools = [], 
-    memory = null, 
-    defaultConfig = {}, 
-    description = "", 
-    rag = null, 
-    retryManager = new RetryManager({ retries: 3, baseDelay: 1000, maxDelay: 10000 }),
-    mcpClient = null,
-    askUser = null
-  } = {}) {
+  constructor(
+    adapter,
+    {
+      tools = [],
+      memory = null,
+      defaultConfig = {},
+      description = '',
+      rag = null,
+      retryManager = new RetryManager({ retries: 3, baseDelay: 1000, maxDelay: 10000 }),
+      mcpClient = null,
+      askUser = null,
+    } = {}
+  ) {
     this.adapter = adapter;
-
-    if (tools?.listTools && typeof tools.listTools === 'function') {
-      // ToolRegistry instance
-      this.toolRegistry = tools;
-      this.tools = this.toolRegistry.listTools();
-    } else if (Array.isArray(tools)) {
-      // Raw array of tools
-      this.toolRegistry = null;
-      this.tools = tools;
-    } else if (tools?.tools) {
-      // { tools, triggers } object
-      this.toolRegistry = null;
-      this.tools = tools.tools;
-    } else {
-      throw new Error(
-        '[Agent] Invalid tools input. Must be ToolRegistry instance, array, or { tools, triggers } object.'
-      );
-    }
-
+    this.toolRegistry = null;
+    this.tools = this._normalizeTools(tools);
     this.memory = memory;
     this.defaultConfig = defaultConfig;
     this.description = description;
     this.rag = rag;
     this.retryManager = retryManager;
     this.mcpClient = mcpClient;
-    this.validator = new ToolValidator();
     this.resolver = new MissingInfoResolver({
       memory: this.memory,
       rag: this.rag,
-      askUser: askUser,
+      askUser,
       tools: this.tools,
     });
   }
 
+  _normalizeTools(tools) {
+    if (tools?.listTools && typeof tools.listTools === 'function') {
+      this.toolRegistry = tools;
+      return tools.listTools();
+    }
+
+    if (Array.isArray(tools)) {
+      return [...tools];
+    }
+
+    if (tools?.tools && Array.isArray(tools.tools)) {
+      return [...tools.tools];
+    }
+
+    throw new Error(
+      '[Agent] Invalid tools input. Must be ToolRegistry instance, array, or { tools, triggers } object.'
+    );
+  }
+
   async _retrieveMemoryContext(userMessage) {
+    if (!this.memory) {
+      return '';
+    }
+
     const facts = [];
 
-    // 1. Pull all active entities
-    for (const key in this.memory.entities) {
-      const value = this.memory.getEntity(key);
-      if (value) {
-        facts.push(`${key}: ${value}`);
+    if (this.memory.entities && typeof this.memory.getEntity === 'function') {
+      for (const key of Object.keys(this.memory.entities)) {
+        const value = this.memory.getEntity(key);
+        if (value) {
+          facts.push(`${key}: ${value}`);
+        }
       }
     }
 
-    // 2. Semantic search (optional)
-    if (this.memory.vectorStore) {
+    if (this.memory.vectorStore && typeof this.memory.searchSemanticMemory === 'function') {
       const semantic = await this.memory.searchSemanticMemory(userMessage);
       if (semantic) {
         facts.push(`Related info: ${semantic}`);
       }
     }
 
-    if (facts.length) {
-      return `Here is what I remember:\n` + facts.join('\n') + '\n';
-    }
-
-    return '';
+    return facts.length ? `Here is what I remember:\n${facts.join('\n')}\n` : '';
   }
 
-  /**
-   * Dynamically add more tools at runtime.
-   * @param {Tool | Tool[] | ToolRegistry} tools 
-   */
-  registerTools(tools) {
-    if (tools.list && typeof tools.list === 'function') {
-      // ToolRegistry
-      this.toolRegistry = tools;
-      this.tools = tools.list();
-    } else {
-      const array = Array.isArray(tools) ? tools : [tools];
-      this.tools.push(...array);
+  async _getRagContext(userMessage, config = {}) {
+    if (!this.rag || config.useRag === false || typeof this.rag.search !== 'function') {
+      return '';
+    }
+
+    try {
+      const matches = await this.retryManager.execute(() =>
+        this.rag.search(userMessage, config.ragOptions || {})
+      );
+
+      if (!Array.isArray(matches) || matches.length === 0) {
+        return '';
+      }
+
+      return `Retrieved context:\n${matches.join('\n')}\n`;
+    } catch (error) {
+      return '';
     }
   }
 
-  // Helper to build the system prompt from description and user input
-  async _buildSystemPrompt(userPrompt = "") {
-    const memoryContext = this.memory ? await this._retrieveMemoryContext(userPrompt) : "";
-    const now = new Date();
-    const dateString = now.toUTCString();
-    const system = (this.description || '') + `\nCurrent date and time is: ${dateString}\n`;
-    const context = (this.memory ? this.memory.getContext() : "") + memoryContext;
-    const user = userPrompt || "";
+  async _buildSystemPrompt(userPrompt = '', config = {}) {
+    const memoryContext = await this._retrieveMemoryContext(userPrompt);
+    const ragContext = await this._getRagContext(userPrompt, config);
+    const now = new Date().toUTCString();
+    const system = `${this.description || ''}\nCurrent date and time is: ${now}\n`.trim();
+    const conversationContext = this.memory?.getContext?.() || '';
+    const context = `${conversationContext}${conversationContext && (memoryContext || ragContext) ? '\n' : ''}${memoryContext}${ragContext}`.trim();
 
     return {
       system,
       context,
-      user,
+      user: userPrompt || '',
     };
   }
 
-  // Helper to format error messages for LLMs
-  _formatErrorForLLM(toolName, error) {
-    const errorMessage = error.message || String(error);
-
-    return `⚠️ The tool "${toolName}" failed with error:\n"${errorMessage}".\n` +
-          `Would you like me to try again with different parameters or take another action?`;
-  }
-
-  /**
-   * Generic text-based prompt method with optional RAG retrieval.
-   * @param {string} userMessage - The user's input message
-   * @param {object} [config] - e.g. { model, temperature, maxTokens, useRag: boolean }
-   * @returns {Promise<string>} - The agent's response
-   */
-  async sendMessage(userMessage, config = {}) {
-    const finalConfig = { ...this.defaultConfig, ...config };
-    const promptObject = await this._buildSystemPrompt(userMessage);
-
+  _promptObjectToMessages(promptObject) {
     const messages = [];
 
     if (promptObject.system) {
       messages.push({ role: 'system', content: promptObject.system });
     }
 
-    const userContent = (promptObject.context || '') + (promptObject.user || '');
-    if (userContent.trim()) {
-      messages.push({ role: 'user', content: userContent });
+    if (promptObject.context) {
+      messages.push({ role: 'user', content: promptObject.context });
     }
 
-    if (messages.length === 0) {
-      throw new Error("Cannot send empty prompt: No messages in the array.");
+    if (promptObject.user) {
+      messages.push({ role: 'user', content: promptObject.user });
     }
-    
+
+    return messages;
+  }
+
+  registerTools(tools) {
+    const nextTools =
+      tools?.listTools && typeof tools.listTools === 'function'
+        ? tools.listTools()
+        : Array.isArray(tools)
+          ? tools
+          : [tools];
+
+    this.tools.push(...nextTools);
+    this.resolver.tools = this.tools;
+  }
+
+  async sendMessage(userMessage, config = {}) {
+    if (!this.adapter?.generateText) {
+      throw new AdapterCapabilityError('Agent requires an adapter with generateText().');
+    }
+
+    const finalConfig = { ...this.defaultConfig, ...config };
+    const promptObject = await this._buildSystemPrompt(userMessage, finalConfig);
+    const messages = this._promptObjectToMessages(promptObject);
+
+    if (messages.length === 0) {
+      throw new InvalidToolCallError('Cannot send empty prompt: No messages in the array.');
+    }
+
     let result;
 
     while (true) {
-      if (this.rag && config.useRag !== false) {
-        result = await this.retryManager.execute(() =>
-          this.rag.query(userMessage, { adapterOptions: finalConfig })
-        );
-      } else {
-        result = await this.retryManager.execute(() =>
-          this.adapter.generateText(promptObject, { ...finalConfig, tools: this.tools })
-        );
+      result = await this.retryManager.execute(() =>
+        this.adapter.generateText(messages, { ...finalConfig, tools: this.tools })
+      );
+
+      const toolCalls = result?.toolCalls || (result?.toolCall ? [result.toolCall] : []);
+      if (!toolCalls.length) {
+        break;
       }
-
-      if (!result.toolCalls?.length && !result.toolCall) break;
-
-      const toolCalls = result.toolCalls || [result.toolCall];
 
       for (const toolCall of toolCalls) {
-        let toolResult;
+        this._validateToolCall(toolCall);
 
-        try {
-          toolResult = await this.retryManager.execute(() =>
-            this._handleToolCall(toolCall)
-          );
-        } catch (err) {
-          console.warn(`[Agent] Tool "${toolCall.name}" failed with error:`, err);
+        const toolResult = await this.retryManager.execute(() => this._handleToolCall(toolCall));
 
-          const errorMsg = this._formatErrorForLLM(toolCall.name, err);
-          messages.push({ role: 'assistant', content: errorMsg });
-
-          // Add the error to user context so the LLM can reason about it
-          promptObject.user += `\nTool "${toolCall.name}" failed with error: ${err.message}\n`;
-
-          continue; // Let the loop continue to LLM for the next suggestion
-        }
-
-        messages.push(
-          {
-            role: 'assistant',
-            content: '',
-            function_call: {
-              name: toolCall.name,
-              arguments: JSON.stringify(toolCall.arguments)
-            }
-          },
-          {
-            role: 'function',
+        messages.push({
+          role: 'assistant',
+          content: '',
+          function_call: {
             name: toolCall.name,
-            content: JSON.stringify(toolResult)
-          }
-        );
-
-        promptObject.user += `\nTool ${toolCall.name} result: ${JSON.stringify(toolResult)}`;
+            arguments: JSON.stringify(toolCall.arguments || {}),
+          },
+        });
+        messages.push({
+          role: 'function',
+          name: toolCall.name,
+          content: JSON.stringify(toolResult),
+        });
       }
     }
 
-    if (this.memory) {
+    if (this.memory?.storeConversation) {
       this.memory.storeConversation(userMessage, result.message || JSON.stringify(result));
+    } else if (this.memory?.store) {
+      this.memory.store(userMessage, result);
     }
 
-    return result.message || result;
+    return result?.message || result;
   }
 
-  /**
-   * If the LLM requests a tool call, we find the matching tool and run it.
-   * @param {object} toolCall - Tool call object from adapter
-   * @returns {Promise<any>} - Tool execution result
-   */
+  _validateToolCall(toolCall) {
+    if (!toolCall?.name || typeof toolCall.arguments !== 'object' || toolCall.arguments === null) {
+      throw new InvalidToolCallError('Invalid tool call format: missing name or arguments');
+    }
+  }
+
   async _handleToolCall(toolCall) {
-    const toolInstance = this.tools.find(t => t.name === toolCall.name);
+    const toolInstance = this.tools.find(tool => tool.name === toolCall.name);
     if (!toolInstance) {
-      throw new Error(`Tool ${toolCall.name} not found.`);
+      throw new ToolNotFoundError(`Tool ${toolCall.name} not found.`);
     }
-    console.log(`[Agent] Executing tool: ${toolCall.name} with args:`, toolCall.arguments);
-    try {
-      const resolvedArgs = await this.resolver.resolve(toolInstance, toolCall.arguments || {});
-      const result = await toolInstance.call(resolvedArgs, { props: toolInstance.props });
-      return result;
-    } catch (err) {
-      console.warn(`[Agent] Tool "${toolCall.name}" failed with error:`, err);
 
-      return {
-        success: false,
-        error: err.message,
-        suggestion: `I couldn't execute "${toolCall.name}". This tool might need manual setup or isn't fully supported yet.`,
-      };
+    const resolvedArgs = await this.resolver.resolve(toolInstance, toolCall.arguments || {});
+    try {
+      return await toolInstance.call(resolvedArgs, { toolCall });
+    } catch (error) {
+      throw new ToolExecutionError(
+        `Tool "${toolCall.name}" failed: ${error.message || String(error)}`
+      );
     }
   }
 
-  /**
-   * Analyze an image (if the adapter supports it).
-   * @param {Buffer|string} imageData - Could be a URL or base64 string
-   * @param {object} config - e.g. { prompt, model, temperature }
-   * @returns {Promise<string>} - Image analysis result
-   */
   async analyzeImage(imageData, config = {}) {
     const finalConfig = { ...this.defaultConfig, ...config };
-    const userPrompt = config.prompt || "Analyze this image.";
-    const promptObject = this._buildSystemPrompt(userPrompt);
+    const promptObject = await this._buildSystemPrompt(config.prompt || 'Analyze this image.', finalConfig);
 
-    return await this.retryManager.execute(() => 
+    return this.retryManager.execute(() =>
       this.adapter.analyzeImage(imageData, {
         ...finalConfig,
         prompt: promptObject,
@@ -259,59 +249,28 @@ class Agent {
     );
   }
 
-  /**
-   * Generate an image (text -> image).
-   * @param {string} userPrompt - The user's input for image generation
-   * @param {object} config - e.g. { model, size, returnBase64 }
-   * @returns {Promise<string|Buffer>} - Generated image (URL or base64)
-   */
   async generateImage(userPrompt, config = {}) {
     const finalConfig = { ...this.defaultConfig, ...config };
-    const promptObject = this._buildSystemPrompt(userPrompt);
+    const promptObject = await this._buildSystemPrompt(userPrompt, finalConfig);
 
-    return await this.retryManager.execute(() => 
-      this.adapter.generateImage(promptObject, finalConfig)
-    );
+    return this.retryManager.execute(() => this.adapter.generateImage(promptObject, finalConfig));
   }
 
-  /**
-   * Transcribe audio data to text (if the adapter supports it).
-   * @param {Buffer|string} audioData - Audio data as a Buffer, URL, or file path
-   * @param {object} [config] - Configuration options {model, language}
-   * @returns {Promise<string>} - Transcribed text
-   */
   async transcribeAudio(audioData, config = {}) {
     const finalConfig = { ...this.defaultConfig, ...config };
-    return await this.retryManager.execute(() =>
-      this.adapter.transcribeAudio(audioData, finalConfig)
-    );
+    return this.retryManager.execute(() => this.adapter.transcribeAudio(audioData, finalConfig));
   }
 
-  /**
-   * Generate audio from text (text-to-speech, if the adapter supports it).
-   * @param {string} text - Text to convert to audio
-   * @param {object} [config] - Configuration options {model, voice, format}
-   * @returns {Promise<Buffer>} - Audio data as a Buffer
-   */
   async generateAudio(text, config = {}) {
     const finalConfig = { ...this.defaultConfig, ...config };
-    return await this.retryManager.execute(() =>
-      this.adapter.generateAudio(text, finalConfig)
-    );
+    return this.retryManager.execute(() => this.adapter.generateAudio(text, finalConfig));
   }
 
-  /**
-   * Analyze a video and generate a description (if the adapter supports it).
-   * @param {Buffer|string} videoData - Video data as a Buffer, URL, or file path
-   * @param {object} [config] - Configuration options {model, prompt, maxTokens}
-   * @returns {Promise<string>} - Video description text
-   */
   async analyzeVideo(videoData, config = {}) {
     const finalConfig = { ...this.defaultConfig, ...config };
-    const userPrompt = config.prompt || "Describe this video.";
-    const promptObject = this._buildSystemPrompt(userPrompt);
+    const promptObject = await this._buildSystemPrompt(config.prompt || 'Describe this video.', finalConfig);
 
-    return await this.retryManager.execute(() =>
+    return this.retryManager.execute(() =>
       this.adapter.analyzeVideo(videoData, {
         ...finalConfig,
         prompt: promptObject,
@@ -319,36 +278,28 @@ class Agent {
     );
   }
 
-  /**
-   * Generate a video from text (if the adapter supports it).
-   * @param {string} text - Text prompt for video generation
-   * @param {object} [config] - Configuration options {model, format, duration}
-   * @returns {Promise<Buffer|string>} - Video data as a Buffer or URL
-   */
   async generateVideo(text, config = {}) {
     const finalConfig = { ...this.defaultConfig, ...config };
-    const promptObject = this._buildSystemPrompt(text);
+    const promptObject = await this._buildSystemPrompt(text, finalConfig);
 
-    return await this.retryManager.execute(() =>
-      this.adapter.generateVideo(promptObject.user, finalConfig)
-    );
+    return this.retryManager.execute(() => this.adapter.generateVideo(promptObject.user, finalConfig));
   }
 
   async init() {
-  if (this.mcpClient && typeof this.mcpClient.toTools === "function") {
+    if (!this.mcpClient || typeof this.mcpClient.toTools !== 'function') {
+      return;
+    }
+
     try {
       const mcpTools = await this.mcpClient.toTools();
-      if (Array.isArray(mcpTools) && mcpTools.length > 0) {
+      if (Array.isArray(mcpTools) && mcpTools.length) {
         this.tools.push(...mcpTools);
-        console.log("[Agent] MCP tools loaded:", mcpTools.map(t => t.name));
+        this.resolver.tools = this.tools;
       }
-    } catch (err) {
-      console.warn("[Agent] Failed to load MCP tools:", err.message);
+    } catch (error) {
+      console.warn('[Agent] Failed to load MCP tools:', error.message);
     }
   }
 }
-}
-
-
 
 module.exports = { Agent };

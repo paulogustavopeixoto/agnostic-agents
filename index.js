@@ -21,6 +21,13 @@ const { MCPTool } = require('./src/mcp/MCPTool');
 const { MCPClient } = require('./src/mcp/MCPClient');
 const { OpenAPILoader } = require('./src/api/OpenAPILoader');
 const { ApiLoader } = require('./src/api/ApiLoader');
+const {
+  AgentError,
+  AdapterCapabilityError,
+  InvalidToolCallError,
+  ToolNotFoundError,
+  ToolExecutionError,
+} = require('./src/errors');
 
 module.exports = {
   Agent,
@@ -44,5 +51,10 @@ module.exports = {
   MCPClient,
   OpenAPILoader,
   MCPDiscoveryLoader,
-  ApiLoader
+  ApiLoader,
+  AgentError,
+  AdapterCapabilityError,
+  InvalidToolCallError,
+  ToolNotFoundError,
+  ToolExecutionError,
 };

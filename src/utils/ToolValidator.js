@@ -4,6 +4,7 @@ const Ajv = require('ajv');
 class ToolValidator {
   constructor() {
     this.ajv = new Ajv({ allErrors: true, strict: false });
+    this.cache = new WeakMap();
   }
 
   /**
@@ -11,8 +12,11 @@ class ToolValidator {
    * Supports nested validation.
    */
   validate(tool, args = {}) {
-    console.log(`[VALIDATOR] Validating args: ${JSON.stringify(args, null, 4)}`)
-    const validate = this.ajv.compile(tool.parameters);
+    let validate = this.cache.get(tool);
+    if (!validate) {
+      validate = this.ajv.compile(tool.parameters);
+      this.cache.set(tool, validate);
+    }
     const valid = validate(args);
 
     const errors = validate.errors || [];
@@ -39,6 +43,5 @@ class ToolValidator {
     return path ? `${path}.${field}` : field;
   }
 }
-
 
 module.exports = { ToolValidator };

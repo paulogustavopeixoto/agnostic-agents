@@ -9,9 +9,12 @@
   },
   "scripts": {
     "test": "jest",
+    "test:unit": "jest --runInBand",
+    "test:live": "RUN_LIVE_API_TESTS=1 jest --runInBand tests/live",
+    "test:all": "npm run test:unit && npm run test:live",
     "test:watch": "jest --watch",
-    "example:openai": "node examples/openaiFunctionCallExample.js",
-    "example:gemini": "node examples/geminiToolExample.js"
+    "example:openai": "node examples/openaiExample.js",
+    "example:gemini": "node examples/geminiExample.js"
   },
   "repository": {
     "type": "git",

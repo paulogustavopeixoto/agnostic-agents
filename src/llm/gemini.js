@@ -2,6 +2,8 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { BaseProvider } = require('./BaseProvider');
 const { RetryManager } = require('../utils/RetryManager');
+const fs = require('fs');
+const path = require('path');
 
 class GeminiAdapter extends BaseProvider {
   constructor(apiKey, config = {}) {

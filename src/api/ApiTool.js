@@ -4,6 +4,7 @@ const { BaseAppSpec } = require('../tools/adapters/BaseAppSpec');
 
 class ApiTool extends Tool {
   constructor({ serviceName, endpointId, action, authToken, spec = new BaseAppSpec() }) {
+    spec = spec || new BaseAppSpec();
     const name = ApiTool.normalizeName(serviceName, endpointId);
 
     const parameters = ApiTool.mapPropsToJsonSchema(action.props, spec);

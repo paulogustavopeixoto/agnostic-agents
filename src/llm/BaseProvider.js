@@ -1,5 +1,11 @@
 // src/llm/BaseProvider.js
+const { RetryManager } = require('../utils/RetryManager');
+
 class BaseProvider {
+  constructor({ retryManager = new RetryManager({ retries: 3, baseDelay: 1000, maxDelay: 10000 }) } = {}) {
+    this.retryManager = retryManager;
+  }
+
   /**
    * Generate text based on input messages.
    * @param {object[]|string} messages - Array of message objects or a single string

@@ -2,16 +2,7 @@
 
 # agnostic-agents
 
-A provider-agnostic toolkit for building resilient AI agents that can plan work, call tools, use memory, and mix RAG with multiple LLM providers.
-
-## Why use it
-
-- Provider agnostic: swap OpenAI, Anthropic, DeepSeek, Gemini, or Hugging Face without changing your agent code.
-- First-class tools: universal JSON schema, validation, and automatic conversion to provider-native function specs.
-- RAG + tools together: fetch context from Pinecone or a local store, then let tools act on it.
-- Planning and orchestration: Planner/Plan/Task/Orchestrator handle workflows (sequential, parallel, hierarchical).
-- Resilient by default: retries, missing-argument resolution, and optional user/console prompts for clarification.
-- Extensible: plug in new adapters, tools, vectors, triggers, and webhooks.
+A Node.js toolkit for building provider-agnostic AI agents with tool calling, memory, optional retrieval, and workflow utilities.
 
 ## Install
 
@@ -19,83 +10,125 @@ A provider-agnostic toolkit for building resilient AI agents that can plan work,
 npm install agnostic-agents
 ```
 
+## What it includes
+
+- `Agent`: chat loop with tool execution, memory context, optional retrieval augmentation, and multimodal helper methods.
+- `Tool`: JSON Schema based tool definition that adapters can export to provider-specific formats.
+- `Memory`: lightweight conversation and entity memory.
+- `RAG`: retrieval helper for Pinecone or the built-in `LocalVectorStore`.
+- `MCPClient` / `MCPTool` / `MCPDiscoveryLoader`: connect to Model Context Protocol tool sources.
+- `RetryManager`: retry wrapper for adapters and workflows.
+
 ## Quick start
 
-Create an agent with memory, a tool, and local RAG. Set `OPENAI_API_KEY` (or another provider key) in your env.
+```js
+const { Agent, Tool, OpenAIAdapter } = require('agnostic-agents');
+
+const adapter = new OpenAIAdapter(process.env.OPENAI_API_KEY, {
+  model: 'gpt-4o-mini',
+});
+
+const calculator = new Tool({
+  name: 'calculate',
+  description: 'Evaluate a basic arithmetic expression.',
+  parameters: {
+    type: 'object',
+    properties: {
+      expression: { type: 'string', description: 'Expression like 12 * 7' },
+    },
+    required: ['expression'],
+  },
+  implementation: async ({ expression }) => ({
+    result: Function(`"use strict"; return (${expression})`)(),
+  }),
+});
+
+const agent = new Agent(adapter, {
+  tools: [calculator],
+  description: 'You are a concise assistant. Use tools when they help.',
+  defaultConfig: { temperature: 0.2, maxTokens: 300 },
+});
+
+const response = await agent.sendMessage('What is 12 * 7?');
+console.log(response);
+```
+
+## Memory example
+
+```js
+const { Agent, Memory, OpenAIAdapter } = require('agnostic-agents');
+
+const memory = new Memory();
+const agent = new Agent(new OpenAIAdapter(process.env.OPENAI_API_KEY), {
+  memory,
+  description: 'You remember earlier turns.',
+});
+
+await agent.sendMessage('My favorite city is Lisbon.');
+const answer = await agent.sendMessage('What city did I mention?');
+console.log(answer);
+```
+
+## Retrieval example
+
+`Agent` uses retrieval as prompt augmentation when a `rag` instance is provided. To use the built-in local store, the adapter must support embeddings.
 
 ```js
 const {
   Agent,
-  Memory,
-  Tool,
   RAG,
-  OpenAIAdapter,
   LocalVectorStore,
-  RetryManager,
-} = require("agnostic-agents");
+  OpenAIAdapter,
+} = require('agnostic-agents');
 
 const adapter = new OpenAIAdapter(process.env.OPENAI_API_KEY);
-const retryManager = new RetryManager({ retries: 2 });
-
-// RAG: index a small fact into an in-memory vector store
-const vectorStore = new LocalVectorStore();
-const rag = new RAG({ adapter, vectorStore, retryManager });
-await rag.index(["AI ethics involve fairness and transparency."]);
-
-// Tool: simple calculator (use eval cautiously in production)
-const calculatorTool = new Tool({
-  name: "calculate",
-  description: "Perform arithmetic calculations.",
-  parameters: {
-    type: "object",
-    properties: { expression: { type: "string", description: "e.g., '12 * 7'" } },
-    required: ["expression"],
-  },
-  implementation: async ({ expression }) => ({ result: eval(expression) }),
+const rag = new RAG({
+  adapter,
+  vectorStore: new LocalVectorStore(),
 });
+
+await rag.index(['AI ethics involves fairness, transparency, and accountability.']);
 
 const agent = new Agent(adapter, {
-  tools: [calculatorTool],
-  memory: new Memory(),
   rag,
-  retryManager,
-  defaultConfig: { model: "gpt-4o-mini", temperature: 0.7 },
-  description: "A helpful assistant with calculation and ethics knowledge.",
+  description: 'Use retrieved context when it is relevant.',
 });
 
-console.log(await agent.sendMessage("What is 12 * 7?")); // tool call
-console.log(await agent.sendMessage("What are AI ethics?")); // RAG + generation
+const answer = await agent.sendMessage('What does AI ethics involve?');
+console.log(answer);
 ```
 
-## Capabilities at a glance
+## Tool contract
 
-- `Agent`: chat core with tool calling, memory, images (adapter dependent), and RAG.
-- `Tool`: universal schema + validation; exports to provider-native function/tool specs.
-- `Memory`: lightweight conversation history for prompt context.
-- `RAG`: chunk, index, search, and generate using Pinecone or the built-in local store.
-- `Planner` / `Plan` / `PlanExecutor`: create and execute flexible plans.
-- `Task` / `Orchestrator`: compose tasks sequentially, in parallel, or hierarchically with retries.
-- `RetryManager`: exponential backoff retries for any async work.
-- `PluginLoader` / `MCPDiscoveryLoader`: discover tools from Plugins or the Model Context Protocol.
+Each tool uses one canonical shape:
 
-## Adapters (LLM)
+- `name`
+- `description`
+- `parameters` as JSON Schema
+- `implementation(args, context)`
 
-- OpenAI, Anthropic, DeepSeek (experimental), Gemini, Hugging Face.
-- Easily add your own by implementing the adapter interface.
-
-## RAG options
-
-- `LocalVectorStore`: in-memory, great for quick start or tests.
-- `PineconeManager`: persistent vectors with namespaces and index utilities.
+The agent validates tool arguments against `parameters`, applies schema defaults, and executes the tool before asking the model for a final response.
 
 ## Examples
 
-- `examples/openaiExample.js`: minimal chat + tool calling.
-- `examples/agentWithMultipleToolsAndMemory.js`: combine tools with memory.
-- `examples/agentPlannerExample.js`: planning + execution.
-- `examples/MCPDiscoveryLoaderExample.js`: discover MCP tools.
-- `examples/openApiExample.js` and `examples/tools/calcom.js`: generate tools from OpenAPI / Cal.com.
+- `npm run example:openai`
+- `npm run example:gemini`
 
-## Contributing
+Additional examples live in [`examples/`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples).
 
-Issues and PRs are welcome. If you add a provider, tool adapter, or vector store, include a small example and tests where possible.
+## Current v1 scope
+
+This package currently targets:
+
+- provider-agnostic tool calling
+- conversation and entity memory
+- retrieval augmentation
+- MCP tool discovery
+
+Some adapters expose extra audio, image, or video methods, but support varies by provider.
+
+## Development
+
+```bash
+npm test
+```

@@ -24,7 +24,14 @@ class RAG {
     retryManager = new RetryManager({ retries: 3, baseDelay: 1000, maxDelay: 10000 }) 
   } = {}) {
     if (!adapter) throw new Error("RAG requires an adapter.");
-    if (vectorStore && !indexName) throw new Error("Vector store operations require an indexName.");
+    const requiresIndexName =
+      vectorStore &&
+      typeof vectorStore.listIndexes === 'function' &&
+      typeof vectorStore.createIndex === 'function';
+
+    if (requiresIndexName && !indexName) {
+      throw new Error("Vector store operations require an indexName.");
+    }
     this.adapter = adapter;
     this.vectorStore = vectorStore;
     this.indexName = indexName;
@@ -98,17 +105,13 @@ class RAG {
    */
   async index(documents, options = {}) {
     if (!this.vectorStore) throw new Error("Indexing requires a vector store.");
-    console.log("Raw documents:", documents);
     const texts = Array.isArray(documents) ? documents : [documents];
-    console.log("Texts:", texts);
     const validTexts = texts.filter(t => typeof t === 'string' && t.trim().length > 0);
-    console.log("Valid texts:", validTexts);
     if (!validTexts.length) throw new Error("No valid text provided for indexing.");
 
     const chunkPromises = validTexts.map(text => this.chunk(text));
     const chunksArray = await Promise.all(chunkPromises);
     const chunks = chunksArray.flat();
-    console.log("Chunks before embed:", chunks);
 
     if (!chunks.length || chunks.some(c => typeof c !== 'string' || !c.trim())) {
       throw new Error("Chunks must be a non-empty array of non-empty strings.");
