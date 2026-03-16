@@ -14,6 +14,28 @@ The format is intentionally simple:
 
 ### Removed
 
+## 1.0.41
+
+### Added
+
+- runtime-backed workflow primitives with `Workflow`, `WorkflowStep`, `AgentWorkflowStep`, and `WorkflowRunner`
+- run inspection, debug sinks, fallback routing, layer stores, and retriever abstractions in the public package surface
+- maintained OpenAI runtime demo covering retrieval, approvals, tool execution, and workflow orchestration
+
+### Changed
+
+- upgraded the package from a `v1` agent toolkit to a `v2` runtime with runs, checkpoints, pause/resume, cancellation, approval gating, and structured events
+- redesigned memory into layered conversation, working, profile, policy, and semantic stores
+- upgraded retrieval to support provenance, reranking, retrievers, improved chunking, and grounded prompt formatting
+- updated the README to document the current `v2` runtime surface and examples
+- refined the roadmap `v3` direction around inspectability, replay, and general-purpose orchestration
+
+### Fixed
+
+- OpenAI adapter usage metadata now flows into run metrics
+- run inspection now preserves zero-duration steps correctly
+- runtime demo retrieval chunking now resolves paragraph chunks safely before indexing
+
 ## 1.0.40
 
 ### Added
