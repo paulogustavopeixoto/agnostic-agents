@@ -26,8 +26,8 @@ The package ships a maintained `index.d.ts` so TypeScript projects get typed acc
 - `FallbackRouter`: capability-aware provider fallback routing with cost/risk/task-type hints.
 - `BackgroundJobScheduler`: recurring and delayed job execution with pluggable job stores.
 - `EvidenceGraph` / `EvalHarness` / `LearningLoop`: runtime evidence tracking, eval execution, and learning signals from runs and benchmarks.
-- `EventBus` / `ConsoleDebugSink` / `FileAuditSink` / `RuntimeEventRedactor`: structured runtime events, debug sinks, JSONL audit logging for side-effecting runs, and PII-safe redaction helpers.
-- `ToolPolicy` / `GovernanceHooks` / `ApprovalInbox` / `StorageBackendRegistry`: governance policy controls, external review hooks, and stable runtime storage contracts.
+- `EventBus` / `ConsoleDebugSink` / `FileAuditSink` / `WebhookEventSink` / `RuntimeEventRedactor`: structured runtime events, debug sinks, JSONL audit logging, external event forwarding, and PII-safe redaction helpers.
+- `ToolPolicy` / `GovernanceHooks` / `WebhookGovernanceAdapter` / `ApprovalInbox` / `StorageBackendRegistry`: governance policy controls, external review hooks, remote control-plane forwarding, and stable runtime storage contracts.
 - environment adapters for browser, shell, API, queue, and file-backed execution environments.
 - `MCPClient` / `MCPTool` / `MCPDiscoveryLoader`: connect to Model Context Protocol tool sources.
 - `RetryManager`: retry wrapper for adapters and workflows.
@@ -318,6 +318,8 @@ The agent validates tool arguments against `parameters`, applies schema defaults
 - `npm run example:reference-durable-backends`
 - `npm run example:reference-distributed-handoff`
 - `npm run example:reference-distributed-incident`
+- `npm run example:reference-remote-control-plane`
+- `npm run example:reference-deployment-split`
 
 Additional examples live in [`examples/`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples).
 
@@ -338,6 +340,7 @@ Operator triage, replay, branching, and recovery workflows are documented in [`d
 Operator-facing deployment guidance is documented in [`docs/operator-architecture.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/operator-architecture.md).
 Production-oriented storage backend guidance is documented in [`docs/storage-backends.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/storage-backends.md).
 Distributed execution and handoff guidance is documented in [`docs/distributed-execution.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/distributed-execution.md).
+Remote control-plane guidance is documented in [`docs/remote-control-planes.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/remote-control-planes.md).
 
 Secret-handling expectations for adapters, tools, logs, traces, and tests are documented in [`docs/secret-handling.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/secret-handling.md).
 Tool auth propagation for host-controlled credentials is documented in [`docs/tool-auth-propagation.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/tool-auth-propagation.md).
@@ -411,4 +414,6 @@ npm run example:openai-v3-runtime
 npm run example:openai-v4-runtime
 npm run example:reference-distributed-handoff
 npm run example:reference-distributed-incident
+npm run example:reference-remote-control-plane
+npm run example:reference-deployment-split
 ```

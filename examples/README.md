@@ -63,6 +63,12 @@ These examples are intended as reference deployment patterns rather than feature
 - `referenceDistributedIncident.js`
   - no API key required
   - shows distributed incident reconstruction with correlation metadata, incident reports, and portable trace export
+- `referenceRemoteControlPlane.js`
+  - no API key required
+  - shows governance callbacks and runtime events being forwarded to a remote control-plane service
+- `referenceDeploymentSplit.js`
+  - no API key required
+  - shows an API service, worker, and control plane sharing runtime stores and callback transports
 
 ## Legacy / advanced examples
 

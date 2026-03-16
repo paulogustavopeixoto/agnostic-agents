@@ -57,4 +57,29 @@ describe('Maintained examples', () => {
     expect(stdout).toContain('Correlation metadata');
     expect(stdout).toContain('destinationWorker');
   });
+
+  test('reference remote control plane example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceRemoteControlPlane.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Governance requests');
+    expect(stdout).toContain('Event sink requests');
+    expect(stdout).toContain('waiting_for_approval');
+    expect(stdout).toContain('completed');
+  });
+
+  test('reference deployment split example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceDeploymentSplit.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('API run status');
+    expect(stdout).toContain('Control-plane governance events');
+    expect(stdout).toContain('Worker run summary');
+    expect(stdout).toContain('waiting_for_approval');
+    expect(stdout).toContain('completed');
+  });
 });

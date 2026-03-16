@@ -241,9 +241,29 @@ export class ConsoleDebugSink {
   handle(event: JsonObject, run?: Run): Promise<void>;
 }
 
+export class WebhookEventSink {
+  constructor(options?: {
+    endpoint?: string;
+    transport?: ((request: JsonObject) => Promise<any> | any) | null;
+    headers?: JsonObject;
+    eventTypes?: string[] | null;
+  });
+  handleEvent(event: JsonObject, run?: Run): Promise<any>;
+}
+
 export class GovernanceHooks {
   constructor(options?: Record<string, any>);
   dispatch(type: string, payload?: JsonObject, context?: JsonObject): Promise<void>;
+}
+
+export class WebhookGovernanceAdapter {
+  constructor(options?: {
+    endpoint?: string;
+    transport?: ((request: JsonObject) => Promise<any> | any) | null;
+    headers?: JsonObject;
+  });
+  handle(type: string, payload?: JsonObject, context?: JsonObject): Promise<any>;
+  asHooks(): { onEvent: (type: string, payload?: JsonObject, context?: JsonObject) => Promise<any> };
 }
 
 export class ExtensionHost {

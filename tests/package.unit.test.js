@@ -21,7 +21,9 @@ const { EvidenceGraph } = require('../src/runtime/EvidenceGraph');
 const { EvalHarness } = require('../src/runtime/EvalHarness');
 const { LearningLoop } = require('../src/runtime/LearningLoop');
 const { GovernanceHooks } = require('../src/runtime/GovernanceHooks');
+const { WebhookGovernanceAdapter } = require('../src/runtime/WebhookGovernanceAdapter');
 const { FileAuditSink } = require('../src/runtime/FileAuditSink');
+const { WebhookEventSink } = require('../src/runtime/WebhookEventSink');
 const { RuntimeEventRedactor } = require('../src/runtime/RuntimeEventRedactor');
 const { ExtensionHost } = require('../src/runtime/ExtensionHost');
 const { StorageBackendRegistry } = require('../src/runtime/StorageBackendRegistry');
@@ -87,7 +89,9 @@ describe('Package/module unit tests', () => {
     expect(pkg.EvalHarness).toBeDefined();
     expect(pkg.LearningLoop).toBeDefined();
     expect(pkg.GovernanceHooks).toBeDefined();
+    expect(pkg.WebhookGovernanceAdapter).toBeDefined();
     expect(pkg.FileAuditSink).toBeDefined();
+    expect(pkg.WebhookEventSink).toBeDefined();
     expect(pkg.RuntimeEventRedactor).toBeDefined();
     expect(pkg.ExtensionHost).toBeDefined();
     expect(pkg.StorageBackendRegistry).toBeDefined();
@@ -1263,6 +1267,68 @@ describe('Package/module unit tests', () => {
 
     await hooks.dispatch('approval_requested', { runId: 'run-1' }, {});
     expect(seen).toEqual(['approval:run-1', 'event:approval_requested']);
+  });
+
+  test('WebhookGovernanceAdapter forwards governance events through its transport', async () => {
+    const requests = [];
+    const adapter = new WebhookGovernanceAdapter({
+      endpoint: 'https://control-plane.example/governance',
+      transport: async request => {
+        requests.push(request);
+        return { ok: true };
+      },
+      headers: { 'x-control-plane': 'demo' },
+    });
+
+    const hooks = new GovernanceHooks(adapter.asHooks());
+    await hooks.dispatch('approval_requested', { runId: 'run-1' }, { actor: 'agent-service' });
+
+    expect(requests).toEqual([
+      expect.objectContaining({
+        url: 'https://control-plane.example/governance',
+        method: 'POST',
+        headers: expect.objectContaining({
+          'content-type': 'application/json',
+          'x-control-plane': 'demo',
+        }),
+        body: {
+          type: 'approval_requested',
+          payload: { runId: 'run-1' },
+          context: { actor: 'agent-service' },
+        },
+      }),
+    ]);
+  });
+
+  test('WebhookEventSink forwards selected runtime events', async () => {
+    const requests = [];
+    const sink = new WebhookEventSink({
+      endpoint: 'https://control-plane.example/events',
+      eventTypes: ['run_completed'],
+      transport: async request => {
+        requests.push(request);
+        return { ok: true };
+      },
+    });
+    const run = new Run({ id: 'run-1', input: 'done' });
+    run.setStatus('completed');
+
+    await sink.handleEvent({ type: 'model_response', payload: { ok: true } }, run);
+    await sink.handleEvent({ type: 'run_completed', payload: { output: 'done' } }, run);
+
+    expect(requests).toEqual([
+      expect.objectContaining({
+        url: 'https://control-plane.example/events',
+        body: {
+          event: { type: 'run_completed', payload: { output: 'done' } },
+          run: {
+            id: 'run-1',
+            status: 'completed',
+            metadata: run.metadata,
+          },
+        },
+      }),
+    ]);
   });
 
   test('ExtensionHost aggregates contributions and extends runtime surfaces', async () => {

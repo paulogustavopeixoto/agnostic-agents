@@ -9,6 +9,7 @@ const { EvidenceGraph } = require('./EvidenceGraph');
 const { EvalHarness } = require('./EvalHarness');
 const { LearningLoop } = require('./LearningLoop');
 const { GovernanceHooks } = require('./GovernanceHooks');
+const { WebhookGovernanceAdapter } = require('./WebhookGovernanceAdapter');
 const { ExtensionHost } = require('./ExtensionHost');
 const { StorageBackendRegistry } = require('./StorageBackendRegistry');
 const { ApprovalInbox } = require('./ApprovalInbox');
@@ -19,6 +20,7 @@ const { ToolPolicy } = require('./ToolPolicy');
 const { EventBus } = require('./EventBus');
 const { ConsoleDebugSink } = require('./ConsoleDebugSink');
 const { FileAuditSink } = require('./FileAuditSink');
+const { WebhookEventSink } = require('./WebhookEventSink');
 const { RuntimeEventRedactor } = require('./RuntimeEventRedactor');
 const { DistributedRunEnvelope } = require('./DistributedRunEnvelope');
 const { BaseRunStore } = require('./stores/BaseRunStore');
@@ -52,6 +54,7 @@ module.exports = {
   EvalHarness,
   LearningLoop,
   GovernanceHooks,
+  WebhookGovernanceAdapter,
   ExtensionHost,
   StorageBackendRegistry,
   ApprovalInbox,
@@ -62,6 +65,7 @@ module.exports = {
   EventBus,
   ConsoleDebugSink,
   FileAuditSink,
+  WebhookEventSink,
   RuntimeEventRedactor,
   DistributedRunEnvelope,
   BaseRunStore,

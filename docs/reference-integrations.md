@@ -110,6 +110,11 @@ For most serious systems, split the runtime into separate processes:
 That keeps the runtime portable and lets each deployment choose its own transport, UI, and persistence.
 
 For a fuller operator-facing architecture view, see [`docs/operator-architecture.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/operator-architecture.md).
+For remote governance callback patterns, see [`docs/remote-control-planes.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/remote-control-planes.md).
+
+Maintained split reference:
+
+- [`examples/referenceDeploymentSplit.js`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples/referenceDeploymentSplit.js)
 
 ## 5. Storage recommendation
 
