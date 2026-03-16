@@ -7,6 +7,7 @@ const { RAG } = require('../src/rag/RAG');
 const { ToolPolicy } = require('../src/runtime/ToolPolicy');
 const { InMemoryRunStore } = require('../src/runtime/stores/InMemoryRunStore');
 const { EventBus } = require('../src/runtime/EventBus');
+const { ApprovalInbox } = require('../src/runtime/ApprovalInbox');
 const { RunInspector } = require('../src/runtime/RunInspector');
 const {
   InvalidToolCallError,
@@ -426,6 +427,13 @@ describe('Agent', () => {
         }),
       ],
     });
+    expect(run.state.evidenceGraph).toBeDefined();
+    expect(run.state.evidenceGraph.summarize()).toEqual(
+      expect.objectContaining({
+        nodes: expect.any(Number),
+        edges: expect.any(Number),
+      })
+    );
   });
 
   test('pauses for approval and resumes the run after approval', async () => {
@@ -509,6 +517,102 @@ describe('Agent', () => {
     });
 
     await expect(agent.run('Use tool to delete')).rejects.toBeInstanceOf(ToolPolicyError);
+  });
+
+  test('records declarative policy decisions on the run', async () => {
+    const tool = new Tool({
+      name: 'notify_user',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string' },
+        },
+        required: ['query'],
+      },
+      metadata: {
+        sideEffectLevel: 'external_write',
+      },
+      implementation: async ({ query }) => ({ delivered: query }),
+    });
+
+    mockAdapter.generateText = jest.fn().mockResolvedValue({
+      message: '',
+      toolCalls: [{ name: 'notify_user', arguments: { query: 'status' }, id: 'tool_use_1' }],
+    });
+
+    const runStore = new InMemoryRunStore();
+    const agent = new Agent(mockAdapter, {
+      tools: [tool],
+      retryManager,
+      runStore,
+      toolPolicy: new ToolPolicy({
+        rules: [
+          {
+            id: 'external-approval',
+            sideEffectLevels: ['external_write'],
+            action: 'require_approval',
+            reason: 'External writes require approval.',
+          },
+        ],
+      }),
+    });
+
+    const pendingRun = await agent.run('Use tool to notify');
+
+    expect(pendingRun.status).toBe('waiting_for_approval');
+    expect(pendingRun.state.policyDecisions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          toolName: 'notify_user',
+          stage: 'evaluate',
+          decision: expect.objectContaining({
+            action: 'require_approval',
+            ruleId: 'external-approval',
+            source: 'rule',
+          }),
+        }),
+      ])
+    );
+    expect(pendingRun.events.map(event => event.type)).toContain('policy_decision');
+  });
+
+  test('adds approval requests to the approval inbox', async () => {
+    const tool = new Tool({
+      name: 'send_email',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string' },
+        },
+        required: ['query'],
+      },
+      metadata: {
+        executionPolicy: 'require_approval',
+      },
+      implementation: async ({ query }) => ({ delivered: true, query }),
+    });
+
+    mockAdapter.generateText = jest.fn().mockResolvedValue({
+      message: '',
+      toolCalls: [{ name: 'send_email', arguments: { query: 'hello' }, id: 'tool_use_1' }],
+    });
+
+    const approvalInbox = new ApprovalInbox();
+    const agent = new Agent(mockAdapter, {
+      tools: [tool],
+      retryManager,
+      runStore: new InMemoryRunStore(),
+      approvalInbox,
+    });
+
+    const pendingRun = await agent.run('Use tool to send email');
+    expect(pendingRun.status).toBe('waiting_for_approval');
+    await expect(approvalInbox.get(pendingRun.id)).resolves.toEqual(
+      expect.objectContaining({
+        runId: pendingRun.id,
+        toolName: 'send_email',
+      })
+    );
   });
 
   test('pauses and resumes a run outside approval flow', async () => {
@@ -623,5 +727,201 @@ describe('Agent', () => {
         result: { query: 'hello', transformed: true },
       }),
     ]);
+  });
+
+  test('can branch an agent run from a checkpoint and resume the branch', async () => {
+    const runStore = new InMemoryRunStore();
+    const agent = new Agent(mockAdapter, { runStore });
+
+    const originalRun = await agent.run('Hello branchable runtime');
+    const branchedRun = await agent.branchRun(originalRun.id);
+
+    expect(branchedRun.id).not.toBe(originalRun.id);
+    expect(branchedRun.status).toBe('paused');
+    expect(branchedRun.metadata.lineage).toEqual(
+      expect.objectContaining({
+        rootRunId: originalRun.id,
+        branchOriginRunId: originalRun.id,
+        branchCheckpointId: originalRun.checkpoints[originalRun.checkpoints.length - 1].id,
+      })
+    );
+    expect(branchedRun.events.map(event => event.type)).toContain('run_branched');
+
+    const resumedRun = await agent.resumeRun(branchedRun.id);
+    expect(resumedRun.status).toBe('completed');
+    expect(resumedRun.output).toBe('Mock response');
+  });
+
+  test('can replay an agent run from a frozen trace without calling the adapter again', async () => {
+    const runStore = new InMemoryRunStore();
+    const agent = new Agent(mockAdapter, { runStore });
+    const generateSpy = jest.spyOn(mockAdapter, 'generateText');
+
+    const sourceRun = await agent.run('Replay this run');
+    const generateCountBeforeReplay = generateSpy.mock.calls.length;
+    const replayRun = await agent.replayRun(sourceRun.id);
+
+    expect(replayRun.id).not.toBe(sourceRun.id);
+    expect(replayRun.output).toBe(sourceRun.output);
+    expect(replayRun.status).toBe(sourceRun.status);
+    expect(replayRun.events.map(event => event.type)).toEqual(
+      expect.arrayContaining(['replay_started', 'replay_completed'])
+    );
+    expect(replayRun.metadata.replay).toEqual(
+      expect.objectContaining({
+        mode: 'frozen_trace',
+        sourceRunId: sourceRun.id,
+      })
+    );
+    expect(generateSpy.mock.calls.length).toBe(generateCountBeforeReplay);
+  });
+
+  test('runs a verifier pass before risky tool execution', async () => {
+    const tool = new Tool({
+      name: 'send_email',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string' },
+        },
+        required: ['query'],
+      },
+      metadata: {
+        sideEffectLevel: 'external_write',
+      },
+      implementation: async ({ query }) => ({ sent: query }),
+    });
+
+    mockAdapter.generateText = jest.fn()
+      .mockResolvedValueOnce({
+        message: '',
+        toolCalls: [{ name: 'send_email', arguments: { query: 'status' }, id: 'tool_use_1' }],
+      })
+      .mockResolvedValueOnce({
+        message: 'Sent',
+      });
+
+    const verifier = jest.fn().mockResolvedValue({ action: 'allow', reason: 'safe enough' });
+    const agent = new Agent(mockAdapter, {
+      tools: [tool],
+      retryManager,
+      verifier,
+    });
+
+    const run = await agent.run('Use tool to send email');
+
+    expect(run.status).toBe('completed');
+    expect(verifier).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'send_email' }),
+      { query: 'status' },
+      expect.objectContaining({ run: expect.any(Object) })
+    );
+    expect(run.events.map(event => event.type)).toEqual(
+      expect.arrayContaining(['verifier_started', 'verifier_completed', 'tool_completed'])
+    );
+    expect(run.steps).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'verifier',
+          status: 'completed',
+        }),
+      ])
+    );
+    expect(run.metrics.timings.verifierMs).toBeGreaterThanOrEqual(0);
+  });
+
+  test('denies risky tool execution when verifier rejects it', async () => {
+    const tool = new Tool({
+      name: 'send_email',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string' },
+        },
+        required: ['query'],
+      },
+      metadata: {
+        sideEffectLevel: 'external_write',
+      },
+      implementation: async () => ({ sent: true }),
+    });
+
+    mockAdapter.generateText = jest.fn().mockResolvedValue({
+      message: '',
+      toolCalls: [{ name: 'send_email', arguments: { query: 'status' }, id: 'tool_use_1' }],
+    });
+
+    const agent = new Agent(mockAdapter, {
+      tools: [tool],
+      retryManager,
+      verifier: jest.fn().mockResolvedValue({ action: 'deny', reason: 'unsafe action' }),
+    });
+
+    await expect(agent.run('Use tool to send email')).rejects.toBeInstanceOf(ToolPolicyError);
+  });
+
+  test('records self-verification, tool confidence, and run assessment', async () => {
+    const tool = new Tool({
+      name: 'send_email',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string' },
+        },
+        required: ['query'],
+      },
+      metadata: {
+        sideEffectLevel: 'external_write',
+      },
+      implementation: async ({ query }) => ({ sent: query }),
+    });
+
+    mockAdapter.generateText = jest.fn()
+      .mockResolvedValueOnce({
+        message: '',
+        toolCalls: [{ name: 'send_email', arguments: { query: 'status' }, id: 'tool_use_1' }],
+      })
+      .mockResolvedValueOnce({
+        message: 'Sent',
+      });
+
+    const verifier = jest
+      .fn()
+      .mockResolvedValueOnce({ action: 'allow', reason: 'tool is safe' })
+      .mockResolvedValueOnce({ action: 'allow', reason: 'final response is grounded' });
+
+    const agent = new Agent(mockAdapter, {
+      tools: [tool],
+      retryManager,
+      verifier,
+    });
+
+    const run = await agent.run('Use tool to send email', { selfVerify: true });
+
+    expect(run.state.toolConfidence).toEqual([
+      expect.objectContaining({
+        toolName: 'send_email',
+        score: expect.any(Number),
+      }),
+    ]);
+    expect(run.state.selfVerification).toEqual(
+      expect.objectContaining({
+        action: 'allow',
+      })
+    );
+    expect(run.state.assessment).toEqual(
+      expect.objectContaining({
+        uncertainty: expect.any(Number),
+        confidence: expect.any(Number),
+        averageToolConfidence: expect.any(Number),
+      })
+    );
+    expect(run.events.map(event => event.type)).toEqual(
+      expect.arrayContaining([
+        'tool_confidence_scored',
+        'self_verification_started',
+        'self_verification_completed',
+      ])
+    );
   });
 });

@@ -1,10 +1,13 @@
 const { RetryManager } = require('../utils/RetryManager');
+const { repairJsonOutput } = require('../utils');
 const { MissingInfoResolver } = require('./MissingInfoResolver');
 const { Run } = require('../runtime/Run');
+const { EvidenceGraph } = require('../runtime/EvidenceGraph');
 const { ToolPolicy } = require('../runtime/ToolPolicy');
 const { EventBus } = require('../runtime/EventBus');
 const { ConsoleDebugSink } = require('../runtime/ConsoleDebugSink');
 const { RunInspector } = require('../runtime/RunInspector');
+const { ApprovalInbox } = require('../runtime/ApprovalInbox');
 const {
   AdapterCapabilityError,
   InvalidToolCallError,
@@ -50,6 +53,8 @@ class Agent {
       onEvent = null,
       eventBus = null,
       debug = false,
+      verifier = null,
+      approvalInbox = null,
     } = {}
   ) {
     this.adapter = adapter;
@@ -69,6 +74,8 @@ class Agent {
       this.eventBus.addSink(new ConsoleDebugSink());
     }
     this.debug = debug;
+    this.verifier = verifier;
+    this.approvalInbox = approvalInbox instanceof ApprovalInbox ? approvalInbox : approvalInbox || null;
     this.resolver = new MissingInfoResolver({
       memory: this.memory,
       rag: this.rag,
@@ -131,11 +138,28 @@ class Agent {
       timestamp: new Date().toISOString(),
       status: run.status,
       payload,
+      snapshot: run.createCheckpointSnapshot(),
       messageCount: run.messages.length,
       toolCallCount: run.toolCalls.length,
       toolResultCount: run.toolResults.length,
     });
     await this._persistRun(run);
+  }
+
+  async _linkParentRun(run) {
+    const parentRunId = run.metadata?.lineage?.parentRunId;
+    if (!parentRunId || !this.runStore?.getRun || !this.runStore?.saveRun) {
+      return;
+    }
+
+    const storedParent = await this.runStore.getRun(parentRunId);
+    if (!storedParent) {
+      return;
+    }
+
+    const parentRun = storedParent instanceof Run ? storedParent : Run.fromJSON(storedParent);
+    parentRun.registerChildRun(run.id);
+    await this.runStore.saveRun(parentRun);
   }
 
   async _pauseRun(run, reason, payload = {}) {
@@ -248,6 +272,168 @@ class Agent {
     return facts.length ? `Here is what I remember:\n${facts.join('\n')}\n` : '';
   }
 
+  _getEvidenceGraph(run) {
+    if (!run.state.evidenceGraph) {
+      run.state.evidenceGraph = new EvidenceGraph();
+    } else if (!(run.state.evidenceGraph instanceof EvidenceGraph)) {
+      run.state.evidenceGraph = new EvidenceGraph(run.state.evidenceGraph);
+    }
+
+    return run.state.evidenceGraph;
+  }
+
+  _getToolConfidence(run) {
+    if (!run.state.toolConfidence) {
+      run.state.toolConfidence = [];
+    }
+
+    return run.state.toolConfidence;
+  }
+
+  async _scoreToolCallConfidence(run, tool, toolCall) {
+    const schema = tool?.parameters || {};
+    const required = Array.isArray(schema.required) ? schema.required : [];
+    const args = toolCall.arguments || {};
+    const providedRequired = required.filter(
+      key => args[key] !== undefined && args[key] !== null && args[key] !== ''
+    );
+    const completeness = required.length ? providedRequired.length / required.length : 1;
+    const score = Number(
+      Math.max(
+        0,
+        Math.min(
+          1,
+          completeness * 0.85 +
+            (tool?.metadata?.verificationPolicy === 'never' ? 0.05 : 0) +
+            (Array.isArray(tool?.metadata?.examples) && tool.metadata.examples.length ? 0.1 : 0)
+        )
+      ).toFixed(3)
+    );
+
+    const assessment = {
+      toolName: tool.name,
+      score,
+      completeness: Number(completeness.toFixed(3)),
+      requiredArguments: required,
+      providedRequiredArguments: providedRequired,
+    };
+
+    this._getToolConfidence(run).push(assessment);
+    await this._emitEvent(run, 'tool_confidence_scored', assessment);
+    return assessment;
+  }
+
+  _assessRun(run) {
+    const evidenceSummary = this._getEvidenceGraph(run).summarize();
+    const toolConfidence = this._getToolConfidence(run);
+    const averageToolConfidence = toolConfidence.length
+      ? toolConfidence.reduce((sum, entry) => sum + (entry.score || 0), 0) / toolConfidence.length
+      : 1;
+    const selfVerification = run.state.selfVerification || null;
+
+    let uncertainty = 0.15;
+    if (evidenceSummary.nodes === 0) {
+      uncertainty += 0.2;
+    }
+    if (evidenceSummary.conflicts > 0) {
+      uncertainty += Math.min(0.35, evidenceSummary.conflicts * 0.15);
+    }
+    if (averageToolConfidence < 0.75) {
+      uncertainty += 0.15;
+    }
+    if (selfVerification?.action === 'deny' || selfVerification?.action === 'require_approval') {
+      uncertainty += 0.2;
+    }
+
+    const assessment = {
+      uncertainty: Number(Math.max(0, Math.min(1, uncertainty)).toFixed(3)),
+      confidence: Number((1 - Math.max(0, Math.min(1, uncertainty))).toFixed(3)),
+      evidenceConflicts: evidenceSummary.conflicts || 0,
+      averageToolConfidence: Number(averageToolConfidence.toFixed(3)),
+      verification: selfVerification
+        ? {
+            action: selfVerification.action || selfVerification.status || null,
+            reason: selfVerification.reason || null,
+          }
+        : null,
+    };
+
+    run.state.assessment = assessment;
+    return assessment;
+  }
+
+  _outputProposesNewAction(run) {
+    const output = String(run.output || '').toLowerCase();
+    const toolNames = this.tools.map(tool => tool.name.toLowerCase());
+    const actionVerbs = ['send', 'call', 'execute', 'delete', 'write', 'update', 'message', 'email', 'notify'];
+
+    if (run.toolResults?.length || run.pendingApproval) {
+      return false;
+    }
+
+    const mentionsTool = toolNames.some(name => output.includes(name));
+    const mentionsActionVerb = actionVerbs.some(verb => output.includes(`${verb} `) || output.includes(`will ${verb}`));
+
+    return mentionsTool || mentionsActionVerb;
+  }
+
+  async _selfVerifyRunOutput(run, finalConfig = {}) {
+    if (!finalConfig.selfVerify || !this.verifier) {
+      return null;
+    }
+
+    const step = this._startStep(run, 'self_verification', {
+      output: run.output,
+    });
+    await this._emitEvent(run, 'self_verification_started', { output: run.output });
+
+    try {
+      const startedAt = Date.now();
+      const verdict = await this._invokeVerifier(
+        {
+          name: 'final_response',
+          description: 'Validate the final agent response before completion.',
+          metadata: {
+            verificationPolicy: 'require_verifier',
+            sideEffectLevel: 'none',
+          },
+        },
+        {
+          output: run.output,
+          input: run.input,
+          retrieval: run.state.retrieval || null,
+          toolResults: run.toolResults || [],
+        },
+        { run, config: finalConfig, stage: 'self_verification' }
+      );
+      const normalizedVerdict = verdict || { action: 'allow', reason: null };
+      if (
+        normalizedVerdict.action === 'require_approval' &&
+        !this._outputProposesNewAction(run)
+      ) {
+        normalizedVerdict.action = 'allow';
+        normalizedVerdict.reason =
+          'Final output is analytical only and does not propose a new external action.';
+      }
+      run.recordTiming('verifierMs', Date.now() - startedAt);
+      run.state.selfVerification = normalizedVerdict;
+      this._completeStep(run, step.id, run.state.selfVerification);
+      await this._emitEvent(run, 'self_verification_completed', {
+        verdict: run.state.selfVerification,
+      });
+      await this._checkpointRun(run, 'self_verification_completed', {
+        verdict: run.state.selfVerification,
+      });
+      return run.state.selfVerification;
+    } catch (error) {
+      this._failStep(run, step.id, error);
+      await this._emitEvent(run, 'self_verification_failed', {
+        message: error.message || String(error),
+      });
+      throw error;
+    }
+  }
+
   async _getRagContext(userMessage, config = {}, runtime = {}) {
     const hasStructuredSearch = typeof this.rag?.searchWithProvenance === 'function';
     const hasPlainSearch = typeof this.rag?.search === 'function';
@@ -282,6 +468,11 @@ class Agent {
             query: userMessage,
             matches: [],
           };
+          this._getEvidenceGraph(run).addNode({
+            id: `${run.id}:evidence:query`,
+            type: 'query',
+            label: userMessage,
+          });
           await this._emitEvent(run, 'retrieval_completed', { query: userMessage, matches: [] });
         }
 
@@ -294,6 +485,20 @@ class Agent {
           query: userMessage,
           matches,
         };
+        const evidenceGraph = this._getEvidenceGraph(run);
+        const queryNodeId = `${run.id}:evidence:query`;
+        evidenceGraph.addNode({ id: queryNodeId, type: 'query', label: userMessage });
+        matches.forEach((match, index) => {
+          const nodeId = `${run.id}:evidence:retrieval:${index + 1}`;
+          evidenceGraph.addNode({
+            id: nodeId,
+            type: 'retrieval',
+            label: match.text,
+            source: match.metadata?.source || match.id || null,
+            score: match.score ?? null,
+          });
+          evidenceGraph.addEdge({ from: queryNodeId, to: nodeId, type: 'supports' });
+        });
         run.recordTiming('retrievalMs', endedAt - new Date(run.events[run.events.length - 1]?.timestamp || endedAt).getTime());
         await this._emitEvent(run, 'retrieval_completed', { query: userMessage, matches });
       }
@@ -387,15 +592,37 @@ class Agent {
 
     const finalConfig = { ...this.defaultConfig, ...config };
     const run = new Run({
+      id: finalConfig.runId,
       input: userMessage,
       state: { ...(finalConfig.state || {}) },
       metadata: {
         description: this.description,
+        ...(finalConfig.metadata || {}),
+        lineage: {
+          rootRunId:
+            finalConfig.lineage?.rootRunId ||
+            finalConfig.metadata?.lineage?.rootRunId ||
+            finalConfig.lineage?.parentRunId ||
+            finalConfig.metadata?.lineage?.parentRunId ||
+            undefined,
+          parentRunId:
+            finalConfig.lineage?.parentRunId || finalConfig.metadata?.lineage?.parentRunId || null,
+          childRunIds: finalConfig.lineage?.childRunIds || finalConfig.metadata?.lineage?.childRunIds || [],
+          branchOriginRunId:
+            finalConfig.lineage?.branchOriginRunId ||
+            finalConfig.metadata?.lineage?.branchOriginRunId ||
+            null,
+          branchCheckpointId:
+            finalConfig.lineage?.branchCheckpointId ||
+            finalConfig.metadata?.lineage?.branchCheckpointId ||
+            null,
+        },
       },
     });
 
     run.setStatus('running');
     await this._persistRun(run);
+    await this._linkParentRun(run);
 
     try {
       const promptObject = await this._buildSystemPrompt(userMessage, finalConfig, { run });
@@ -592,6 +819,8 @@ class Agent {
       }
 
       run.output = result?.message || result;
+      await this._selfVerifyRunOutput(run, finalConfig);
+      this._assessRun(run);
       run.setStatus('completed');
 
       if (this.memory?.storeConversation) {
@@ -649,10 +878,22 @@ class Agent {
 
     run.addToolCall(request);
     await this._emitEvent(run, 'tool_requested', request);
+    await this._scoreToolCallConfidence(run, toolInstance, toolCall);
 
     const decision = this.toolPolicy.evaluate(toolInstance, toolCall.arguments || {}, {
       run,
       config: finalConfig,
+    });
+    run.state.policyDecisions = run.state.policyDecisions || [];
+    run.state.policyDecisions.push({
+      toolName: toolCall.name,
+      stage: 'evaluate',
+      decision,
+    });
+    await this._emitEvent(run, 'policy_decision', {
+      toolName: toolCall.name,
+      stage: 'evaluate',
+      decision,
     });
 
     if (decision?.action === 'deny') {
@@ -667,6 +908,9 @@ class Agent {
         reason: decision.reason || null,
       };
       run.setStatus('waiting_for_approval');
+      if (this.approvalInbox?.add) {
+        await this.approvalInbox.add(run.pendingApproval);
+      }
       await this._emitEvent(run, 'approval_requested', run.pendingApproval);
       await this._persistRun(run);
       return { status: 'waiting_for_approval' };
@@ -677,6 +921,16 @@ class Agent {
       toolCall.arguments || {},
       { run, config: finalConfig }
     );
+    run.state.policyDecisions.push({
+      toolName: toolCall.name,
+      stage: 'before_execute',
+      decision: beforeExecution,
+    });
+    await this._emitEvent(run, 'policy_decision', {
+      toolName: toolCall.name,
+      stage: 'before_execute',
+      decision: beforeExecution,
+    });
 
     if (beforeExecution?.action === 'deny') {
       throw new ToolPolicyError(
@@ -690,12 +944,206 @@ class Agent {
         reason: beforeExecution.reason || null,
       };
       run.setStatus('waiting_for_approval');
+      if (this.approvalInbox?.add) {
+        await this.approvalInbox.add(run.pendingApproval);
+      }
+      await this._emitEvent(run, 'approval_requested', run.pendingApproval);
+      await this._persistRun(run);
+      return { status: 'waiting_for_approval' };
+    }
+
+    const verification = await this._verifyToolCall(toolInstance, toolCall, { run, config: finalConfig });
+    if (verification?.action === 'deny') {
+      throw new ToolPolicyError(
+        verification.reason || `Verifier denied execution for tool "${toolCall.name}".`
+      );
+    }
+
+    if (verification?.action === 'require_approval') {
+      run.pendingApproval = {
+        ...request,
+        reason: verification.reason || null,
+        verification,
+      };
+      run.setStatus('waiting_for_approval');
+      if (this.approvalInbox?.add) {
+        await this.approvalInbox.add(run.pendingApproval);
+      }
       await this._emitEvent(run, 'approval_requested', run.pendingApproval);
       await this._persistRun(run);
       return { status: 'waiting_for_approval' };
     }
 
     return { status: 'approved' };
+  }
+
+  _shouldVerifyTool(tool, finalConfig = {}) {
+    const verificationPolicy = tool?.metadata?.verificationPolicy || 'auto';
+    const sideEffectLevel = tool?.metadata?.sideEffectLevel || 'none';
+
+    if (verificationPolicy === 'never') {
+      return false;
+    }
+
+    if (verificationPolicy === 'require_verifier') {
+      return true;
+    }
+
+    if (finalConfig.forceVerify === true) {
+      return true;
+    }
+
+    return ['external_write', 'system_write', 'destructive'].includes(sideEffectLevel);
+  }
+
+  async _invokeVerifier(tool, args, context = {}) {
+    if (typeof this.verifier === 'function') {
+      return this.verifier(tool, args, context);
+    }
+
+    if (this.verifier?.generateText) {
+      const isSelfVerification = context.stage === 'self_verification';
+      const prompt = [
+        {
+          role: 'system',
+          content: isSelfVerification
+            ? [
+                'You are a runtime output verifier.',
+                'Return only valid JSON with keys action and reason.',
+                'action must be one of allow, deny, require_approval.',
+                'Allow if the final output faithfully reflects retrieved evidence, completed tool results, and prior approvals.',
+                'Do not require approval for actions that have already been executed and approved.',
+                'Do not deny an output merely because the underlying evidence is conflicting; deny only if the output hides, distorts, or overstates the evidence.',
+                'Require approval only if the final output proposes a new risky external action that has not yet been executed.',
+              ].join(' ')
+            : 'You are a runtime safety verifier. Return only valid JSON with keys action and reason. action must be one of allow, deny, require_approval.',
+        },
+        {
+          role: 'user',
+          content: JSON.stringify(
+            {
+              tool: {
+                name: tool.name,
+                description: tool.description,
+                metadata: tool.metadata,
+              },
+              arguments: args,
+              runId: context.run?.id || null,
+              input: context.run?.input || null,
+              stage: context.stage || null,
+              toolResults: context.run?.toolResults || [],
+              pendingApproval: context.run?.pendingApproval || null,
+            },
+            null,
+            2
+          ),
+        },
+      ];
+
+      const response = await this.verifier.generateText(prompt, {
+        temperature: 0,
+        maxTokens: 200,
+      });
+      const content = response?.message || response?.content || '';
+      return repairJsonOutput(
+        {
+          sendMessage: async repairPrompt => {
+            const repairResponse = await this.verifier.generateText(
+              [
+                {
+                  role: 'system',
+                  content: 'Return only valid JSON.',
+                },
+                { role: 'user', content: repairPrompt },
+              ],
+              { temperature: 0, maxTokens: 200 }
+            );
+            return repairResponse?.message || repairResponse?.content || '';
+          },
+        },
+        content
+      );
+    }
+
+    return null;
+  }
+
+  async _verifyToolCall(tool, toolCall, { run, config = {} } = {}) {
+    if (!this._shouldVerifyTool(tool, config)) {
+      return { action: 'allow', reason: null, source: 'skipped' };
+    }
+
+    if (!this.verifier && !this.toolPolicy.customVerify) {
+      throw new ToolPolicyError(
+        `Tool "${tool.name}" requires verification, but no verifier is configured.`
+      );
+    }
+
+    const step = run
+      ? this._startStep(run, 'verifier', {
+          toolName: tool.name,
+          arguments: toolCall.arguments || {},
+        })
+      : null;
+
+    if (run) {
+      await this._emitEvent(run, 'verifier_started', {
+        toolName: tool.name,
+        arguments: toolCall.arguments || {},
+      });
+    }
+
+    try {
+      const startedAt = Date.now();
+      const policyVerdict = await this.toolPolicy.verify(tool, toolCall.arguments || {}, {
+        run,
+        config,
+        toolCall,
+      });
+      const verifierVerdict =
+        policyVerdict?.action && policyVerdict.action !== 'allow'
+          ? policyVerdict
+          : await this._invokeVerifier(tool, toolCall.arguments || {}, { run, config, toolCall });
+
+      const verdict = verifierVerdict || policyVerdict || { action: 'allow', reason: null };
+
+      if (run) {
+        run.recordTiming('verifierMs', Date.now() - startedAt);
+        this._getEvidenceGraph(run).addNode({
+          id: `${run.id}:evidence:verifier:${run.steps.length + 1}`,
+          type: 'verifier',
+          label: tool.name,
+          verdict,
+        });
+        this._completeStep(run, step.id, verdict);
+        await this._emitEvent(run, 'verifier_completed', {
+          toolName: tool.name,
+          verdict,
+        });
+        await this._checkpointRun(run, 'verifier_completed', {
+          toolName: tool.name,
+          verdict,
+        });
+      }
+
+      return {
+        action: verdict.action || 'allow',
+        reason: verdict.reason || null,
+        source: verdict.source || 'verifier',
+      };
+    } catch (error) {
+      if (run) {
+        this._failStep(run, step.id, error);
+        await this._emitEvent(run, 'verifier_failed', {
+          toolName: tool.name,
+          message: error.message || String(error),
+        });
+      }
+
+      throw new ToolPolicyError(
+        `Verifier failed for tool "${tool.name}": ${error.message || String(error)}`
+      );
+    }
   }
 
   _appendToolMessages(run, toolCall, toolResult) {
@@ -714,6 +1162,12 @@ class Agent {
     });
     run.addToolResult({
       toolName: toolCall.name,
+      result: toolResult,
+    });
+    this._getEvidenceGraph(run).addNode({
+      id: `${run.id}:evidence:tool:${run.toolResults.length}`,
+      type: 'tool_result',
+      label: toolCall.name,
       result: toolResult,
     });
   }
@@ -910,6 +1364,121 @@ class Agent {
     }
 
     return this._cancelRun(run, reason, payload);
+  }
+
+  async branchRun(
+    runId,
+    { checkpointId = null, input = null, metadata = {}, persist = true } = {}
+  ) {
+    if (!this.runStore?.getRun) {
+      throw new RunNotFoundError('Cannot branch a run without a configured runStore.');
+    }
+
+    const storedRun = await this.runStore.getRun(runId);
+    if (!storedRun) {
+      throw new RunNotFoundError(`Run "${runId}" not found.`);
+    }
+
+    const sourceRun = storedRun instanceof Run ? storedRun : Run.fromJSON(storedRun);
+    const branchedRun = sourceRun.branchFromCheckpoint(checkpointId, {
+      input: input ?? sourceRun.input,
+      metadata: {
+        description: this.description,
+        ...metadata,
+      },
+    });
+
+    await this._emitEvent(branchedRun, 'run_branched', {
+      sourceRunId: sourceRun.id,
+      sourceCheckpointId: branchedRun.metadata.lineage.branchCheckpointId,
+    });
+    await this._checkpointRun(branchedRun, 'run_branched', {
+      sourceRunId: sourceRun.id,
+      sourceCheckpointId: branchedRun.metadata.lineage.branchCheckpointId,
+    });
+
+    if (persist) {
+      await this._persistRun(branchedRun);
+    }
+
+    return branchedRun;
+  }
+
+  async replayRun(runId, { persist = true, metadata = {}, replayRunId = null } = {}) {
+    if (!this.runStore?.getRun) {
+      throw new RunNotFoundError('Cannot replay a run without a configured runStore.');
+    }
+
+    const storedRun = await this.runStore.getRun(runId);
+    if (!storedRun) {
+      throw new RunNotFoundError(`Run "${runId}" not found.`);
+    }
+
+    const sourceRun = storedRun instanceof Run ? storedRun : Run.fromJSON(storedRun);
+    const replayRun = Run.fromJSON(sourceRun.toJSON());
+    replayRun.id = replayRunId || `${sourceRun.id}:replay:${Date.now()}`;
+    replayRun.metadata = {
+      ...replayRun.metadata,
+      ...metadata,
+      replay: {
+        mode: 'frozen_trace',
+        sourceRunId: sourceRun.id,
+        replayedAt: new Date().toISOString(),
+      },
+      lineage: {
+        ...replayRun.metadata.lineage,
+        rootRunId: sourceRun.metadata?.lineage?.rootRunId || sourceRun.id,
+        parentRunId: null,
+        childRunIds: [],
+      },
+    };
+    replayRun.events = [];
+    replayRun.checkpoints = [];
+    replayRun.timestamps = {
+      createdAt: new Date().toISOString(),
+      startedAt: null,
+      updatedAt: new Date().toISOString(),
+      completedAt: null,
+      failedAt: null,
+      cancelledAt: null,
+    };
+    replayRun.pendingApproval = null;
+    replayRun.pendingPause = null;
+
+    replayRun.setStatus('running');
+    await this._emitEvent(replayRun, 'replay_started', {
+      sourceRunId: sourceRun.id,
+      mode: 'frozen_trace',
+    });
+    await this._checkpointRun(replayRun, 'replay_started', {
+      sourceRunId: sourceRun.id,
+      mode: 'frozen_trace',
+    });
+
+    replayRun.output = sourceRun.output;
+    replayRun.state = JSON.parse(JSON.stringify(sourceRun.state || {}));
+    replayRun.messages = JSON.parse(JSON.stringify(sourceRun.messages || []));
+    replayRun.steps = JSON.parse(JSON.stringify(sourceRun.steps || []));
+    replayRun.toolCalls = JSON.parse(JSON.stringify(sourceRun.toolCalls || []));
+    replayRun.toolResults = JSON.parse(JSON.stringify(sourceRun.toolResults || []));
+    replayRun.metrics = JSON.parse(JSON.stringify(sourceRun.metrics || replayRun.metrics));
+    replayRun.errors = JSON.parse(JSON.stringify(sourceRun.errors || []));
+    replayRun.setStatus(sourceRun.status);
+
+    await this._emitEvent(replayRun, 'replay_completed', {
+      sourceRunId: sourceRun.id,
+      status: sourceRun.status,
+    });
+    await this._checkpointRun(replayRun, 'replay_completed', {
+      sourceRunId: sourceRun.id,
+      status: sourceRun.status,
+    });
+
+    if (persist) {
+      await this._persistRun(replayRun);
+    }
+
+    return replayRun;
   }
 
   inspectRun(run) {

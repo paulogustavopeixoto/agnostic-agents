@@ -1,4 +1,5 @@
 const { WorkflowStep } = require('./WorkflowStep');
+const { ExecutionGraph } = require('./ExecutionGraph');
 
 class Workflow {
   constructor({ id, name = null, description = '', steps = [], metadata = {} }) {
@@ -39,6 +40,10 @@ class Workflow {
 
   getStep(stepId) {
     return this.steps.find(step => step.id === stepId) || null;
+  }
+
+  toExecutionGraph() {
+    return ExecutionGraph.fromWorkflow(this);
   }
 }
 

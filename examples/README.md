@@ -19,6 +19,12 @@ These examples are aligned with the current public API and should be treated as 
 - `localRagToolExample.js`
   - no API key required
   - combined retrieval + tool demo
+- `openaiRuntimeDemo.js`
+  - requires `OPENAI_API_KEY`
+  - advanced runtime demo for `v2`
+- `openaiV3RuntimeDemo.js`
+  - requires `OPENAI_API_KEY`
+  - advanced runtime-OS demo for `v3`
 
 ## Legacy / advanced examples
 

@@ -38,6 +38,7 @@ class Tool {
       costHint: metadata.costHint || 'unknown',
       retryabilityHint: metadata.retryabilityHint || 'unknown',
       executionPolicy: metadata.executionPolicy || 'auto',
+      verificationPolicy: metadata.verificationPolicy || 'auto',
     };
   }
 

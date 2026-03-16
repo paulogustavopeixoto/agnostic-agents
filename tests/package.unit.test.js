@@ -16,12 +16,30 @@ const { MCPClient } = require('../src/mcp/MCPClient');
 const { OpenAPILoader } = require('../src/api/OpenAPILoader');
 const { ApiLoader } = require('../src/api/ApiLoader');
 const { Run } = require('../src/runtime/Run');
+const { EvidenceGraph } = require('../src/runtime/EvidenceGraph');
+const { EvalHarness } = require('../src/runtime/EvalHarness');
+const { LearningLoop } = require('../src/runtime/LearningLoop');
+const { ApprovalInbox } = require('../src/runtime/ApprovalInbox');
+const { BackgroundJobScheduler } = require('../src/runtime/BackgroundJobScheduler');
+const { DelegationRuntime } = require('../src/runtime/DelegationRuntime');
+const { PlanningRuntime } = require('../src/runtime/PlanningRuntime');
+const { TraceSerializer } = require('../src/runtime/TraceSerializer');
 const { ToolPolicy } = require('../src/runtime/ToolPolicy');
 const { EventBus } = require('../src/runtime/EventBus');
 const { InMemoryRunStore } = require('../src/runtime/stores/InMemoryRunStore');
 const { FileRunStore } = require('../src/runtime/stores/FileRunStore');
+const { InMemoryJobStore } = require('../src/runtime/stores/InMemoryJobStore');
+const { FileJobStore } = require('../src/runtime/stores/FileJobStore');
+const { BaseEnvironmentAdapter } = require('../src/runtime/environments/BaseEnvironmentAdapter');
+const { BrowserEnvironmentAdapter } = require('../src/runtime/environments/BrowserEnvironmentAdapter');
+const { ShellEnvironmentAdapter } = require('../src/runtime/environments/ShellEnvironmentAdapter');
+const { ApiEnvironmentAdapter } = require('../src/runtime/environments/ApiEnvironmentAdapter');
+const { QueueEnvironmentAdapter } = require('../src/runtime/environments/QueueEnvironmentAdapter');
+const { FileEnvironmentAdapter } = require('../src/runtime/environments/FileEnvironmentAdapter');
 const { Workflow } = require('../src/runtime/workflow/Workflow');
 const { WorkflowStep } = require('../src/runtime/workflow/WorkflowStep');
+const { ExecutionGraph } = require('../src/runtime/workflow/ExecutionGraph');
+const { DelegationContract } = require('../src/runtime/workflow/DelegationContract');
 const { AgentWorkflowStep } = require('../src/runtime/workflow/AgentWorkflowStep');
 const { WorkflowRunner } = require('../src/runtime/workflow/WorkflowRunner');
 const { ToolValidator } = require('../src/utils/ToolValidator');
@@ -47,10 +65,28 @@ describe('Package/module unit tests', () => {
     expect(pkg.Run).toBeDefined();
     expect(pkg.ToolPolicy).toBeDefined();
     expect(pkg.EventBus).toBeDefined();
+    expect(pkg.TraceSerializer).toBeDefined();
+    expect(pkg.EvidenceGraph).toBeDefined();
+    expect(pkg.EvalHarness).toBeDefined();
+    expect(pkg.LearningLoop).toBeDefined();
+    expect(pkg.ApprovalInbox).toBeDefined();
+    expect(pkg.BackgroundJobScheduler).toBeDefined();
+    expect(pkg.DelegationRuntime).toBeDefined();
+    expect(pkg.PlanningRuntime).toBeDefined();
     expect(pkg.InMemoryRunStore).toBeDefined();
     expect(pkg.FileRunStore).toBeDefined();
+    expect(pkg.InMemoryJobStore).toBeDefined();
+    expect(pkg.FileJobStore).toBeDefined();
+    expect(pkg.BaseEnvironmentAdapter).toBeDefined();
+    expect(pkg.BrowserEnvironmentAdapter).toBeDefined();
+    expect(pkg.ShellEnvironmentAdapter).toBeDefined();
+    expect(pkg.ApiEnvironmentAdapter).toBeDefined();
+    expect(pkg.QueueEnvironmentAdapter).toBeDefined();
+    expect(pkg.FileEnvironmentAdapter).toBeDefined();
     expect(pkg.Workflow).toBeDefined();
     expect(pkg.WorkflowStep).toBeDefined();
+    expect(pkg.ExecutionGraph).toBeDefined();
+    expect(pkg.DelegationContract).toBeDefined();
     expect(pkg.AgentWorkflowStep).toBeDefined();
     expect(pkg.WorkflowRunner).toBeDefined();
     expect(pkg.RunInspector).toBeDefined();
@@ -80,6 +116,7 @@ describe('Package/module unit tests', () => {
       metadata: expect.objectContaining({
         sideEffectLevel: 'none',
         executionPolicy: 'auto',
+        verificationPolicy: 'auto',
       }),
     });
     expect(tool.toOpenAIFunction()).toEqual({
@@ -118,6 +155,140 @@ describe('Package/module unit tests', () => {
     expect(restored.pendingPause).toEqual({ reason: 'pause' });
     expect(restored.metrics.tokenUsage.total).toBe(15);
     expect(restored.metrics.cost).toBe(0.12);
+    expect(pkg.RunInspector.summarize(restored).lineage).toEqual(
+      expect.objectContaining({
+        rootRunId: run.id,
+        childRunIds: [],
+      })
+    );
+  });
+
+  test('Run aggregates child-run metrics once', () => {
+    const parent = new Run({ input: 'parent' });
+    const child = new Run({ input: 'child' });
+    child.recordUsage({ prompt: 3, completion: 2, total: 5 });
+    child.recordCost(0.25);
+    child.recordTiming('modelMs', 42);
+
+    parent.aggregateChildRun(child, { scope: 'unit' });
+    parent.aggregateChildRun(child, { scope: 'unit' });
+
+    expect(parent.metrics.childRuns.count).toBe(1);
+    expect(parent.metrics.tokenUsage.total).toBe(5);
+    expect(parent.metrics.cost).toBe(0.25);
+    expect(parent.metrics.timings.modelMs).toBe(42);
+  });
+
+  test('Run can branch from a checkpoint snapshot', () => {
+    const run = new Run({ input: 'branch-me' });
+    run.setStatus('running');
+    run.addMessage({ role: 'user', content: 'branch-me' });
+    run.addCheckpoint({
+      id: 'cp-1',
+      label: 'before_tool',
+      snapshot: run.createCheckpointSnapshot(),
+      status: run.status,
+    });
+    run.setStatus('completed');
+
+    const branch = run.branchFromCheckpoint('cp-1');
+    expect(branch.id).not.toBe(run.id);
+    expect(branch.status).toBe('paused');
+    expect(branch.messages).toEqual(run.messages);
+    expect(branch.metadata.lineage).toEqual(
+      expect.objectContaining({
+        rootRunId: run.id,
+        branchOriginRunId: run.id,
+        branchCheckpointId: 'cp-1',
+      })
+    );
+  });
+
+  test('TraceSerializer exports and imports stable run traces', () => {
+    const run = new Run({ input: 'trace-me' });
+    run.setStatus('completed');
+    run.output = 'done';
+
+    const trace = TraceSerializer.exportRun(run, { label: 'unit-test' });
+    expect(trace).toEqual(
+      expect.objectContaining({
+        schemaVersion: '1.0',
+        format: 'agnostic-agents-run-trace',
+        metadata: { label: 'unit-test' },
+      })
+    );
+
+    const imported = TraceSerializer.importRun(trace);
+    expect(imported).toBeInstanceOf(Run);
+    expect(imported.id).toBe(run.id);
+    expect(imported.output).toBe('done');
+  });
+
+  test('EvidenceGraph collects nodes and edges', () => {
+    const graph = new EvidenceGraph();
+    graph.addNode({ id: 'q1', type: 'query', label: 'What happened?' });
+    graph.addNode({ id: 'r1', type: 'retrieval', label: 'Source text' });
+    graph.addEdge({ from: 'q1', to: 'r1', type: 'supports' });
+
+    expect(graph.summarize()).toEqual({
+      nodes: 2,
+      edges: 1,
+      conflicts: 0,
+      nodeTypes: ['query', 'retrieval'],
+    });
+  });
+
+  test('EvidenceGraph detects simple negation conflicts', () => {
+    const graph = new EvidenceGraph();
+    graph.addNode({ id: 'a', type: 'claim', label: 'The deployment is ready.' });
+    graph.addNode({ id: 'b', type: 'claim', label: 'The deployment is not ready.' });
+
+    expect(graph.detectConflicts()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          left: 'a',
+          right: 'b',
+          type: 'negation_conflict',
+        }),
+        expect.objectContaining({
+          left: 'a',
+          right: 'b',
+          type: 'subject_predicate_conflict',
+        }),
+      ])
+    );
+  });
+
+  test('EvalHarness runs scenarios and reports pass/fail totals', async () => {
+    const learningLoop = new LearningLoop();
+    const harness = new EvalHarness({
+      scenarios: [
+        {
+          id: 'ok',
+          run: async () => 'hello',
+          assert: result => result === 'hello',
+        },
+        {
+          id: 'fail',
+          run: async () => 'bad',
+          assert: result => result === 'hello',
+        },
+      ],
+    });
+
+    await expect(harness.run({ learningLoop })).resolves.toEqual(
+      expect.objectContaining({
+        total: 2,
+        passed: 1,
+        failed: 1,
+      })
+    );
+    expect(learningLoop.summarize()).toEqual(
+      expect.objectContaining({
+        evaluations: 1,
+        failedEvaluations: 1,
+      })
+    );
   });
 
   test('run stores persist and reload runs', async () => {
@@ -146,7 +317,54 @@ describe('Package/module unit tests', () => {
     expect(policy.evaluate(tool, {})).toEqual({
       action: 'require_approval',
       reason: 'Tool requires explicit approval.',
+      source: 'metadata',
     });
+  });
+
+  test('ToolPolicy supports declarative authorization rules', () => {
+    const policy = new ToolPolicy({
+      rules: [
+        {
+          id: 'deny-delete',
+          toolNames: ['delete_records'],
+          action: 'deny',
+          reason: 'Deletes are blocked in this environment.',
+        },
+        {
+          id: 'approve-external',
+          sideEffectLevels: ['external_write'],
+          action: 'require_approval',
+          reason: 'External writes require approval.',
+        },
+      ],
+    });
+
+    const deleteTool = new Tool({
+      name: 'delete_records',
+      parameters: { type: 'object', properties: {} },
+      implementation: async () => ({ ok: true }),
+    });
+    const notifyTool = new Tool({
+      name: 'notify_user',
+      parameters: { type: 'object', properties: {} },
+      metadata: { sideEffectLevel: 'external_write' },
+      implementation: async () => ({ ok: true }),
+    });
+
+    expect(policy.evaluate(deleteTool, {}, {})).toEqual(
+      expect.objectContaining({
+        action: 'deny',
+        ruleId: 'deny-delete',
+        source: 'rule',
+      })
+    );
+    expect(policy.evaluate(notifyTool, {}, {})).toEqual(
+      expect.objectContaining({
+        action: 'require_approval',
+        ruleId: 'approve-external',
+        source: 'rule',
+      })
+    );
   });
 
   test('EventBus dispatches events to function and object sinks', async () => {
@@ -184,13 +402,67 @@ describe('Package/module unit tests', () => {
       onFallback: async info => events.push(info.to === providerB ? 'fallback' : 'other'),
     });
 
-    await expect(router.generateText([{ role: 'user', content: 'hello' }])).resolves.toEqual({
-      message: 'ok from fallback',
-    });
+    await expect(router.generateText([{ role: 'user', content: 'hello' }])).resolves.toEqual(
+      expect.objectContaining({
+        message: 'ok from fallback',
+        routing: expect.any(Object),
+      })
+    );
     expect(router.getCapabilities()).toEqual(
       expect.objectContaining({ generateText: true, toolCalling: true })
     );
     expect(events).toEqual(['fallback']);
+  });
+
+  test('FallbackRouter can route by cost, risk, and task hints before fallback', async () => {
+    const cheapProvider = {
+      getCapabilities: () => ({ generateText: true, toolCalling: true }),
+      generateText: jest.fn().mockResolvedValue({ message: 'cheap route' }),
+    };
+    const safeProvider = {
+      getCapabilities: () => ({ generateText: true, toolCalling: true }),
+      generateText: jest.fn().mockResolvedValue({ message: 'safe route' }),
+    };
+
+    const router = new FallbackRouter({
+      providers: [
+        {
+          provider: cheapProvider,
+          profile: { costTier: 'low', riskTier: 'medium', taskTypes: ['summarization'] },
+        },
+        {
+          provider: safeProvider,
+          profile: { costTier: 'high', riskTier: 'high', taskTypes: ['verification'] },
+        },
+      ],
+    });
+
+    const cheapResult = await router.generateText([{ role: 'user', content: 'summarize' }], {
+      route: { hints: { cost: 'low', taskType: 'summarization' } },
+    });
+    expect(cheapResult).toEqual(
+      expect.objectContaining({
+        message: 'cheap route',
+        routing: expect.objectContaining({
+          selectedProfile: expect.objectContaining({ costTier: 'low' }),
+        }),
+      })
+    );
+
+    const safeResult = await router.generateText([{ role: 'user', content: 'verify' }], {
+      route: { hints: { risk: 'high', taskType: 'verification' } },
+    });
+    expect(safeResult).toEqual(
+      expect.objectContaining({
+        message: 'safe route',
+        routing: expect.objectContaining({
+          selectedProfile: expect.objectContaining({ riskTier: 'high' }),
+        }),
+      })
+    );
+
+    expect(cheapProvider.generateText).toHaveBeenCalledTimes(1);
+    expect(safeProvider.generateText).toHaveBeenCalledTimes(1);
   });
 
   test('Workflow validates step definitions and dependencies', () => {
@@ -207,6 +479,240 @@ describe('Package/module unit tests', () => {
           steps: [{ id: 'a', dependsOn: ['missing'], run: async () => null }],
         })
     ).toThrow('depends on unknown step');
+  });
+
+  test('DelegationContract validates required inputs and serializes cleanly', () => {
+    const contract = new DelegationContract({
+      id: 'delegate',
+      requiredInputs: ['prompt'],
+      requiredCapabilities: ['toolCalling'],
+    });
+
+    expect(contract.toJSON()).toEqual(
+      expect.objectContaining({
+        id: 'delegate',
+        requiredInputs: ['prompt'],
+        requiredCapabilities: ['toolCalling'],
+      })
+    );
+
+    expect(() => contract.validateInput({})).toThrow('missing required input "prompt"');
+    expect(() =>
+      contract.validateCapabilities({
+        adapter: { getCapabilities: () => ({ toolCalling: false }) },
+      })
+    ).toThrow('requires capability "toolCalling"');
+  });
+
+  test('ApprovalInbox stores and resolves approval requests', async () => {
+    const inbox = new ApprovalInbox();
+    await inbox.add({ runId: 'run-1', toolName: 'send_email' });
+    await expect(inbox.get('run-1')).resolves.toEqual(
+      expect.objectContaining({ toolName: 'send_email' })
+    );
+    await inbox.resolve('run-1');
+    await expect(inbox.get('run-1')).resolves.toBeNull();
+  });
+
+  test('BackgroundJobScheduler executes due jobs and records results', async () => {
+    const scheduler = new BackgroundJobScheduler();
+    await scheduler.schedule({
+      id: 'job-1',
+      runAt: '2020-01-01T00:00:00.000Z',
+      run: async () => 'done',
+    });
+
+    const results = await scheduler.runDueJobs(new Date('2020-01-01T00:00:01.000Z'));
+    expect(results).toEqual([
+      expect.objectContaining({
+        id: 'job-1',
+        status: 'completed',
+        result: 'done',
+      }),
+    ]);
+  });
+
+  test('BackgroundJobScheduler persists recurring jobs through a file store', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'job-store-'));
+    const store = new FileJobStore({ directory: tmpDir });
+    const scheduler = new BackgroundJobScheduler({
+      store,
+      handlers: {
+        ping: async payload => ({ echoed: payload.value }),
+      },
+    });
+
+    await scheduler.schedule({
+      id: 'job-2',
+      handler: 'ping',
+      payload: { value: 'pong' },
+      runAt: '2020-01-01T00:00:00.000Z',
+      intervalMs: 1000,
+      maxRuns: 2,
+    });
+
+    const firstRun = await scheduler.runDueJobs(new Date('2020-01-01T00:00:00.500Z'));
+    expect(firstRun[0]).toEqual(
+      expect.objectContaining({
+        id: 'job-2',
+        status: 'scheduled',
+        runCount: 1,
+        result: { echoed: 'pong' },
+      })
+    );
+
+    const rehydrated = new BackgroundJobScheduler({
+      store,
+      handlers: {
+        ping: async payload => ({ echoed: payload.value }),
+      },
+    });
+    const secondRun = await rehydrated.runDueJobs(new Date('2020-01-01T00:00:02.000Z'));
+    expect(secondRun[0]).toEqual(
+      expect.objectContaining({
+        id: 'job-2',
+        status: 'completed',
+        runCount: 2,
+      })
+    );
+  });
+
+  test('BaseEnvironmentAdapter and specializations expose runtime environment contracts', async () => {
+    const adapter = new BaseEnvironmentAdapter({
+      kind: 'custom',
+      actions: ['write'],
+      metadata: { scope: 'unit' },
+      execute: async (_action, payload) => payload.value,
+    });
+
+    await expect(adapter.execute('write', { value: 'ok' })).resolves.toBe('ok');
+    expect(adapter.describe()).toEqual({
+      kind: 'custom',
+      actions: ['write'],
+      metadata: { scope: 'unit' },
+    });
+    expect(new BrowserEnvironmentAdapter().kind).toBe('browser');
+    expect(new ShellEnvironmentAdapter().kind).toBe('shell');
+    expect(new ApiEnvironmentAdapter().kind).toBe('api');
+    expect(new QueueEnvironmentAdapter().kind).toBe('queue');
+    expect(new FileEnvironmentAdapter().kind).toBe('file');
+  });
+
+  test('DelegationRuntime delegates child runs under explicit lineage', async () => {
+    const runtime = new DelegationRuntime();
+    const parentRun = new Run({ input: 'parent' });
+    const agent = {
+      adapter: { getCapabilities: () => ({ toolCalling: true }) },
+      run: jest.fn(async (_prompt, config) =>
+        new Run({
+          input: 'child',
+          output: 'delegated',
+          status: 'completed',
+          metadata: config.metadata,
+        })
+      ),
+    };
+
+    const result = await runtime.delegate({
+      parentRun,
+      agent,
+      prompt: 'Do work',
+      contract: {
+        id: 'contract-1',
+        requiredInputs: ['prompt'],
+        requiredCapabilities: ['toolCalling'],
+      },
+      metadata: { assignee: 'delegate' },
+    });
+
+    expect(result.childRun.output).toBe('delegated');
+    expect(parentRun.metadata.lineage.childRunIds).toContain(result.childRun.id);
+    expect(parentRun.metrics.childRuns.count).toBe(1);
+    expect(parentRun.events.map(event => event.type)).toEqual(
+      expect.arrayContaining(['delegation_runtime_started', 'delegation_runtime_completed'])
+    );
+  });
+
+  test('PlanningRuntime supports planning, verification, and recovery phases', async () => {
+    const runtime = new PlanningRuntime({
+      planner: async ({ input }) => [{ id: 'step-1', task: input }],
+      executor: async ({ plan }) => ({ completed: plan.length, valid: false }),
+      verifier: async ({ result }) => ({ status: result.valid ? 'passed' : 'recover' }),
+      recovery: async ({ plan }) => ({ plan: [...plan, { id: 'step-2', task: 'retry' }] }),
+    });
+
+    const run = await runtime.run('draft update');
+    expect(run.status).toBe('completed');
+    expect(run.output.plan).toHaveLength(2);
+    expect(run.output.recoveries).toHaveLength(1);
+    expect(run.events.map(event => event.type)).toEqual(
+      expect.arrayContaining(['plan_created', 'plan_verified', 'plan_recovered', 'planning_completed'])
+    );
+  });
+
+  test('PlanningRuntime revises the plan after execution failure', async () => {
+    let firstAttempt = true;
+    const runtime = new PlanningRuntime({
+      planner: async () => [{ id: 'initial' }],
+      executor: async ({ plan }) => {
+        if (firstAttempt) {
+          firstAttempt = false;
+          throw new Error(`failed:${plan[0].id}`);
+        }
+        return { ok: true, planLength: plan.length };
+      },
+      recovery: async ({ error }) => ({
+        reason: error.message,
+        plan: [{ id: 'revised' }, { id: 'stabilize' }],
+      }),
+    });
+
+    const run = await runtime.run('recover me');
+    expect(run.status).toBe('completed');
+    expect(run.output.plan).toHaveLength(2);
+    expect(run.events.map(event => event.type)).toEqual(
+      expect.arrayContaining(['plan_execution_failed', 'plan_recovered', 'planning_completed'])
+    );
+  });
+
+  test('LearningLoop builds recommendations from runs and evals', () => {
+    const learningLoop = new LearningLoop();
+    learningLoop.recordRun(
+      new Run({
+        input: 'bad run',
+        status: 'failed',
+        errors: [{ message: 'boom' }],
+        state: { selfVerification: { action: 'require_approval' } },
+      })
+    );
+    learningLoop.recordEvaluation({ total: 1, passed: 0, failed: 1, results: [] });
+
+    expect(learningLoop.buildRecommendations()).toEqual(
+      expect.arrayContaining([
+        'Investigate failed runs and add replay-based regression coverage.',
+        'Tighten prompts, tool contracts, or policies for scenarios failing the eval harness.',
+        'Review verifier denials and require approval or stronger routing for risky actions.',
+      ])
+    );
+  });
+
+  test('ExecutionGraph builds dependency edges from workflows', () => {
+    const workflow = new Workflow({
+      id: 'graph-flow',
+      steps: [
+        { id: 'a', run: async () => 'a' },
+        { id: 'b', dependsOn: ['a'], run: async () => 'b' },
+      ],
+    });
+
+    const graph = workflow.toExecutionGraph();
+    expect(graph).toBeInstanceOf(ExecutionGraph);
+    expect(graph.nodes).toHaveLength(2);
+    expect(graph.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ from: 'a', to: 'b', type: 'depends_on' }),
+      ])
+    );
   });
 
   test('WorkflowRunner can be constructed from plain workflow config', () => {

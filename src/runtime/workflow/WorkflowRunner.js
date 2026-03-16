@@ -6,6 +6,7 @@ const { RunInspector } = require('../RunInspector');
 const { RetryManager } = require('../../utils/RetryManager');
 const { InMemoryRunStore } = require('../stores/InMemoryRunStore');
 const { Workflow } = require('./Workflow');
+const { ExecutionGraph } = require('./ExecutionGraph');
 const { RunNotFoundError, RunCancelledError } = require('../../errors');
 
 class WorkflowPauseSignal extends Error {
@@ -71,6 +72,7 @@ class WorkflowRunner {
       timestamp: new Date().toISOString(),
       status: run.status,
       payload,
+      snapshot: run.createCheckpointSnapshot(),
       workflowId: this.workflow.id,
       completedSteps: Object.keys(run.state.workflow?.results || {}),
     });
@@ -120,7 +122,12 @@ class WorkflowRunner {
         workflowId: this.workflow.id,
         results: {},
         completedStepIds: [],
+        compensations: [],
       };
+    }
+
+    if (!Array.isArray(run.state.workflow.compensations)) {
+      run.state.workflow.compensations = [];
     }
 
     return run.state.workflow;
@@ -159,6 +166,21 @@ class WorkflowRunner {
       metadata: {
         workflowId: this.workflow.id,
         workflowName: this.workflow.name,
+        ...(options.metadata || {}),
+        lineage: {
+          rootRunId:
+            options.lineage?.rootRunId ||
+            options.metadata?.lineage?.rootRunId ||
+            options.lineage?.parentRunId ||
+            options.metadata?.lineage?.parentRunId ||
+            undefined,
+          parentRunId: options.lineage?.parentRunId || options.metadata?.lineage?.parentRunId || null,
+          childRunIds: options.lineage?.childRunIds || options.metadata?.lineage?.childRunIds || [],
+          branchOriginRunId:
+            options.lineage?.branchOriginRunId || options.metadata?.lineage?.branchOriginRunId || null,
+          branchCheckpointId:
+            options.lineage?.branchCheckpointId || options.metadata?.lineage?.branchCheckpointId || null,
+        },
       },
     });
 
@@ -218,22 +240,17 @@ class WorkflowRunner {
 
   async _continue(run) {
     const workflowState = this._getWorkflowState(run);
+    const graph = this.workflow.toExecutionGraph();
 
     try {
-      for (const step of this.workflow.steps) {
-        if (workflowState.completedStepIds.includes(step.id)) {
-          continue;
+      while (workflowState.completedStepIds.length < this.workflow.steps.length) {
+        const readyNodes = graph.getReadyNodes(workflowState.completedStepIds);
+        if (!readyNodes.length) {
+          throw new Error(`Workflow "${this.workflow.id}" has no executable ready steps.`);
         }
 
-        const missingDependency = step.dependsOn.find(
-          dependency => !workflowState.completedStepIds.includes(dependency)
-        );
-
-        if (missingDependency) {
-          throw new Error(
-            `Workflow step "${step.id}" cannot run before dependency "${missingDependency}".`
-          );
-        }
+        const nextNode = readyNodes[0];
+        const step = this.workflow.getStep(nextNode.id);
 
         const stepRecord = this._startStep(run, step);
         await this._emitEvent(run, 'workflow_step_started', {
@@ -303,6 +320,8 @@ class WorkflowRunner {
             return this._pauseRun(run, error.reason, error.payload);
           }
 
+          await this._runCompensations(run, step, workflowState);
+
           run.updateStep(stepRecord.id, {
             status: 'failed',
             error: {
@@ -352,6 +371,45 @@ class WorkflowRunner {
     }
   }
 
+  async _runCompensations(run, failedStep, workflowState) {
+    const completedSteps = [...workflowState.completedStepIds]
+      .map(stepId => this.workflow.getStep(stepId))
+      .filter(Boolean)
+      .reverse();
+
+    for (const step of completedSteps) {
+      if (typeof step.compensate !== 'function') {
+        continue;
+      }
+
+      const result = workflowState.results[step.id];
+      const compensationResult = await step.compensate({
+        run,
+        workflow: this.workflow,
+        step,
+        result,
+        failedStep,
+        results: { ...workflowState.results },
+      });
+
+      workflowState.compensations.push({
+        stepId: step.id,
+        compensationResult,
+      });
+      await this._emitEvent(run, 'workflow_compensation_completed', {
+        workflowId: this.workflow.id,
+        stepId: step.id,
+        failedStepId: failedStep.id,
+        compensationResult,
+      });
+      await this._checkpointRun(run, 'workflow_compensation_completed', {
+        workflowId: this.workflow.id,
+        stepId: step.id,
+        failedStepId: failedStep.id,
+      });
+    }
+  }
+
   async cancelRun(runId, { reason = 'Cancelled manually.', payload = {} } = {}) {
     if (!this.runStore?.getRun) {
       throw new RunNotFoundError('Cannot cancel a workflow run without a configured runStore.');
@@ -368,6 +426,128 @@ class WorkflowRunner {
     }
 
     return this._cancelRun(run, reason, payload);
+  }
+
+  async branchRun(
+    runId,
+    { checkpointId = null, input = null, metadata = {}, persist = true } = {}
+  ) {
+    if (!this.runStore?.getRun) {
+      throw new RunNotFoundError('Cannot branch a workflow run without a configured runStore.');
+    }
+
+    const storedRun = await this.runStore.getRun(runId);
+    if (!storedRun) {
+      throw new RunNotFoundError(`Run "${runId}" not found.`);
+    }
+
+    const sourceRun = storedRun instanceof Run ? storedRun : Run.fromJSON(storedRun);
+    const branchedRun = sourceRun.branchFromCheckpoint(checkpointId, {
+      input: input ?? sourceRun.input,
+      metadata: {
+        workflowId: this.workflow.id,
+        workflowName: this.workflow.name,
+        ...metadata,
+      },
+    });
+
+    await this._emitEvent(branchedRun, 'workflow_branched', {
+      workflowId: this.workflow.id,
+      sourceRunId: sourceRun.id,
+      sourceCheckpointId: branchedRun.metadata.lineage.branchCheckpointId,
+    });
+    await this._checkpointRun(branchedRun, 'workflow_branched', {
+      workflowId: this.workflow.id,
+      sourceRunId: sourceRun.id,
+      sourceCheckpointId: branchedRun.metadata.lineage.branchCheckpointId,
+    });
+
+    if (persist) {
+      await this._persistRun(branchedRun);
+    }
+
+    return branchedRun;
+  }
+
+  async replayRun(runId, { persist = true, metadata = {}, replayRunId = null } = {}) {
+    if (!this.runStore?.getRun) {
+      throw new RunNotFoundError('Cannot replay a workflow run without a configured runStore.');
+    }
+
+    const storedRun = await this.runStore.getRun(runId);
+    if (!storedRun) {
+      throw new RunNotFoundError(`Run "${runId}" not found.`);
+    }
+
+    const sourceRun = storedRun instanceof Run ? storedRun : Run.fromJSON(storedRun);
+    const replayRun = Run.fromJSON(sourceRun.toJSON());
+    replayRun.id = replayRunId || `${sourceRun.id}:replay:${Date.now()}`;
+    replayRun.metadata = {
+      ...replayRun.metadata,
+      ...metadata,
+      replay: {
+        mode: 'frozen_trace',
+        sourceRunId: sourceRun.id,
+        replayedAt: new Date().toISOString(),
+      },
+      lineage: {
+        ...replayRun.metadata.lineage,
+        rootRunId: sourceRun.metadata?.lineage?.rootRunId || sourceRun.id,
+        parentRunId: null,
+        childRunIds: [],
+      },
+    };
+    replayRun.events = [];
+    replayRun.checkpoints = [];
+    replayRun.timestamps = {
+      createdAt: new Date().toISOString(),
+      startedAt: null,
+      updatedAt: new Date().toISOString(),
+      completedAt: null,
+      failedAt: null,
+      cancelledAt: null,
+    };
+    replayRun.pendingApproval = null;
+    replayRun.pendingPause = null;
+
+    replayRun.setStatus('running');
+    await this._emitEvent(replayRun, 'workflow_replay_started', {
+      workflowId: this.workflow.id,
+      sourceRunId: sourceRun.id,
+      mode: 'frozen_trace',
+    });
+    await this._checkpointRun(replayRun, 'workflow_replay_started', {
+      workflowId: this.workflow.id,
+      sourceRunId: sourceRun.id,
+      mode: 'frozen_trace',
+    });
+
+    replayRun.output = sourceRun.output;
+    replayRun.state = JSON.parse(JSON.stringify(sourceRun.state || {}));
+    replayRun.messages = JSON.parse(JSON.stringify(sourceRun.messages || []));
+    replayRun.steps = JSON.parse(JSON.stringify(sourceRun.steps || []));
+    replayRun.toolCalls = JSON.parse(JSON.stringify(sourceRun.toolCalls || []));
+    replayRun.toolResults = JSON.parse(JSON.stringify(sourceRun.toolResults || []));
+    replayRun.metrics = JSON.parse(JSON.stringify(sourceRun.metrics || replayRun.metrics));
+    replayRun.errors = JSON.parse(JSON.stringify(sourceRun.errors || []));
+    replayRun.setStatus(sourceRun.status);
+
+    await this._emitEvent(replayRun, 'workflow_replay_completed', {
+      workflowId: this.workflow.id,
+      sourceRunId: sourceRun.id,
+      status: sourceRun.status,
+    });
+    await this._checkpointRun(replayRun, 'workflow_replay_completed', {
+      workflowId: this.workflow.id,
+      sourceRunId: sourceRun.id,
+      status: sourceRun.status,
+    });
+
+    if (persist) {
+      await this._persistRun(replayRun);
+    }
+
+    return replayRun;
   }
 
   inspectRun(run) {

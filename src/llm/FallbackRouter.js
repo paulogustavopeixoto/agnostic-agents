@@ -13,7 +13,7 @@ const METHOD_CAPABILITY_MAP = {
 };
 
 class FallbackRouter extends BaseProvider {
-  constructor({ providers = [], onFallback = null, onError = null } = {}) {
+  constructor({ providers = [], onFallback = null, onError = null, routingStrategy = null } = {}) {
     super({
       capabilities: providers.reduce(
         (acc, provider) => {
@@ -31,14 +31,79 @@ class FallbackRouter extends BaseProvider {
       throw new Error('FallbackRouter requires at least one provider.');
     }
 
-    this.providers = providers;
+    this.providers = providers.map(entry => {
+      if (entry?.provider) {
+        return {
+          provider: entry.provider,
+          profile: {
+            costTier: entry.profile?.costTier || 'medium',
+            riskTier: entry.profile?.riskTier || 'medium',
+            taskTypes: [...(entry.profile?.taskTypes || [])],
+            labels: [...(entry.profile?.labels || [])],
+          },
+        };
+      }
+
+      return {
+        provider: entry,
+        profile: {
+          costTier: 'medium',
+          riskTier: 'medium',
+          taskTypes: [],
+          labels: [],
+        },
+      };
+    });
     this.onFallback = onFallback;
     this.onError = onError;
+    this.routingStrategy = routingStrategy;
+  }
+
+  _resolveRoute(methodName, args) {
+    if (typeof this.routingStrategy === 'function') {
+      return this.routingStrategy({
+        methodName,
+        args,
+        providers: this.providers,
+      });
+    }
+
+    if (methodName !== 'generateText') {
+      return this.providers;
+    }
+
+    const [, config = {}] = args;
+    const route = config.route || {};
+    const routeHints = route.hints || {};
+    const costPreference = routeHints.cost || route.cost || null;
+    const riskPreference = routeHints.risk || route.risk || null;
+    const taskType = routeHints.taskType || route.taskType || null;
+
+    const scoreProvider = entry => {
+      let score = 0;
+
+      if (costPreference && entry.profile.costTier === costPreference) {
+        score += 3;
+      }
+
+      if (riskPreference && entry.profile.riskTier === riskPreference) {
+        score += 3;
+      }
+
+      if (taskType && entry.profile.taskTypes.includes(taskType)) {
+        score += 4;
+      }
+
+      return score;
+    };
+
+    return [...this.providers].sort((a, b) => scoreProvider(b) - scoreProvider(a));
   }
 
   async _execute(methodName, args) {
     const capability = METHOD_CAPABILITY_MAP[methodName];
-    const eligibleProviders = this.providers.filter(provider =>
+    const routedProviders = this._resolveRoute(methodName, args);
+    const eligibleProviders = routedProviders.filter(({ provider }) =>
       capability === 'generateText'
         ? typeof provider.generateText === 'function'
         : provider.supports?.(capability)
@@ -51,10 +116,17 @@ class FallbackRouter extends BaseProvider {
     let lastError = null;
 
     for (let index = 0; index < eligibleProviders.length; index += 1) {
-      const provider = eligibleProviders[index];
+      const { provider, profile } = eligibleProviders[index];
 
       try {
-        return await provider[methodName](...args);
+        const result = await provider[methodName](...args);
+        if (methodName === 'generateText' && result && typeof result === 'object') {
+          result.routing = {
+            selectedProfile: profile,
+            selectedProviderIndex: index,
+          };
+        }
+        return result;
       } catch (error) {
         lastError = error;
         if (typeof this.onError === 'function') {
@@ -70,7 +142,7 @@ class FallbackRouter extends BaseProvider {
           await this.onFallback({
             methodName,
             from: provider,
-            to: eligibleProviders[index + 1],
+            to: eligibleProviders[index + 1].provider,
             error,
           });
         }

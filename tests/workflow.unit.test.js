@@ -1,5 +1,7 @@
 const { Agent } = require('../src/agent/Agent');
 const { Workflow } = require('../src/runtime/workflow/Workflow');
+const { ExecutionGraph } = require('../src/runtime/workflow/ExecutionGraph');
+const { DelegationContract } = require('../src/runtime/workflow/DelegationContract');
 const { AgentWorkflowStep } = require('../src/runtime/workflow/AgentWorkflowStep');
 const { WorkflowRunner } = require('../src/runtime/workflow/WorkflowRunner');
 const { InMemoryRunStore } = require('../src/runtime/stores/InMemoryRunStore');
@@ -45,6 +47,7 @@ describe('Workflow runtime', () => {
         'workflow_completed',
       ])
     );
+    expect(workflow.toExecutionGraph()).toBeInstanceOf(ExecutionGraph);
   });
 
   test('persists failed workflow runs and resumes remaining steps', async () => {
@@ -189,6 +192,8 @@ describe('Workflow runtime', () => {
     const agent = new Agent({
       generateText: async messages => ({
         message: `agent:${messages[messages.length - 1].content}`,
+        usage: { prompt: 10, completion: 5, total: 15 },
+        cost: 0.01,
       }),
     });
 
@@ -235,5 +240,172 @@ describe('Workflow runtime', () => {
     expect(run.events.map(event => event.type)).toEqual(
       expect.arrayContaining(['agent_step_started', 'agent_step_completed', 'agent_handoff'])
     );
+    expect(run.metadata.lineage.childRunIds).toHaveLength(2);
+    expect(run.metrics.childRuns.count).toBe(2);
+    expect(run.metrics.tokenUsage.total).toBe(30);
+    expect(run.metrics.cost).toBeCloseTo(0.02);
+    expect(run.output.research).toEqual(
+      expect.objectContaining({
+        agentRunId: expect.any(String),
+        metrics: expect.objectContaining({
+          tokenUsage: expect.objectContaining({ total: 15 }),
+        }),
+      })
+    );
+  });
+
+  test('can branch a workflow run from a checkpoint and resume the branch', async () => {
+    const runStore = new InMemoryRunStore();
+    const workflow = new Workflow({
+      id: 'branch-flow',
+      steps: [
+        {
+          id: 'collect',
+          run: async ({ input }) => ({ input }),
+        },
+      ],
+    });
+
+    const runner = new WorkflowRunner({ workflow, runStore });
+    const originalRun = await runner.run('alpha');
+    const branchedRun = await runner.branchRun(originalRun.id);
+
+    expect(branchedRun.status).toBe('paused');
+    expect(branchedRun.metadata.lineage).toEqual(
+      expect.objectContaining({
+        rootRunId: originalRun.id,
+        branchOriginRunId: originalRun.id,
+        branchCheckpointId: originalRun.checkpoints[originalRun.checkpoints.length - 1].id,
+      })
+    );
+    expect(branchedRun.events.map(event => event.type)).toContain('workflow_branched');
+
+    const resumedRun = await runner.resumeRun(branchedRun.id);
+    expect(resumedRun.status).toBe('completed');
+    expect(resumedRun.output).toEqual({ collect: { input: 'alpha' } });
+  });
+
+  test('can replay a workflow run from a frozen trace', async () => {
+    const runStore = new InMemoryRunStore();
+    const workflow = new Workflow({
+      id: 'replay-flow',
+      steps: [
+        {
+          id: 'collect',
+          run: async ({ input }) => ({ input }),
+        },
+      ],
+    });
+
+    const runner = new WorkflowRunner({ workflow, runStore });
+    const sourceRun = await runner.run('beta');
+    const replayRun = await runner.replayRun(sourceRun.id);
+
+    expect(replayRun.id).not.toBe(sourceRun.id);
+    expect(replayRun.status).toBe(sourceRun.status);
+    expect(replayRun.output).toEqual(sourceRun.output);
+    expect(replayRun.events.map(event => event.type)).toEqual(
+      expect.arrayContaining(['workflow_replay_started', 'workflow_replay_completed'])
+    );
+    expect(replayRun.metadata.replay).toEqual(
+      expect.objectContaining({
+        mode: 'frozen_trace',
+        sourceRunId: sourceRun.id,
+      })
+    );
+  });
+
+  test('supports explicit delegation contracts for agent-backed steps', async () => {
+    const adapter = {
+      getCapabilities: () => ({ generateText: true, toolCalling: true }),
+      generateText: async messages => ({
+        message: `agent:${messages[messages.length - 1].content}`,
+      }),
+    };
+    const agent = new Agent(adapter);
+
+    const contract = new DelegationContract({
+      id: 'research-contract',
+      assignee: 'researcher',
+      requiredInputs: ['prompt'],
+      outputValidator: ({ output }) => typeof output === 'string' && output.startsWith('agent:'),
+    });
+
+    const workflow = new Workflow({
+      id: 'delegation-flow',
+      steps: [
+        new AgentWorkflowStep({
+          id: 'research',
+          agent,
+          assignee: 'researcher',
+          prompt: 'Research the roadmap',
+          delegationContract: contract,
+        }),
+      ],
+    });
+
+    const runner = new WorkflowRunner({ workflow, runStore: new InMemoryRunStore() });
+    const run = await runner.run('roadmap');
+
+    expect(run.status).toBe('completed');
+    expect(run.events.map(event => event.type)).toEqual(
+      expect.arrayContaining(['delegation_requested', 'delegation_completed'])
+    );
+  });
+
+  test('rejects delegation when the contract requires unsupported capabilities', async () => {
+    const adapter = {
+      getCapabilities: () => ({ generateText: true, toolCalling: false }),
+      generateText: async messages => ({
+        message: `agent:${messages[messages.length - 1].content}`,
+      }),
+    };
+    const agent = new Agent(adapter);
+
+    const workflow = new Workflow({
+      id: 'delegation-error-flow',
+      steps: [
+        new AgentWorkflowStep({
+          id: 'delegate',
+          agent,
+          prompt: 'Do the thing',
+          delegationContract: {
+            id: 'requires-tools',
+            requiredCapabilities: ['toolCalling'],
+          },
+        }),
+      ],
+    });
+
+    const runner = new WorkflowRunner({ workflow, runStore: new InMemoryRunStore() });
+    await expect(runner.run('x')).rejects.toThrow('requires capability "toolCalling"');
+  });
+
+  test('runs compensation hooks when a later workflow step fails', async () => {
+    const compensations = [];
+    const workflow = new Workflow({
+      id: 'comp-flow',
+      steps: [
+        {
+          id: 'provision',
+          run: async () => ({ resourceId: 'r1' }),
+          compensate: async ({ result }) => {
+            compensations.push(result.resourceId);
+            return { reverted: result.resourceId };
+          },
+        },
+        {
+          id: 'explode',
+          dependsOn: ['provision'],
+          run: async () => {
+            throw new Error('later failure');
+          },
+        },
+      ],
+    });
+
+    const runner = new WorkflowRunner({ workflow, runStore: new InMemoryRunStore() });
+    await expect(runner.run('x')).rejects.toThrow('later failure');
+    expect(compensations).toEqual(['r1']);
   });
 });

@@ -5,6 +5,7 @@ class WorkflowStep {
     description = '',
     dependsOn = [],
     run,
+    compensate = null,
     metadata = {},
   }) {
     if (!id) {
@@ -20,6 +21,7 @@ class WorkflowStep {
     this.description = description;
     this.dependsOn = [...dependsOn];
     this.run = run;
+    this.compensate = typeof compensate === 'function' ? compensate : null;
     this.metadata = { ...metadata };
   }
 }

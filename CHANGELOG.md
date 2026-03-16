@@ -14,6 +14,26 @@ The format is intentionally simple:
 
 ### Removed
 
+## 1.0.42
+
+### Added
+
+- `v3` runtime-OS primitives including `DelegationRuntime`, `PlanningRuntime`, `LearningLoop`, persistent job stores, and environment adapters
+- `openaiV3RuntimeDemo.js` to exercise replay-oriented runtime behavior, approvals, delegation, planning recovery, scheduling, evals, and learning signals
+- run assessment with uncertainty/confidence scoring, tool-confidence scoring, self-verification, and stronger evidence conflict detection
+
+### Changed
+
+- completed the `v3` roadmap around inspectability, replay, governance, delegation, planning/recovery, scheduling, and runtime-OS positioning
+- upgraded self-verification so analytical outputs are not falsely flagged for approval and completed tool actions are verified in context
+- extended `BackgroundJobScheduler` into a persistent recurring scheduler with handler registration and job stores
+
+### Fixed
+
+- `v3` OpenAI demo now separates conflict analysis from approval-gated tool execution so both paths are exercised deterministically
+- evidence conflict detection now catches stronger subject/predicate contradictions such as readiness vs not-ready claims
+- workflow child-run metrics, verifier timing, and inspection outputs now reflect the newer runtime surfaces consistently
+
 ## 1.0.41
 
 ### Added

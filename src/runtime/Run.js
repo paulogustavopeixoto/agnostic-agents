@@ -54,10 +54,24 @@ class Run {
         modelMs: metrics.timings?.modelMs || 0,
         toolMs: metrics.timings?.toolMs || 0,
         workflowMs: metrics.timings?.workflowMs || 0,
+        verifierMs: metrics.timings?.verifierMs || 0,
+      },
+      childRuns: {
+        count: metrics.childRuns?.count || 0,
+        items: [...(metrics.childRuns?.items || [])],
       },
       debug: metrics.debug || {},
     };
-    this.metadata = { ...metadata };
+    this.metadata = {
+      ...metadata,
+      lineage: {
+        rootRunId: metadata.lineage?.rootRunId || id,
+        parentRunId: metadata.lineage?.parentRunId || null,
+        childRunIds: [...(metadata.lineage?.childRunIds || [])],
+        branchOriginRunId: metadata.lineage?.branchOriginRunId || null,
+        branchCheckpointId: metadata.lineage?.branchCheckpointId || null,
+      },
+    };
   }
 
   touch() {
@@ -137,6 +151,38 @@ class Run {
     this.touch();
   }
 
+  aggregateChildRun(childRun, metadata = {}) {
+    const run = childRun instanceof Run ? childRun : Run.fromJSON(childRun || {});
+    const existing = this.metrics.childRuns.items.find(item => item.runId === run.id);
+    if (existing) {
+      return existing;
+    }
+
+    const item = {
+      runId: run.id,
+      status: run.status,
+      tokenUsage: { ...(run.metrics?.tokenUsage || { prompt: 0, completion: 0, total: 0 }) },
+      cost: run.metrics?.cost || 0,
+      timings: { ...(run.metrics?.timings || {}) },
+      metadata,
+    };
+
+    this.metrics.childRuns.items.push(item);
+    this.metrics.childRuns.count = this.metrics.childRuns.items.length;
+    this.recordUsage(item.tokenUsage);
+    this.recordCost(item.cost);
+
+    for (const [key, value] of Object.entries(item.timings)) {
+      if (key === 'workflowMs' && metadata.scope === 'workflow_child') {
+        continue;
+      }
+      this.recordTiming(key, value);
+    }
+
+    this.touch();
+    return item;
+  }
+
   addToolCall(toolCall) {
     this.toolCalls.push(toolCall);
     this.touch();
@@ -161,6 +207,85 @@ class Run {
     this.checkpoints.push(checkpoint);
     this.touch();
     return checkpoint;
+  }
+
+  registerChildRun(childRunId) {
+    if (!childRunId) {
+      return this.metadata.lineage.childRunIds;
+    }
+
+    if (!this.metadata.lineage.childRunIds.includes(childRunId)) {
+      this.metadata.lineage.childRunIds.push(childRunId);
+      this.touch();
+    }
+
+    return [...this.metadata.lineage.childRunIds];
+  }
+
+  getCheckpoint(checkpointId) {
+    if (!checkpointId) {
+      return this.checkpoints[this.checkpoints.length - 1] || null;
+    }
+
+    return this.checkpoints.find(checkpoint => checkpoint.id === checkpointId) || null;
+  }
+
+  createCheckpointSnapshot() {
+    return {
+      state: JSON.parse(JSON.stringify(this.state)),
+      messages: JSON.parse(JSON.stringify(this.messages)),
+      steps: JSON.parse(JSON.stringify(this.steps)),
+      toolCalls: JSON.parse(JSON.stringify(this.toolCalls)),
+      toolResults: JSON.parse(JSON.stringify(this.toolResults)),
+      metrics: JSON.parse(JSON.stringify(this.metrics)),
+      pendingApproval: this.pendingApproval ? JSON.parse(JSON.stringify(this.pendingApproval)) : null,
+      pendingPause: this.pendingPause ? JSON.parse(JSON.stringify(this.pendingPause)) : null,
+      output: this.output,
+      status: this.status,
+    };
+  }
+
+  branchFromCheckpoint(checkpointId, { id = randomUUID(), input = this.input, metadata = {} } = {}) {
+    const checkpoint = this.getCheckpoint(checkpointId);
+    if (!checkpoint) {
+      throw new Error(
+        checkpointId
+          ? `Checkpoint "${checkpointId}" not found on run "${this.id}".`
+          : `Run "${this.id}" has no checkpoints to branch from.`
+      );
+    }
+
+    const snapshot = checkpoint.snapshot || this.createCheckpointSnapshot();
+    const branch = new Run({
+      id,
+      input,
+      state: snapshot.state || {},
+      messages: snapshot.messages || [],
+      steps: snapshot.steps || [],
+      toolCalls: snapshot.toolCalls || [],
+      toolResults: snapshot.toolResults || [],
+      metrics: snapshot.metrics || {},
+      metadata: {
+        ...metadata,
+        lineage: {
+          rootRunId: this.metadata.lineage?.rootRunId || this.id,
+          parentRunId: this.metadata.lineage?.parentRunId || null,
+          childRunIds: [],
+          branchOriginRunId: this.id,
+          branchCheckpointId: checkpoint.id,
+        },
+      },
+    });
+
+    branch.pendingApproval = null;
+    branch.pendingPause = {
+      reason: `Branched from checkpoint "${checkpoint.label}".`,
+      stage: 'branch',
+      sourceRunId: this.id,
+      sourceCheckpointId: checkpoint.id,
+    };
+    branch.setStatus('paused');
+    return branch;
   }
 
   toJSON() {

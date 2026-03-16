@@ -18,6 +18,16 @@ class RunInspector {
         status: checkpoint.status,
       })),
       metrics: run.metrics,
+      lineage: run.metadata?.lineage || null,
+      assessment: run.state?.assessment || null,
+      evidence: run.state?.evidenceGraph?.summarize
+        ? run.state.evidenceGraph.summarize()
+        : run.state?.evidenceGraph
+          ? {
+              nodes: run.state.evidenceGraph.nodes?.length || 0,
+              edges: run.state.evidenceGraph.edges?.length || 0,
+            }
+          : null,
       pendingApproval: run.pendingApproval,
       pendingPause: run.pendingPause,
       errors: run.errors,

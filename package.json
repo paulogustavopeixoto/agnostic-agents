@@ -1,6 +1,6 @@
 {
   "name": "agnostic-agents",
-  "version": "1.0.41",
+  "version": "1.0.42",
   "description": "A Node.js package for multi-LLM agent support",
   "main": "index.js",
   "files": [
@@ -9,6 +9,7 @@
     "examples/README.md",
     "examples/openaiExample.js",
     "examples/openaiRuntimeDemo.js",
+    "examples/openaiV3RuntimeDemo.js",
     "examples/geminiExample.js",
     "examples/localToolExample.js",
     "examples/localRagExample.js",
@@ -38,6 +39,7 @@
     "test:watch": "jest --watch",
     "example:openai": "node examples/openaiExample.js",
     "example:openai-runtime": "node examples/openaiRuntimeDemo.js",
+    "example:openai-v3-runtime": "node examples/openaiV3RuntimeDemo.js",
     "example:gemini": "node examples/geminiExample.js",
     "example:local-tool": "node examples/localToolExample.js",
     "example:local-rag": "node examples/localRagExample.js",
