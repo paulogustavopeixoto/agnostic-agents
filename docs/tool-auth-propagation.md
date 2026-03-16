@@ -69,6 +69,13 @@ const agent = new Agent(adapter, {
 
 Use `resolveToolAuth` when bindings depend on tenant, user, environment, or runtime state.
 
+For remote runtimes, `resolveToolAuth` also receives:
+
+- `executionIdentity`
+- `authScope`
+
+Those values come from distributed run metadata and let the receiving host resolve credentials without sending secret material through the distributed envelope.
+
 ## Tool execution context
 
 When auth requirements are satisfied, the tool receives:
@@ -108,6 +115,8 @@ Auth propagation should be used together with:
 
 Auth propagation decides how credentials reach tools.
 It does not replace approval or policy decisions.
+
+For distributed runtimes, see [`docs/distributed-identities.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/distributed-identities.md).
 
 ## Recommended practices
 

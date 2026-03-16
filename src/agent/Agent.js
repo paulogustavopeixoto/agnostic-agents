@@ -11,6 +11,7 @@ const { ApprovalInbox } = require('../runtime/ApprovalInbox');
 const { GovernanceHooks } = require('../runtime/GovernanceHooks');
 const { ExtensionHost } = require('../runtime/ExtensionHost');
 const { DistributedRunEnvelope } = require('../runtime/DistributedRunEnvelope');
+const { ExecutionIdentity } = require('../runtime/ExecutionIdentity');
 const { BaseRunStore } = require('../runtime/stores/BaseRunStore');
 const {
   AdapterCapabilityError,
@@ -39,6 +40,7 @@ class Agent {
    * @param {ToolPolicy|object|null} [options.toolPolicy]
    * @param {object|null} [options.authContext]
    * @param {Function|null} [options.resolveToolAuth]
+   * @param {object|null} [options.executionIdentity]
    * @param {Function|null} [options.onEvent]
    * @param {EventBus|object|null} [options.eventBus]
    * @param {boolean} [options.debug]
@@ -58,6 +60,7 @@ class Agent {
       toolPolicy = null,
       authContext = null,
       resolveToolAuth = null,
+      executionIdentity = null,
       onEvent = null,
       eventBus = null,
       debug = false,
@@ -90,6 +93,7 @@ class Agent {
         : new ToolPolicy(toolPolicy || {});
     this.authContext = authContext && typeof authContext === 'object' ? { ...authContext } : null;
     this.resolveToolAuth = typeof resolveToolAuth === 'function' ? resolveToolAuth : null;
+    this.executionIdentity = ExecutionIdentity.normalize(executionIdentity);
     this.onEvent = onEvent;
     this.eventBus = this.extensionHost
       ? this.extensionHost.extendEventBus(eventBus)
@@ -632,6 +636,8 @@ class Agent {
     }
 
     const finalConfig = { ...this.defaultConfig, ...config };
+    const executionIdentity = this._resolveExecutionIdentity(finalConfig);
+    const distributedAuthScope = this._resolveDistributedAuthScope(finalConfig);
     const run = new Run({
       id: finalConfig.runId,
       input: userMessage,
@@ -639,6 +645,8 @@ class Agent {
       metadata: {
         description: this.description,
         ...(finalConfig.metadata || {}),
+        ...(executionIdentity ? { executionIdentity } : {}),
+        ...(distributedAuthScope.length ? { distributedAuthScope } : {}),
         lineage: {
           rootRunId:
             finalConfig.lineage?.rootRunId ||
@@ -1219,12 +1227,28 @@ class Agent {
       return {};
     }
 
+    const distributedAuthScope = Array.isArray(runtime?.run?.metadata?.distributedAuthScope)
+      ? runtime.run.metadata.distributedAuthScope
+      : Array.isArray(runtime?.authScope)
+        ? runtime.authScope
+        : null;
+    if (
+      distributedAuthScope &&
+      requirements.some(requirement => !distributedAuthScope.includes(requirement))
+    ) {
+      throw new ToolPolicyError(
+        `Distributed auth scope does not allow all required bindings for tool "${toolInstance.name}".`
+      );
+    }
+
     const resolved =
       typeof this.resolveToolAuth === 'function'
         ? await this.resolveToolAuth(toolInstance, {
             run: runtime.run || null,
             agent: this,
             requirements,
+            executionIdentity: runtime?.run?.metadata?.executionIdentity || null,
+            authScope: distributedAuthScope,
           })
         : this.authContext || {};
 
@@ -1247,6 +1271,28 @@ class Agent {
     }
 
     return filtered;
+  }
+
+  _resolveExecutionIdentity(config = {}) {
+    return (
+      ExecutionIdentity.normalize(config.executionIdentity) ||
+      ExecutionIdentity.normalize(config.metadata?.executionIdentity) ||
+      this.executionIdentity ||
+      null
+    );
+  }
+
+  _resolveDistributedAuthScope(config = {}) {
+    const configuredScope = config.distributedAuthScope || config.metadata?.distributedAuthScope || null;
+    if (Array.isArray(configuredScope)) {
+      return [...new Set(configuredScope)];
+    }
+
+    if (this.authContext && typeof this.authContext === 'object') {
+      return Object.keys(this.authContext);
+    }
+
+    return [];
   }
 
   async _handleToolCall(toolCall, runtime = {}) {
@@ -1505,7 +1551,13 @@ class Agent {
       runtimeKind: 'agent',
       action,
       checkpointId,
-      metadata,
+      metadata: {
+        ...(run.metadata?.executionIdentity ? { executionIdentity: run.metadata.executionIdentity } : {}),
+        ...(run.metadata?.distributedAuthScope
+          ? { distributedAuthScope: run.metadata.distributedAuthScope }
+          : {}),
+        ...metadata,
+      },
     });
   }
 

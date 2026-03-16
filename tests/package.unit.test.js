@@ -32,6 +32,7 @@ const { IncidentDebugger } = require('../src/runtime/IncidentDebugger');
 const { TraceDiffer } = require('../src/runtime/TraceDiffer');
 const { DistributedRunEnvelope } = require('../src/runtime/DistributedRunEnvelope');
 const { TraceCorrelation } = require('../src/runtime/TraceCorrelation');
+const { ExecutionIdentity } = require('../src/runtime/ExecutionIdentity');
 const { ApprovalInbox } = require('../src/runtime/ApprovalInbox');
 const { BackgroundJobScheduler } = require('../src/runtime/BackgroundJobScheduler');
 const { DelegationRuntime } = require('../src/runtime/DelegationRuntime');
@@ -80,6 +81,7 @@ describe('Package/module unit tests', () => {
     expect(pkg.ApiLoader).toBeDefined();
     expect(pkg.Run).toBeDefined();
     expect(pkg.DistributedRunEnvelope).toBeDefined();
+    expect(pkg.ExecutionIdentity).toBeDefined();
     expect(pkg.RunTreeInspector).toBeDefined();
     expect(pkg.IncidentDebugger).toBeDefined();
     expect(pkg.ToolPolicy).toBeDefined();
@@ -322,6 +324,38 @@ describe('Package/module unit tests', () => {
         timings: expect.objectContaining({ modelMs: 30 }),
       })
     );
+  });
+
+  test('ExecutionIdentity normalizes and annotates metadata', () => {
+    expect(
+      ExecutionIdentity.normalize({
+        actorId: 'operator-1',
+        serviceId: 'api-service',
+        tenantId: 'tenant-1',
+        scopes: ['runs:write', 'runs:write', 'approvals:resolve'],
+      })
+    ).toEqual({
+      actorId: 'operator-1',
+      serviceId: 'api-service',
+      tenantId: 'tenant-1',
+      sessionId: null,
+      scopes: ['runs:write', 'approvals:resolve'],
+    });
+    expect(
+      ExecutionIdentity.annotateMetadata(
+        { queue: 'runtime-job-queue' },
+        { actorId: 'operator-1', serviceId: 'api-service' }
+      )
+    ).toEqual({
+      queue: 'runtime-job-queue',
+      executionIdentity: {
+        actorId: 'operator-1',
+        serviceId: 'api-service',
+        tenantId: null,
+        sessionId: null,
+        scopes: [],
+      },
+    });
   });
 
   test('Run can branch from a checkpoint snapshot', () => {

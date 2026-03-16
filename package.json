@@ -36,6 +36,7 @@
     "docs/benchmarking.md",
     "docs/cookbook.md",
     "docs/distributed-execution.md",
+    "docs/distributed-identities.md",
     "docs/mcp-interoperability.md",
     "docs/migration-guides.md",
     "docs/migration-v1-to-v2.md",

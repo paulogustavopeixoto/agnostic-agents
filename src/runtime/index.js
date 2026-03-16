@@ -5,6 +5,7 @@ const { IncidentDebugger } = require('./IncidentDebugger');
 const { TraceDiffer } = require('./TraceDiffer');
 const { TraceCorrelation } = require('./TraceCorrelation');
 const { TraceSerializer } = require('./TraceSerializer');
+const { ExecutionIdentity } = require('./ExecutionIdentity');
 const { EvidenceGraph } = require('./EvidenceGraph');
 const { EvalHarness } = require('./EvalHarness');
 const { LearningLoop } = require('./LearningLoop');
@@ -50,6 +51,7 @@ module.exports = {
   TraceDiffer,
   TraceCorrelation,
   TraceSerializer,
+  ExecutionIdentity,
   EvidenceGraph,
   EvalHarness,
   LearningLoop,

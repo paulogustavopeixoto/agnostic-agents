@@ -5,6 +5,7 @@ const { RetryManager } = require('../src/utils/RetryManager');
 const { LocalVectorStore } = require('../src/db/LocalVectorStore');
 const { RAG } = require('../src/rag/RAG');
 const { ToolPolicy } = require('../src/runtime/ToolPolicy');
+const { Run } = require('../src/runtime/Run');
 const { InMemoryRunStore } = require('../src/runtime/stores/InMemoryRunStore');
 const { EventBus } = require('../src/runtime/EventBus');
 const { ApprovalInbox } = require('../src/runtime/ApprovalInbox');
@@ -220,6 +221,91 @@ describe('Agent', () => {
       },
       token: 'server-only-token',
     });
+  });
+
+  test('distributed envelopes carry execution identity and auth scope metadata', async () => {
+    const runStore = new InMemoryRunStore();
+    const agent = new Agent(mockAdapter, {
+      runStore,
+      authContext: {
+        apiToken: 'server-only-token',
+        workspaceId: 'workspace-123',
+      },
+      executionIdentity: {
+        actorId: 'operator-1',
+        serviceId: 'api-service',
+        scopes: ['runs:write'],
+      },
+    });
+
+    const run = await agent.run('Identity propagation');
+    const envelope = await agent.createDistributedEnvelope(run.id, { action: 'replay' });
+
+    expect(run.metadata.executionIdentity).toEqual({
+      actorId: 'operator-1',
+      serviceId: 'api-service',
+      tenantId: null,
+      sessionId: null,
+      scopes: ['runs:write'],
+    });
+    expect(run.metadata.distributedAuthScope).toEqual(['apiToken', 'workspaceId']);
+    expect(envelope.metadata).toEqual(
+      expect.objectContaining({
+        executionIdentity: {
+          actorId: 'operator-1',
+          serviceId: 'api-service',
+          tenantId: null,
+          sessionId: null,
+          scopes: ['runs:write'],
+        },
+        distributedAuthScope: ['apiToken', 'workspaceId'],
+      })
+    );
+  });
+
+  test('distributed auth scope fails closed when a remote tool requests a binding outside scope', async () => {
+    const tool = new Tool({
+      name: 'secure_search',
+      description: 'Search with host-provided auth',
+      parameters: {
+        type: 'object',
+        properties: { query: { type: 'string' } },
+        required: ['query'],
+      },
+      metadata: { authRequirements: ['apiToken'] },
+      implementation: async ({ query }) => ({ query }),
+    });
+    const remoteAgent = new Agent(mockAdapter, {
+      tools: [tool],
+      retryManager,
+      resolveToolAuth: async (_tool, runtime) => {
+        expect(runtime.executionIdentity).toEqual(
+          expect.objectContaining({ serviceId: 'worker-service' })
+        );
+        expect(runtime.authScope).toEqual([]);
+        return { apiToken: 'should-not-be-usable' };
+      },
+    });
+    const remoteRun = new Run({
+      input: 'remote tool call',
+      metadata: {
+        executionIdentity: {
+          actorId: null,
+          serviceId: 'worker-service',
+          tenantId: null,
+          sessionId: null,
+          scopes: ['runs:resume'],
+        },
+        distributedAuthScope: [],
+      },
+    });
+
+    await expect(
+      remoteAgent._handleToolCall(
+        { name: 'secure_search', arguments: { query: 'status' }, id: 'tool_use_remote' },
+        { run: remoteRun }
+      )
+    ).rejects.toThrow('Distributed auth scope does not allow all required bindings');
   });
 
   test('denies tool execution when required auth bindings are missing', async () => {

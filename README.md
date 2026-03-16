@@ -18,6 +18,7 @@ The package ships a maintained `index.d.ts` so TypeScript projects get typed acc
 - `Tool`: JSON Schema based tool definition that adapters can export to provider-specific formats.
 - `Run` / `RunInspector`: inspectable run model with events, checkpoints, timings, usage, lineage, assessments, and errors.
 - `DistributedRunEnvelope` / `TraceCorrelation` / `RunTreeInspector` / `IncidentDebugger` / `TraceSerializer` / `TraceDiffer`: distributed handoff envelopes, correlation metadata, run trees, incident workflows, portable traces, and replay diffing for runtime control.
+- `ExecutionIdentity`: normalized execution identity metadata for delegated and remote runtime paths.
 - `Workflow` / `WorkflowStep` / `AgentWorkflowStep` / `WorkflowRunner`: dependency-aware orchestration built on the runtime.
 - `DelegationRuntime` / `DelegationContract`: explicit multi-agent delegation with governed contracts and child-run tracking.
 - `PlanningRuntime`: plan, verify, recover execution flow for higher-order runtime tasks.
@@ -341,6 +342,7 @@ Operator-facing deployment guidance is documented in [`docs/operator-architectur
 Production-oriented storage backend guidance is documented in [`docs/storage-backends.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/storage-backends.md).
 Distributed execution and handoff guidance is documented in [`docs/distributed-execution.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/distributed-execution.md).
 Remote control-plane guidance is documented in [`docs/remote-control-planes.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/remote-control-planes.md).
+Distributed identity and auth-scope guidance is documented in [`docs/distributed-identities.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/distributed-identities.md).
 
 Secret-handling expectations for adapters, tools, logs, traces, and tests are documented in [`docs/secret-handling.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/secret-handling.md).
 Tool auth propagation for host-controlled credentials is documented in [`docs/tool-auth-propagation.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/tool-auth-propagation.md).

@@ -7,6 +7,7 @@ const { RetryManager } = require('../../utils/RetryManager');
 const { BaseRunStore } = require('../stores/BaseRunStore');
 const { InMemoryRunStore } = require('../stores/InMemoryRunStore');
 const { DistributedRunEnvelope } = require('../DistributedRunEnvelope');
+const { ExecutionIdentity } = require('../ExecutionIdentity');
 const { Workflow } = require('./Workflow');
 const { ExecutionGraph } = require('./ExecutionGraph');
 const { RunNotFoundError, RunCancelledError } = require('../../errors');
@@ -28,6 +29,7 @@ class WorkflowRunner {
     eventBus = null,
     onEvent = null,
     debug = false,
+    executionIdentity = null,
     } = {}) {
     this.workflow = workflow instanceof Workflow ? workflow : new Workflow(workflow || {});
     this.runStore = BaseRunStore.assert(runStore, 'WorkflowRunner runStore');
@@ -38,6 +40,7 @@ class WorkflowRunner {
     }
     this.onEvent = onEvent;
     this.debug = debug;
+    this.executionIdentity = ExecutionIdentity.normalize(executionIdentity);
   }
 
   async _persistRun(run) {
@@ -154,6 +157,11 @@ class WorkflowRunner {
   }
 
   async run(input, options = {}) {
+    const executionIdentity =
+      ExecutionIdentity.normalize(options.executionIdentity) ||
+      ExecutionIdentity.normalize(options.metadata?.executionIdentity) ||
+      this.executionIdentity ||
+      null;
     const run = new Run({
       id: options.runId || randomUUID(),
       input,
@@ -169,6 +177,7 @@ class WorkflowRunner {
         workflowId: this.workflow.id,
         workflowName: this.workflow.name,
         ...(options.metadata || {}),
+        ...(executionIdentity ? { executionIdentity } : {}),
         lineage: {
           rootRunId:
             options.lineage?.rootRunId ||
@@ -494,6 +503,10 @@ class WorkflowRunner {
       metadata: {
         workflowId: this.workflow.id,
         workflowName: this.workflow.name,
+        ...(run.metadata?.executionIdentity ? { executionIdentity: run.metadata.executionIdentity } : {}),
+        ...(run.metadata?.distributedAuthScope
+          ? { distributedAuthScope: run.metadata.distributedAuthScope }
+          : {}),
         ...metadata,
       },
     });

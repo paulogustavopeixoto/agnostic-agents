@@ -405,6 +405,47 @@ describe('Workflow runtime', () => {
     );
   });
 
+  test('workflow runs propagate execution identity into distributed envelopes', async () => {
+    const runStore = new InMemoryRunStore();
+    const workflow = new Workflow({
+      id: 'workflow-identity-flow',
+      steps: [
+        {
+          id: 'collect',
+          run: async ({ input }) => ({ input }),
+        },
+      ],
+    });
+
+    const runner = new WorkflowRunner({
+      workflow,
+      runStore,
+      executionIdentity: {
+        actorId: 'scheduler-1',
+        serviceId: 'workflow-service',
+        scopes: ['workflow:run'],
+      },
+    });
+
+    const run = await runner.run('identity aware workflow');
+    const envelope = await runner.createDistributedEnvelope(run.id, { action: 'replay' });
+
+    expect(run.metadata.executionIdentity).toEqual({
+      actorId: 'scheduler-1',
+      serviceId: 'workflow-service',
+      tenantId: null,
+      sessionId: null,
+      scopes: ['workflow:run'],
+    });
+    expect(envelope.metadata.executionIdentity).toEqual({
+      actorId: 'scheduler-1',
+      serviceId: 'workflow-service',
+      tenantId: null,
+      sessionId: null,
+      scopes: ['workflow:run'],
+    });
+  });
+
   test('supports explicit delegation contracts for agent-backed steps', async () => {
     const adapter = {
       getCapabilities: () => ({ generateText: true, toolCalling: true }),

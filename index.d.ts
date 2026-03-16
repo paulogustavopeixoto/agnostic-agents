@@ -50,6 +50,9 @@ export interface AgentOptions {
   askUser?: ((prompt: string, context?: any) => Promise<any> | any) | null;
   runStore?: BaseRunStore | null;
   toolPolicy?: ToolPolicy | JsonObject | null;
+  authContext?: JsonObject | null;
+  resolveToolAuth?: ((tool: Tool, runtime?: JsonObject) => Promise<JsonObject> | JsonObject) | null;
+  executionIdentity?: JsonObject | null;
   onEvent?: ((event: JsonObject, run: Run) => Promise<void> | void) | null;
   eventBus?: EventBus | JsonObject | null;
   debug?: boolean;
@@ -190,6 +193,11 @@ export class DistributedRunEnvelope {
   static create(run: Run | JsonObject, options?: JsonObject): JsonObject;
   static validate(envelope?: JsonObject): { valid: boolean; errors: string[] };
   static parse(envelope?: JsonObject): JsonObject;
+}
+
+export class ExecutionIdentity {
+  static normalize(identity?: JsonObject | null): JsonObject | null;
+  static annotateMetadata(metadata?: JsonObject, identity?: JsonObject | null): JsonObject;
 }
 
 export class TraceCorrelation {
@@ -442,6 +450,7 @@ export class WorkflowRunner {
     eventBus?: EventBus | JsonObject | null;
     onEvent?: ((event: JsonObject, run: Run) => Promise<void> | void) | null;
     debug?: boolean;
+    executionIdentity?: JsonObject | null;
   });
   run(input?: any, options?: JsonObject): Promise<Run>;
   resumeRun(runId: string, options?: JsonObject): Promise<Run>;
