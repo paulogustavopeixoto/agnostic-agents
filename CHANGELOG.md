@@ -14,6 +14,28 @@ The format is intentionally simple:
 
 ### Removed
 
+## 1.0.43
+
+### Added
+
+- `v4` runtime-control surfaces including `RunTreeInspector`, `TraceDiffer`, `IncidentDebugger`, `GovernanceHooks`, `ExtensionHost`, `StorageBackendRegistry`, portable trace bundles, and published TypeScript declarations
+- maintained `openaiV4RuntimeDemo.js` covering approval gating, branching, frozen replay, run trees, incident debugging, trace export, governance hooks, and scheduling
+- reference integration examples and deployment guidance for API server, queue worker, and offline incident debugging flows
+- provider certification documentation and certification levels for maintained adapters
+
+### Changed
+
+- completed the `v4` runtime-OS baseline around runtime control, portability, storage contracts, trace portability, extension model, and deployment references
+- updated the README and examples docs to reflect the current `v4` runtime surface and reference integration paths
+- normalized partial frozen replay so checkpoint-based replay pauses intentionally as an inspection/restart surface rather than appearing still active
+- improved run-tree rendering and ordering so inspection output reflects execution order more clearly
+
+### Fixed
+
+- `v4` OpenAI demo now completes the incident-debugging section instead of aborting on the intentional planning failure
+- `v4` workflow demo prompts are constrained to real shipped runtime-control capabilities instead of generic invented platform features
+- stale documentation references to older runtime phases were cleaned up across the README and examples
+
 ## 1.0.42
 
 ### Added

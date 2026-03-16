@@ -1,6 +1,6 @@
 {
   "name": "agnostic-agents",
-  "version": "1.0.42",
+  "version": "1.0.43",
   "description": "A Node.js package for multi-LLM agent support",
   "main": "index.js",
   "types": "index.d.ts",

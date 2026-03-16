@@ -15,6 +15,7 @@ class RunTreeInspector {
           id: run.id,
           status: run.status,
           input: run.input,
+          createdAt: run.timestamps?.createdAt || null,
           lineage: run.metadata?.lineage || null,
           summary: RunInspector.summarize(run),
           subtreeMetrics: null,
@@ -36,8 +37,8 @@ class RunTreeInspector {
 
     const sortNode = node => {
       node.children.sort((left, right) => {
-        const leftCreated = left.summary?.checkpoints?.[0]?.id || left.id;
-        const rightCreated = right.summary?.checkpoints?.[0]?.id || right.id;
+        const leftCreated = left.createdAt || left.id;
+        const rightCreated = right.createdAt || right.id;
         return leftCreated.localeCompare(rightCreated);
       });
       node.children.forEach(sortNode);

@@ -134,7 +134,7 @@ const agent = new Agent(new OpenAIAdapter(process.env.OPENAI_API_KEY), {
   description: 'You remember earlier turns and task context.',
 });
 
-memory.setWorkingMemory('current_project', 'Build the v2 runtime release.');
+memory.setWorkingMemory('current_project', 'Validate the v4 runtime-control release.');
 memory.setPolicy('external_updates', 'Ask for approval before sending external updates.');
 
 await agent.sendMessage('My favorite city is Lisbon.');

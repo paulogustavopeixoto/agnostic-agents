@@ -189,7 +189,14 @@ async function main() {
           requiredInputs: ['prompt'],
         }),
         prompt: ({ dependencyResults }) =>
-          `Turn this research into a one-paragraph runtime-control summary:\n${dependencyResults.research.output}`,
+          [
+            'Write exactly one sentence.',
+            'Describe these as shipped runtime-control capabilities of the agnostic-agents v4 baseline.',
+            'Name the capabilities directly and do not translate them into generic infrastructure concepts.',
+            'Do not mention dates.',
+            'Research:',
+            dependencyResults.research.output,
+          ].join('\n'),
       }),
     ],
   });
