@@ -114,6 +114,20 @@ describe('Package/module unit tests', () => {
     expect(pkg.RunCancelledError).toBeDefined();
   });
 
+  test('package publishes a TypeScript declaration surface', () => {
+    const packageJson = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf8'));
+    const declarationPath = path.join(process.cwd(), packageJson.types);
+    const declarationSource = fs.readFileSync(declarationPath, 'utf8');
+
+    expect(packageJson.types).toBe('index.d.ts');
+    expect(packageJson.files).toContain('index.d.ts');
+    expect(fs.existsSync(declarationPath)).toBe(true);
+    expect(declarationSource).toContain('export class Agent');
+    expect(declarationSource).toContain('export class Run');
+    expect(declarationSource).toContain('export class TraceSerializer');
+    expect(declarationSource).toContain('export class StorageBackendRegistry');
+  });
+
   test('Tool exposes unified schema and provider-specific representations', async () => {
     const tool = new Tool({
       name: 'calculate',
@@ -254,11 +268,17 @@ describe('Package/module unit tests', () => {
     const trace = TraceSerializer.exportRun(run, { label: 'unit-test' });
     expect(trace).toEqual(
       expect.objectContaining({
-        schemaVersion: '1.0',
+        schemaVersion: '1.1',
         format: 'agnostic-agents-run-trace',
+        traceType: 'run',
         metadata: { label: 'unit-test' },
       })
     );
+    expect(TraceSerializer.validateTrace(trace)).toEqual({
+      valid: true,
+      errors: [],
+      warnings: [],
+    });
 
     const imported = TraceSerializer.importRun(trace);
     expect(imported).toBeInstanceOf(Run);
@@ -285,10 +305,60 @@ describe('Package/module unit tests', () => {
         checkpointId: 'cp-1',
       })
     );
+    expect(trace.traceType).toBe('partial');
     expect(trace.run.metadata.lineage).toEqual(
       expect.objectContaining({
         branchOriginRunId: run.id,
         branchCheckpointId: 'cp-1',
+      })
+    );
+  });
+
+  test('TraceSerializer exports and imports portable trace bundles', () => {
+    const first = new Run({ input: 'first' });
+    first.setStatus('completed');
+    const second = new Run({ input: 'second' });
+    second.setStatus('failed');
+
+    const bundle = TraceSerializer.exportBundle([first, second], { source: 'external-tool' });
+    expect(bundle).toEqual(
+      expect.objectContaining({
+        schemaVersion: '1.1',
+        format: 'agnostic-agents-trace-bundle',
+        traceType: 'bundle',
+        metadata: { source: 'external-tool' },
+        index: [
+          expect.objectContaining({ runId: first.id, status: 'completed' }),
+          expect.objectContaining({ runId: second.id, status: 'failed' }),
+        ],
+      })
+    );
+    expect(TraceSerializer.validateTrace(bundle, { allowBundle: true })).toEqual({
+      valid: true,
+      errors: [],
+      warnings: [],
+    });
+
+    const imported = TraceSerializer.importBundle(bundle);
+    expect(imported).toHaveLength(2);
+    expect(imported[0]).toBeInstanceOf(Run);
+    expect(imported[0].id).toBe(first.id);
+    expect(imported[1].id).toBe(second.id);
+  });
+
+  test('TraceSerializer describes and validates its portable schema', () => {
+    expect(TraceSerializer.describeSchema()).toEqual(
+      expect.objectContaining({
+        schemaVersion: '1.1',
+        runFormat: 'agnostic-agents-run-trace',
+        bundleFormat: 'agnostic-agents-trace-bundle',
+      })
+    );
+
+    expect(TraceSerializer.validateTrace({ format: 'bad' })).toEqual(
+      expect.objectContaining({
+        valid: false,
+        errors: expect.arrayContaining(['schemaVersion is required.', 'Unsupported trace format.']),
       })
     );
   });

@@ -49,3 +49,15 @@ Optional provider model overrides:
   - model availability mismatches
   - inference provider availability
 - OpenAI and DeepSeek are currently the strongest live verification paths in this repo.
+
+## Provider certification
+
+Provider support claims should follow the certification process in [`docs/provider-certification.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/provider-certification.md).
+
+In practice:
+
+- unit tests establish contract verification
+- live tests establish smoke verification
+- maintained runtime demos or end-to-end flows establish runtime verification
+
+Do not treat a passing mocked adapter test as equivalent to live or runtime verification.

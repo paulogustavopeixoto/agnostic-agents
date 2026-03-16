@@ -555,6 +555,14 @@ class WorkflowRunner {
       replayRun.metrics = JSON.parse(JSON.stringify(sourceRun.metrics || replayRun.metrics));
       replayRun.errors = JSON.parse(JSON.stringify(sourceRun.errors || []));
       replayRun.setStatus(sourceRun.status);
+    } else {
+      replayRun.setStatus('paused');
+      replayRun.pendingPause = {
+        reason: `Frozen workflow replay prepared from checkpoint "${checkpointId}".`,
+        stage: 'workflow_replay',
+        sourceRunId: sourceRun.id,
+        sourceCheckpointId: checkpointId,
+      };
     }
 
     await this._emitEvent(replayRun, 'workflow_replay_completed', {

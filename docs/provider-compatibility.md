@@ -1,6 +1,8 @@
 # Provider Compatibility
 
-This document describes the normalized adapter contract in `agnostic-agents` as of `v2`.
+This document describes the normalized adapter contract and current certification status in `agnostic-agents`.
+
+For how certification levels are defined, see [`docs/provider-certification.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/provider-certification.md).
 
 ## Shared contract
 
@@ -16,6 +18,8 @@ Optional methods are governed by capability flags and should throw `AdapterCapab
 
 ### OpenAIAdapter
 
+- Certification: `Level 3 - Runtime Verified`
+
 - Text generation: yes
 - Tool calling: yes
 - Embeddings: yes
@@ -27,6 +31,8 @@ Optional methods are governed by capability flags and should throw `AdapterCapab
 - Video generation: no
 
 ### GeminiAdapter
+
+- Certification: `Level 1 - Contract Verified`
 
 - Text generation: yes
 - Tool calling: yes
@@ -40,6 +46,8 @@ Optional methods are governed by capability flags and should throw `AdapterCapab
 
 ### AnthropicAdapter
 
+- Certification: `Level 2 - Live Smoke Verified`
+
 - Text generation: yes
 - Tool calling: yes
 - Embeddings: no
@@ -52,6 +60,8 @@ Optional methods are governed by capability flags and should throw `AdapterCapab
 
 ### HFAdapter
 
+- Certification: `Level 2 - Live Smoke Verified`
+
 - Text generation: yes
 - Tool calling: yes
 - Embeddings: yes
@@ -63,6 +73,8 @@ Optional methods are governed by capability flags and should throw `AdapterCapab
 - Video generation: no
 
 ### DeepSeekAdapter
+
+- Certification: `Level 2 - Live Smoke Verified`
 
 - Text generation: yes
 - Tool calling: yes
@@ -79,3 +91,4 @@ Optional methods are governed by capability flags and should throw `AdapterCapab
 - Tool-calling payloads are normalized to `{ message, toolCalls }`.
 - Unsupported optional methods should be treated as capability-checked operations, not runtime surprises.
 - Live availability can still depend on provider account state, quota, and model access.
+- Certification levels should be updated only after the corresponding test and docs workflow is completed.

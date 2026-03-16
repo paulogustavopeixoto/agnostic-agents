@@ -909,6 +909,14 @@ describe('Agent', () => {
     expect(partialReplayRun.events.map(event => event.type)).toEqual(
       expect.arrayContaining(['replay_started', 'replay_completed'])
     );
+    expect(partialReplayRun.status).toBe('paused');
+    expect(partialReplayRun.pendingPause).toEqual(
+      expect.objectContaining({
+        stage: 'replay',
+        sourceRunId: sourceRun.id,
+        sourceCheckpointId: checkpointId,
+      })
+    );
   });
 
   test('runs a verifier pass before risky tool execution', async () => {

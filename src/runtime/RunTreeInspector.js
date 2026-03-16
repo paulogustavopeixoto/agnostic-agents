@@ -59,19 +59,19 @@ class RunTreeInspector {
     const roots = Array.isArray(tree) ? tree : tree ? [tree] : [];
     const lines = [];
 
-    const visit = (node, prefix = '', isLast = true) => {
-      const branch = prefix ? `${prefix}${isLast ? '└─ ' : '├─ '}` : '';
+    const visit = (node, prefix = '', isLast = true, isRoot = false) => {
+      const branch = isRoot ? '' : `${prefix}${isLast ? '└─ ' : '├─ '}`;
       const status = includeStatus ? ` [${node.status}]` : '';
       lines.push(`${branch}${node.id}${status}`);
 
-      const nextPrefix = prefix ? `${prefix}${isLast ? '   ' : '│  '}` : '';
+      const nextPrefix = isRoot ? '' : `${prefix}${isLast ? '   ' : '│  '}`;
       node.children.forEach((child, index) => {
-        visit(child, nextPrefix, index === node.children.length - 1);
+        visit(child, nextPrefix, index === node.children.length - 1, false);
       });
     };
 
     roots.forEach((root, index) => {
-      visit(root, '', index === roots.length - 1);
+      visit(root, '', index === roots.length - 1, true);
     });
 
     return lines.join('\n');

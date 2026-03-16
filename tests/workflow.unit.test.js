@@ -343,6 +343,14 @@ describe('Workflow runtime', () => {
     expect(replayRun.events.map(event => event.type)).toEqual(
       expect.arrayContaining(['workflow_replay_started', 'workflow_replay_completed'])
     );
+    expect(replayRun.status).toBe('paused');
+    expect(replayRun.pendingPause).toEqual(
+      expect.objectContaining({
+        stage: 'workflow_replay',
+        sourceRunId: sourceRun.id,
+        sourceCheckpointId: checkpointId,
+      })
+    );
   });
 
   test('supports explicit delegation contracts for agent-backed steps', async () => {

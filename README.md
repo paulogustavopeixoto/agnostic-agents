@@ -10,11 +10,14 @@ A Node.js runtime OS for building provider-agnostic agent systems with inspectab
 npm install agnostic-agents
 ```
 
+The package ships a maintained `index.d.ts` so TypeScript projects get typed access to the public runtime surface without extra setup.
+
 ## What it includes
 
 - `Agent`: runtime-backed agent execution with tool calling, approvals, pause/resume, cancellation, replay, run assessment, self-verification, memory context, retrieval augmentation, and multimodal helper methods.
 - `Tool`: JSON Schema based tool definition that adapters can export to provider-specific formats.
 - `Run` / `RunInspector`: inspectable run model with events, checkpoints, timings, usage, lineage, assessments, and errors.
+- `RunTreeInspector` / `IncidentDebugger` / `TraceSerializer` / `TraceDiffer`: run trees, incident workflows, portable traces, and replay diffing for runtime control.
 - `Workflow` / `WorkflowStep` / `AgentWorkflowStep` / `WorkflowRunner`: dependency-aware orchestration built on the runtime.
 - `DelegationRuntime` / `DelegationContract`: explicit multi-agent delegation with governed contracts and child-run tracking.
 - `PlanningRuntime`: plan, verify, recover execution flow for higher-order runtime tasks.
@@ -24,6 +27,7 @@ npm install agnostic-agents
 - `BackgroundJobScheduler`: recurring and delayed job execution with pluggable job stores.
 - `EvidenceGraph` / `EvalHarness` / `LearningLoop`: runtime evidence tracking, eval execution, and learning signals from runs and benchmarks.
 - `EventBus` / `ConsoleDebugSink`: structured runtime events and debug sinks.
+- `GovernanceHooks` / `ApprovalInbox` / `StorageBackendRegistry`: governance integrations and stable runtime storage contracts.
 - environment adapters for browser, shell, API, queue, and file-backed execution environments.
 - `MCPClient` / `MCPTool` / `MCPDiscoveryLoader`: connect to Model Context Protocol tool sources.
 - `RetryManager`: retry wrapper for adapters and workflows.
@@ -282,23 +286,29 @@ The agent validates tool arguments against `parameters`, applies schema defaults
 - `npm run example:gemini`
 - `npm run example:openai-runtime`
 - `npm run example:openai-v3-runtime`
+- `npm run example:openai-v4-runtime`
+- `npm run example:reference-worker`
+- `npm run example:reference-incident`
 
 Additional examples live in [`examples/`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples).
 
 Maintained `v1` examples are documented in [`examples/README.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples/README.md).
 
-## Current v3 scope
+Reference deployment patterns are documented in [`docs/reference-integrations.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/reference-integrations.md).
+
+## Current v4 scope
 
 This package currently targets:
 
 - provider-agnostic tool calling
-- inspectable runs with checkpoints, replay, branching, events, and assessments
+- inspectable runs with checkpoints, replay, branching, run trees, traces, events, and assessments
 - approval-gated, pausable, resumable, and cancellable execution
 - layered memory
 - grounded retrieval with provenance and evidence tracking
 - workflow orchestration and explicit delegation on top of the runtime
 - planning, recovery, and recurring background execution
 - provider fallback routing with cost/risk/task-type hints
+- incident debugging, portable trace export, governance hooks, and reference deployment patterns
 - MCP tool discovery
 - eval and learning-loop primitives for runtime benchmarking
 
@@ -323,6 +333,7 @@ Each adapter exposes `getCapabilities()` with the normalized capability map:
 Use this to decide whether to expose optional features in your app.
 
 See [`docs/provider-compatibility.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/provider-compatibility.md) for provider-specific notes.
+Certification levels and support-claim rules are defined in [`docs/provider-certification.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/provider-certification.md).
 
 ## Development
 

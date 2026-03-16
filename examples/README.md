@@ -25,6 +25,23 @@ These examples are aligned with the current public API and should be treated as 
 - `openaiV3RuntimeDemo.js`
   - requires `OPENAI_API_KEY`
   - advanced runtime-OS demo for `v3`
+- `openaiV4RuntimeDemo.js`
+  - requires `OPENAI_API_KEY`
+  - advanced runtime-control demo for `v4`
+
+## Maintained v4 reference integrations
+
+These examples are intended as reference deployment patterns rather than feature walkthroughs.
+
+- `referenceExpressRuntimeServer.js`
+  - requires `OPENAI_API_KEY`
+  - shows how to expose runtime-backed runs over HTTP with approvals and inspection
+- `referenceQueueWorker.js`
+  - no API key required
+  - shows how to run planning and scheduling in a worker process
+- `referenceIncidentDebug.js`
+  - no API key required
+  - shows how to inspect stored runs and export a portable trace bundle
 
 ## Legacy / advanced examples
 
