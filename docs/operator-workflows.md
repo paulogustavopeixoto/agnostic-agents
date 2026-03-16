@@ -15,6 +15,8 @@ These workflows assume you are using the maintained runtime surfaces:
 - `RunInspector`
 - `RunTreeInspector`
 - `IncidentDebugger`
+- `DistributedRecoveryPlanner`
+- `DistributedRecoveryRunner`
 - `TraceCorrelation`
 - `TraceDiffer`
 - `TraceSerializer`
@@ -80,6 +82,41 @@ Check:
 Operator question:
 
 - what failed, where did it fail, and what is the next safe recovery action?
+
+## 3b. Generate a distributed recovery plan
+
+When the incident spans services, queues, or remote workers, convert the report into an explicit recovery plan.
+
+Use:
+
+- `DistributedRecoveryPlanner.createPlan(runId, { compareToRunId })`
+
+Check:
+
+- `recommendedAction`
+- `steps`
+- `incidentType`
+- `recoveryPolicy`
+- `correlation`
+- `incident`
+
+Operator question:
+
+- should I resolve approval, resume a replay, branch from a failure checkpoint, or compare against a healthy run first?
+
+## 3c. Execute the recovery plan
+
+When the plan is approved, use the recovery runner to execute the safest next runtime action.
+
+Use:
+
+- `DistributedRecoveryRunner.executePlan(planOrRunId, options?)`
+
+Operator question:
+
+- can the runtime safely apply the next action now, or should the plan stay advisory only?
+
+High-impact recovery actions such as branching from a failure boundary should require explicit operator approval unless your recovery runner is configured with an approval decider.
 
 ## 4. Compare runs or branches
 
@@ -242,3 +279,4 @@ See [`examples/referenceOperatorWorkflow.js`](/Users/paulopeixoto/Desktop/PauloR
 - partial trace export
 
 For cross-service and queue-native incident reconstruction, see [`examples/referenceDistributedIncident.js`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples/referenceDistributedIncident.js).
+For structured distributed recovery planning, see [`examples/referenceDistributedRecovery.js`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples/referenceDistributedRecovery.js).

@@ -17,7 +17,7 @@ The package ships a maintained `index.d.ts` so TypeScript projects get typed acc
 - `Agent`: runtime-backed agent execution with tool calling, approvals, pause/resume, cancellation, replay, run assessment, self-verification, memory context, retrieval augmentation, and multimodal helper methods.
 - `Tool`: JSON Schema based tool definition that adapters can export to provider-specific formats.
 - `Run` / `RunInspector`: inspectable run model with events, checkpoints, timings, usage, lineage, assessments, and errors.
-- `DistributedRunEnvelope` / `TraceCorrelation` / `RunTreeInspector` / `IncidentDebugger` / `TraceSerializer` / `TraceDiffer`: distributed handoff envelopes, correlation metadata, run trees, incident workflows, portable traces, and replay diffing for runtime control.
+- `DistributedRunEnvelope` / `TraceCorrelation` / `RunTreeInspector` / `IncidentDebugger` / `DistributedRecoveryPlanner` / `DistributedRecoveryRunner` / `TraceSerializer` / `TraceDiffer`: distributed handoff envelopes, correlation metadata, run trees, incident workflows, policy-aware recovery planning and execution, portable traces, and replay diffing for runtime control.
 - `ExecutionIdentity`: normalized execution identity metadata for delegated and remote runtime paths.
 - `Workflow` / `WorkflowStep` / `AgentWorkflowStep` / `WorkflowRunner`: dependency-aware orchestration built on the runtime.
 - `DelegationRuntime` / `DelegationContract`: explicit multi-agent delegation with governed contracts and child-run tracking.
@@ -321,6 +321,7 @@ The agent validates tool arguments against `parameters`, applies schema defaults
 - `npm run example:reference-distributed-incident`
 - `npm run example:reference-remote-control-plane`
 - `npm run example:reference-deployment-split`
+- `npm run example:reference-distributed-recovery`
 
 Additional examples live in [`examples/`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples).
 
@@ -418,4 +419,5 @@ npm run example:reference-distributed-handoff
 npm run example:reference-distributed-incident
 npm run example:reference-remote-control-plane
 npm run example:reference-deployment-split
+npm run example:reference-distributed-recovery
 ```

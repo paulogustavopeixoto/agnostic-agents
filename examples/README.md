@@ -69,6 +69,9 @@ These examples are intended as reference deployment patterns rather than feature
 - `referenceDeploymentSplit.js`
   - no API key required
   - shows an API service, worker, and control plane sharing runtime stores and callback transports
+- `referenceDistributedRecovery.js`
+  - no API key required
+  - shows turning a distributed incident into a structured recovery plan and then executing the recommended recovery action
 
 ## Legacy / advanced examples
 

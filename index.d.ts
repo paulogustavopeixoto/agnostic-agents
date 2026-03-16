@@ -239,6 +239,24 @@ export class IncidentDebugger {
   createReport(runId: string, options?: { compareToRunId?: string | null }): Promise<JsonObject>;
 }
 
+export class DistributedRecoveryPlanner {
+  constructor(options: { runStore: BaseRunStore });
+  createPlan(runId: string, options?: { compareToRunId?: string | null }): Promise<JsonObject>;
+}
+
+export class DistributedRecoveryRunner {
+  constructor(options: {
+    runStore: BaseRunStore;
+    agentRuntime?: any | null;
+    workflowRuntimes?: any[] | any | null;
+    autoResumeBranch?: boolean;
+  });
+  executePlan(
+    planOrRunId: JsonObject | string,
+    options?: { compareToRunId?: string | null; approvalReason?: string }
+  ): Promise<JsonObject>;
+}
+
 export class EventBus {
   constructor(options?: { sinks?: any[] });
   addSink(sink: any): void;

@@ -2,6 +2,8 @@ const { Run } = require('./Run');
 const { RunInspector } = require('./RunInspector');
 const { RunTreeInspector } = require('./RunTreeInspector');
 const { IncidentDebugger } = require('./IncidentDebugger');
+const { DistributedRecoveryPlanner } = require('./DistributedRecoveryPlanner');
+const { DistributedRecoveryRunner } = require('./DistributedRecoveryRunner');
 const { TraceDiffer } = require('./TraceDiffer');
 const { TraceCorrelation } = require('./TraceCorrelation');
 const { TraceSerializer } = require('./TraceSerializer');
@@ -48,6 +50,8 @@ module.exports = {
   RunInspector,
   RunTreeInspector,
   IncidentDebugger,
+  DistributedRecoveryPlanner,
+  DistributedRecoveryRunner,
   TraceDiffer,
   TraceCorrelation,
   TraceSerializer,

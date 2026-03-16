@@ -82,4 +82,16 @@ describe('Maintained examples', () => {
     expect(stdout).toContain('waiting_for_approval');
     expect(stdout).toContain('completed');
   });
+
+  test('reference distributed recovery example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceDistributedRecovery.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Distributed recovery plan');
+    expect(stdout).toContain('Executed recovery action');
+    expect(stdout).toContain('recommendedAction');
+    expect(stdout).toContain('branch_from_failure_checkpoint');
+  });
 });

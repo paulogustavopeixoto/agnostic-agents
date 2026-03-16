@@ -94,6 +94,39 @@ Key method:
 
 - `createReport(runId, options?)`
 
+### `DistributedRecoveryPlanner`
+
+Builds structured recovery plans from distributed incident state.
+
+Constructor:
+
+- `new DistributedRecoveryPlanner({ runStore })`
+
+Key method:
+
+- `createPlan(runId, options?)`
+
+Returned plan fields include:
+
+- `incidentType`
+- `recoveryPolicy`
+- `recommendedAction`
+- `steps`
+
+### `DistributedRecoveryRunner`
+
+Executes safe runtime recovery actions from a distributed recovery plan.
+
+Constructor:
+
+- `new DistributedRecoveryRunner({ runStore, agentRuntime?, workflowRuntimes?, autoResumeBranch? })`
+
+Key method:
+
+- `executePlan(planOrRunId, options?)`
+
+If a recovery action requires explicit approval and no approval is supplied, execution returns a `waiting_for_recovery_approval` result with `pendingApproval`.
+
 ### `TraceDiffer`
 
 Compares two runs structurally.

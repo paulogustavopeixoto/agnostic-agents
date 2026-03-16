@@ -29,6 +29,8 @@ const { ExtensionHost } = require('../src/runtime/ExtensionHost');
 const { StorageBackendRegistry } = require('../src/runtime/StorageBackendRegistry');
 const { RunTreeInspector } = require('../src/runtime/RunTreeInspector');
 const { IncidentDebugger } = require('../src/runtime/IncidentDebugger');
+const { DistributedRecoveryPlanner } = require('../src/runtime/DistributedRecoveryPlanner');
+const { DistributedRecoveryRunner } = require('../src/runtime/DistributedRecoveryRunner');
 const { TraceDiffer } = require('../src/runtime/TraceDiffer');
 const { DistributedRunEnvelope } = require('../src/runtime/DistributedRunEnvelope');
 const { TraceCorrelation } = require('../src/runtime/TraceCorrelation');
@@ -84,6 +86,8 @@ describe('Package/module unit tests', () => {
     expect(pkg.ExecutionIdentity).toBeDefined();
     expect(pkg.RunTreeInspector).toBeDefined();
     expect(pkg.IncidentDebugger).toBeDefined();
+    expect(pkg.DistributedRecoveryPlanner).toBeDefined();
+    expect(pkg.DistributedRecoveryRunner).toBeDefined();
     expect(pkg.ToolPolicy).toBeDefined();
     expect(pkg.EventBus).toBeDefined();
     expect(pkg.TraceSerializer).toBeDefined();
@@ -739,6 +743,197 @@ describe('Package/module unit tests', () => {
         expect.stringContaining('Inspect the last error'),
         expect.stringContaining('partial replay or branching'),
       ])
+    );
+  });
+
+  test('DistributedRecoveryPlanner builds a structured recovery plan from incident state', async () => {
+    const store = new InMemoryRunStore();
+    const root = new Run({ input: 'root' });
+    root.setStatus('completed');
+
+    const failed = new Run({
+      input: 'child',
+      metadata: { lineage: { rootRunId: root.id, parentRunId: root.id } },
+    });
+    failed.addStep({
+      id: 'step-1',
+      type: 'tool',
+      status: 'failed',
+      output: null,
+    });
+    failed.addError({ name: 'Error', message: 'queue timeout' });
+    failed.addCheckpoint({
+      id: 'cp-1',
+      label: 'before_failure',
+      status: 'failed',
+      snapshot: failed.createCheckpointSnapshot(),
+    });
+    failed.setStatus('failed');
+
+    await store.saveRun(root);
+    await store.saveRun(failed);
+
+    const planner = new DistributedRecoveryPlanner({ runStore: store });
+    const plan = await planner.createPlan(failed.id, { compareToRunId: root.id });
+
+    expect(plan).toEqual(
+      expect.objectContaining({
+        runId: failed.id,
+        status: 'failed',
+        recommendedAction: 'branch_from_failure_checkpoint',
+        incidentType: 'queue_worker_failure',
+        recoveryPolicy: expect.objectContaining({
+          requiresApprovalForBranch: true,
+          prefersCompareFirst: true,
+        }),
+        correlation: {
+          traceId: root.id,
+          spanId: failed.id,
+          parentSpanId: root.id,
+        },
+      })
+    );
+    expect(plan.steps).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: 'branch_from_failure_checkpoint',
+          payload: expect.objectContaining({
+            failedStepId: 'step-1',
+            checkpointId: 'cp-1',
+          }),
+        }),
+        expect.objectContaining({
+          action: 'compare_to_known_good',
+        }),
+      ])
+    );
+  });
+
+  test('DistributedRecoveryRunner executes a recovery plan against an agent runtime', async () => {
+    const runStore = new InMemoryRunStore();
+    const adapter = {
+      getCapabilities: () => ({ generateText: true, toolCalling: false }),
+      generateText: async messages => ({
+        message: `recovered:${messages[messages.length - 1].content}`,
+      }),
+    };
+    const agent = new pkg.Agent(adapter, { runStore });
+
+    const sourceRun = await agent.run('recover this distributed run');
+    const checkpointId = sourceRun.checkpoints[sourceRun.checkpoints.length - 1].id;
+    const replayRun = await agent.replayRun(sourceRun.id, { checkpointId });
+    replayRun.setStatus('failed');
+    replayRun.addStep({
+      id: `${replayRun.id}:step:failed`,
+      type: 'tool',
+      status: 'failed',
+      output: null,
+    });
+    replayRun.addError({ name: 'QueueWorkerError', message: 'simulated failure' });
+    await runStore.saveRun(replayRun);
+
+    const planner = new DistributedRecoveryPlanner({ runStore });
+    const plan = await planner.createPlan(replayRun.id, { compareToRunId: sourceRun.id });
+    const runner = new DistributedRecoveryRunner({
+      runStore,
+      agentRuntime: agent,
+      approvalDecider: async () => ({ approved: true, reason: 'approved in test' }),
+    });
+    const execution = await runner.executePlan(plan);
+
+    expect(execution).toEqual(
+      expect.objectContaining({
+        executedAction: 'branch_from_failure_checkpoint',
+        result: expect.objectContaining({
+          status: 'completed',
+          output: expect.stringContaining('recovered:recover this distributed run'),
+        }),
+      })
+    );
+  });
+
+  test('DistributedRecoveryPlanner chooses workflow-specific recovery actions for workflow failures', async () => {
+    const store = new InMemoryRunStore();
+    const root = new Run({ input: 'workflow root' });
+    root.setStatus('completed');
+
+    const failed = new Run({
+      input: 'workflow child',
+      metadata: {
+        workflowId: 'workflow-1',
+        lineage: { rootRunId: root.id, parentRunId: root.id },
+      },
+    });
+    failed.addStep({
+      id: 'workflow-step-1',
+      type: 'workflow_step',
+      status: 'failed',
+      output: null,
+    });
+    failed.addError({ name: 'WorkflowExecutionError', message: 'child branch failed' });
+    failed.addCheckpoint({
+      id: 'workflow-cp-1',
+      label: 'workflow_failed',
+      status: 'failed',
+      snapshot: failed.createCheckpointSnapshot(),
+    });
+    failed.setStatus('failed');
+
+    await store.saveRun(root);
+    await store.saveRun(failed);
+
+    const planner = new DistributedRecoveryPlanner({ runStore: store });
+    const plan = await planner.createPlan(failed.id);
+
+    expect(plan).toEqual(
+      expect.objectContaining({
+        incidentType: 'workflow_child_failure',
+        recoveryPolicy: expect.objectContaining({
+          prefersWorkflowScopedRecovery: true,
+          requiresApprovalForBranch: true,
+        }),
+        recommendedAction: 'workflow_branch_from_failure_checkpoint',
+      })
+    );
+  });
+
+  test('DistributedRecoveryRunner waits for approval on high-impact recovery actions by default', async () => {
+    const runStore = new InMemoryRunStore();
+    const adapter = {
+      getCapabilities: () => ({ generateText: true, toolCalling: false }),
+      generateText: async messages => ({
+        message: `recovered:${messages[messages.length - 1].content}`,
+      }),
+    };
+    const agent = new pkg.Agent(adapter, { runStore });
+
+    const sourceRun = await agent.run('recover with approval');
+    const checkpointId = sourceRun.checkpoints[sourceRun.checkpoints.length - 1].id;
+    const replayRun = await agent.replayRun(sourceRun.id, { checkpointId });
+    replayRun.setStatus('failed');
+    replayRun.addStep({
+      id: `${replayRun.id}:step:failed`,
+      type: 'tool',
+      status: 'failed',
+      output: null,
+    });
+    replayRun.addError({ name: 'QueueWorkerError', message: 'queue timeout' });
+    await runStore.saveRun(replayRun);
+
+    const plan = await new DistributedRecoveryPlanner({ runStore }).createPlan(replayRun.id);
+    const execution = await new DistributedRecoveryRunner({
+      runStore,
+      agentRuntime: agent,
+    }).executePlan(plan);
+
+    expect(execution).toEqual(
+      expect.objectContaining({
+        executedAction: 'waiting_for_recovery_approval',
+        pendingApproval: expect.objectContaining({
+          action: 'branch_from_failure_checkpoint',
+          runId: replayRun.id,
+        }),
+      })
     );
   });
 
