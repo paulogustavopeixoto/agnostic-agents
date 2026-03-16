@@ -10,7 +10,7 @@ class RunInspector {
         id: step.id,
         type: step.type,
         status: step.status,
-        durationMs: step.durationMs || null,
+        durationMs: step.durationMs ?? null,
       })),
       checkpoints: run.checkpoints.map(checkpoint => ({
         id: checkpoint.id,

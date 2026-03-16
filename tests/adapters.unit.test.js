@@ -29,6 +29,11 @@ describe('Adapter unit tests', () => {
           completions: {
             create: jest.fn().mockResolvedValue({
               choices: [{ message: { content: 'hello world' } }],
+              usage: {
+                prompt_tokens: 11,
+                completion_tokens: 7,
+                total_tokens: 18,
+              },
             }),
           },
         },
@@ -36,6 +41,11 @@ describe('Adapter unit tests', () => {
 
       await expect(adapter.generateText([{ role: 'user', content: 'Hello' }])).resolves.toEqual({
         message: 'hello world',
+        usage: {
+          prompt: 11,
+          completion: 7,
+          total: 18,
+        },
       });
     });
 

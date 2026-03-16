@@ -126,7 +126,7 @@ class RAG {
    * @param {number} [chunkSize] - Override default chunk size.
    * @returns {string[]} - Array of chunks.
    */
-  chunk(text, chunkSize = this.chunkSize, options = {}) {
+  async chunk(text, chunkSize = this.chunkSize, options = {}) {
     const strategy = options.strategy || this.chunkStrategy;
     const overlap = options.overlap ?? this.chunkOverlap;
 
@@ -137,11 +137,14 @@ class RAG {
         .filter(Boolean);
 
       if (paragraphs.length > 0) {
-        return paragraphs.flatMap(paragraph =>
-          paragraph.length > chunkSize
-            ? chunkText(paragraph, chunkSize, overlap)
-            : [paragraph]
+        const paragraphChunks = await Promise.all(
+          paragraphs.map(paragraph =>
+            paragraph.length > chunkSize
+              ? chunkText(paragraph, chunkSize, overlap)
+              : [paragraph]
+          )
         );
+        return paragraphChunks.flat();
       }
     }
 

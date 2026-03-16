@@ -55,6 +55,13 @@ class OpenAIAdapter extends BaseProvider {
       });
 
       const choice = completion.choices[0].message;
+      const usage = completion.usage
+        ? {
+            prompt: completion.usage.prompt_tokens || 0,
+            completion: completion.usage.completion_tokens || 0,
+            total: completion.usage.total_tokens || 0,
+          }
+        : undefined;
       if (choice.function_call) {
         try {
           const parsed = JSON.parse(choice.function_call.arguments || "{}");
@@ -65,15 +72,20 @@ class OpenAIAdapter extends BaseProvider {
               arguments: parsed,
               id: choice.function_call.id || `tool_use_${Date.now()}`
             }],
+            usage,
           };
         } catch (err) {
           return {
             message: choice.content || "",
             toolCalls: [{ name: choice.function_call.name, arguments: {}, id: `tool_use_${Date.now()}` }],
+            usage,
           };
         }
       }
-      return { message: choice.content || "" };
+      return {
+        message: choice.content || "",
+        usage,
+      };
     });
   }
 
