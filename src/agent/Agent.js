@@ -8,6 +8,7 @@ const { EventBus } = require('../runtime/EventBus');
 const { ConsoleDebugSink } = require('../runtime/ConsoleDebugSink');
 const { RunInspector } = require('../runtime/RunInspector');
 const { ApprovalInbox } = require('../runtime/ApprovalInbox');
+const { GovernanceHooks } = require('../runtime/GovernanceHooks');
 const {
   AdapterCapabilityError,
   InvalidToolCallError,
@@ -55,6 +56,7 @@ class Agent {
       debug = false,
       verifier = null,
       approvalInbox = null,
+      governanceHooks = null,
     } = {}
   ) {
     this.adapter = adapter;
@@ -76,6 +78,12 @@ class Agent {
     this.debug = debug;
     this.verifier = verifier;
     this.approvalInbox = approvalInbox instanceof ApprovalInbox ? approvalInbox : approvalInbox || null;
+    this.governanceHooks =
+      governanceHooks instanceof GovernanceHooks
+        ? governanceHooks
+        : governanceHooks
+          ? new GovernanceHooks(governanceHooks)
+          : null;
     this.resolver = new MissingInfoResolver({
       memory: this.memory,
       rag: this.rag,
@@ -123,6 +131,14 @@ class Agent {
 
     if (typeof this.onEvent === 'function') {
       await this.onEvent(event, run);
+    }
+
+    if (this.governanceHooks) {
+      await this.governanceHooks.dispatch(type, payload, {
+        run,
+        agent: this,
+        event,
+      });
     }
 
     await this.eventBus.emit(event, run);

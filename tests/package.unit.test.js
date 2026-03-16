@@ -19,7 +19,9 @@ const { Run } = require('../src/runtime/Run');
 const { EvidenceGraph } = require('../src/runtime/EvidenceGraph');
 const { EvalHarness } = require('../src/runtime/EvalHarness');
 const { LearningLoop } = require('../src/runtime/LearningLoop');
+const { GovernanceHooks } = require('../src/runtime/GovernanceHooks');
 const { RunTreeInspector } = require('../src/runtime/RunTreeInspector');
+const { IncidentDebugger } = require('../src/runtime/IncidentDebugger');
 const { TraceDiffer } = require('../src/runtime/TraceDiffer');
 const { ApprovalInbox } = require('../src/runtime/ApprovalInbox');
 const { BackgroundJobScheduler } = require('../src/runtime/BackgroundJobScheduler');
@@ -66,12 +68,14 @@ describe('Package/module unit tests', () => {
     expect(pkg.ApiLoader).toBeDefined();
     expect(pkg.Run).toBeDefined();
     expect(pkg.RunTreeInspector).toBeDefined();
+    expect(pkg.IncidentDebugger).toBeDefined();
     expect(pkg.ToolPolicy).toBeDefined();
     expect(pkg.EventBus).toBeDefined();
     expect(pkg.TraceSerializer).toBeDefined();
     expect(pkg.EvidenceGraph).toBeDefined();
     expect(pkg.EvalHarness).toBeDefined();
     expect(pkg.LearningLoop).toBeDefined();
+    expect(pkg.GovernanceHooks).toBeDefined();
     expect(pkg.ApprovalInbox).toBeDefined();
     expect(pkg.BackgroundJobScheduler).toBeDefined();
     expect(pkg.DelegationRuntime).toBeDefined();
@@ -407,6 +411,59 @@ describe('Package/module unit tests', () => {
     expect(roots).toHaveLength(1);
     expect(roots[0].id).toBe(root.id);
     expect(roots[0].children[0].id).toBe(child.id);
+  });
+
+  test('IncidentDebugger builds an incident report with lineage and diff context', async () => {
+    const store = new InMemoryRunStore();
+    const root = new Run({ input: 'root' });
+    root.setStatus('completed');
+
+    const failed = new Run({
+      input: 'child',
+      metadata: { lineage: { rootRunId: root.id, parentRunId: root.id } },
+    });
+    failed.addStep({
+      id: 'step-1',
+      type: 'model',
+      status: 'failed',
+      output: null,
+    });
+    failed.addError({ name: 'Error', message: 'boom' });
+    failed.addCheckpoint({
+      id: 'cp-1',
+      label: 'before_failure',
+      status: 'failed',
+      snapshot: failed.createCheckpointSnapshot(),
+    });
+    failed.setStatus('failed');
+
+    await store.saveRun(root);
+    await store.saveRun(failed);
+
+    const debuggerInstance = new IncidentDebugger({ runStore: store });
+    const report = await debuggerInstance.createReport(failed.id, { compareToRunId: root.id });
+
+    expect(report).toEqual(
+      expect.objectContaining({
+        runId: failed.id,
+        rootRunId: root.id,
+        status: 'failed',
+        failure: expect.objectContaining({ message: 'boom' }),
+        failedSteps: [expect.objectContaining({ id: 'step-1' })],
+        comparison: expect.objectContaining({
+          leftRunId: root.id,
+          rightRunId: failed.id,
+          statusChanged: true,
+        }),
+      })
+    );
+    expect(report.renderedRunTree).toContain(root.id);
+    expect(report.recommendations).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('Inspect the last error'),
+        expect.stringContaining('partial replay or branching'),
+      ])
+    );
   });
 
   test('ToolPolicy honors explicit approval requirements', async () => {
@@ -798,6 +855,21 @@ describe('Package/module unit tests', () => {
         'Review verifier denials and require approval or stronger routing for risky actions.',
       ])
     );
+  });
+
+  test('GovernanceHooks dispatches named governance events', async () => {
+    const seen = [];
+    const hooks = new GovernanceHooks({
+      onApprovalRequested: async payload => {
+        seen.push(`approval:${payload.runId}`);
+      },
+      onEvent: async type => {
+        seen.push(`event:${type}`);
+      },
+    });
+
+    await hooks.dispatch('approval_requested', { runId: 'run-1' }, {});
+    expect(seen).toEqual(['approval:run-1', 'event:approval_requested']);
   });
 
   test('ExecutionGraph builds dependency edges from workflows', () => {

@@ -1,11 +1,13 @@
 const { Run } = require('./Run');
 const { RunInspector } = require('./RunInspector');
 const { RunTreeInspector } = require('./RunTreeInspector');
+const { IncidentDebugger } = require('./IncidentDebugger');
 const { TraceDiffer } = require('./TraceDiffer');
 const { TraceSerializer } = require('./TraceSerializer');
 const { EvidenceGraph } = require('./EvidenceGraph');
 const { EvalHarness } = require('./EvalHarness');
 const { LearningLoop } = require('./LearningLoop');
+const { GovernanceHooks } = require('./GovernanceHooks');
 const { ApprovalInbox } = require('./ApprovalInbox');
 const { BackgroundJobScheduler } = require('./BackgroundJobScheduler');
 const { DelegationRuntime } = require('./DelegationRuntime');
@@ -34,11 +36,13 @@ module.exports = {
   Run,
   RunInspector,
   RunTreeInspector,
+  IncidentDebugger,
   TraceDiffer,
   TraceSerializer,
   EvidenceGraph,
   EvalHarness,
   LearningLoop,
+  GovernanceHooks,
   ApprovalInbox,
   BackgroundJobScheduler,
   DelegationRuntime,

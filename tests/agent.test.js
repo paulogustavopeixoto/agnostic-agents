@@ -615,6 +615,63 @@ describe('Agent', () => {
     );
   });
 
+  test('dispatches governance hooks for policy and approval lifecycle events', async () => {
+    const tool = new Tool({
+      name: 'send_email',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string' },
+        },
+        required: ['query'],
+      },
+      metadata: {
+        executionPolicy: 'require_approval',
+      },
+      implementation: async ({ query }) => ({ delivered: true, query }),
+    });
+
+    mockAdapter.generateText = jest.fn()
+      .mockResolvedValueOnce({
+        message: '',
+        toolCalls: [{ name: 'send_email', arguments: { query: 'hello' }, id: 'tool_use_1' }],
+      })
+      .mockResolvedValueOnce({
+        message: 'Email sent',
+      });
+
+    const seen = [];
+    const agent = new Agent(mockAdapter, {
+      tools: [tool],
+      retryManager,
+      runStore: new InMemoryRunStore(),
+      governanceHooks: {
+        onPolicyDecision: async payload => {
+          seen.push(`policy:${payload.toolName}:${payload.stage}`);
+        },
+        onApprovalRequested: async payload => {
+          seen.push(`approval_requested:${payload.toolName}`);
+        },
+        onApprovalResolved: async payload => {
+          seen.push(`approval_resolved:${payload.request.toolName}`);
+        },
+      },
+    });
+
+    const pendingRun = await agent.run('Use tool to send email');
+    expect(pendingRun.status).toBe('waiting_for_approval');
+
+    const completedRun = await agent.resumeRun(pendingRun.id, { approved: true });
+    expect(completedRun.status).toBe('completed');
+    expect(seen).toEqual(
+      expect.arrayContaining([
+        'policy:send_email:evaluate',
+        'approval_requested:send_email',
+        'approval_resolved:send_email',
+      ])
+    );
+  });
+
   test('pauses and resumes a run outside approval flow', async () => {
     const runStore = new InMemoryRunStore();
     const agent = new Agent(mockAdapter, { runStore });
