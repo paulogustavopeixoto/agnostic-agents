@@ -2,7 +2,7 @@
 
 # agnostic-agents
 
-A Node.js runtime for building provider-agnostic AI agents with tool calling, persistent runs, approvals, workflows, layered memory, and grounded retrieval.
+A Node.js runtime OS for building provider-agnostic agent systems with inspectable runs, replay, branching, approvals, workflows, layered memory, grounded retrieval, and multi-agent orchestration.
 
 ## Install
 
@@ -12,14 +12,19 @@ npm install agnostic-agents
 
 ## What it includes
 
-- `Agent`: runtime-backed agent execution with tool calling, approvals, pause/resume, cancellation, memory context, retrieval augmentation, and multimodal helper methods.
+- `Agent`: runtime-backed agent execution with tool calling, approvals, pause/resume, cancellation, replay, run assessment, self-verification, memory context, retrieval augmentation, and multimodal helper methods.
 - `Tool`: JSON Schema based tool definition that adapters can export to provider-specific formats.
-- `Run` / `RunInspector`: inspectable run model with events, checkpoints, timings, usage, and errors.
+- `Run` / `RunInspector`: inspectable run model with events, checkpoints, timings, usage, lineage, assessments, and errors.
 - `Workflow` / `WorkflowStep` / `AgentWorkflowStep` / `WorkflowRunner`: dependency-aware orchestration built on the runtime.
+- `DelegationRuntime` / `DelegationContract`: explicit multi-agent delegation with governed contracts and child-run tracking.
+- `PlanningRuntime`: plan, verify, recover execution flow for higher-order runtime tasks.
 - `Memory`: layered memory for conversation, working, profile, policy, and semantic storage.
 - `RAG`: grounded retrieval helper with provenance, reranking, retrievers, Pinecone support, or the built-in `LocalVectorStore`.
-- `FallbackRouter`: capability-aware provider fallback routing.
+- `FallbackRouter`: capability-aware provider fallback routing with cost/risk/task-type hints.
+- `BackgroundJobScheduler`: recurring and delayed job execution with pluggable job stores.
+- `EvidenceGraph` / `EvalHarness` / `LearningLoop`: runtime evidence tracking, eval execution, and learning signals from runs and benchmarks.
 - `EventBus` / `ConsoleDebugSink`: structured runtime events and debug sinks.
+- environment adapters for browser, shell, API, queue, and file-backed execution environments.
 - `MCPClient` / `MCPTool` / `MCPDiscoveryLoader`: connect to Model Context Protocol tool sources.
 - `RetryManager`: retry wrapper for adapters and workflows.
 
@@ -59,14 +64,14 @@ console.log(response);
 
 ## Runtime example
 
-`Agent.run()` returns an inspectable `Run` object. This is the maintained path for runtime features like approvals, checkpoints, pause/resume, and inspection.
+`Agent.run()` returns an inspectable `Run` object. This is the maintained path for runtime features like approvals, checkpoints, branching, replay, self-verification, and inspection.
 
 ```js
 const {
   Agent,
   Tool,
   OpenAIAdapter,
-  RunInspector,
+  RunInspector
 } = require('agnostic-agents');
 
 const adapter = new OpenAIAdapter(process.env.OPENAI_API_KEY, {
@@ -98,20 +103,20 @@ const sendUpdate = new Tool({
 const agent = new Agent(adapter, {
   tools: [sendUpdate],
   description: 'Use tools when required and ask for approval before side effects.',
+  verifier: new OpenAIAdapter(process.env.OPENAI_API_KEY, {
+    model: 'gpt-4o-mini',
+  }),
+  defaultConfig: { selfVerify: true },
 });
 
-let run = await agent.run({
-  input: 'Send Paulo a short update saying the v2 runtime is ready.',
-});
+let run = await agent.run('Send Paulo a short update saying the runtime is ready.');
 
 if (run.status === 'waiting_for_approval') {
-  run = await agent.resumeRun(run.id, {
-    approval: { approved: true, reason: 'approved in demo' },
-  });
+  run = await agent.resumeRun(run.id, { approved: true, reason: 'approved in demo' });
 }
 
 console.log(run.output);
-console.log(new RunInspector().inspect(run));
+console.dir(RunInspector.summarize(run), { depth: null });
 ```
 
 ## Memory example
@@ -170,6 +175,8 @@ const {
   Workflow,
   AgentWorkflowStep,
   WorkflowRunner,
+  DelegationContract,
+  DelegationRuntime,
   OpenAIAdapter,
 } = require('agnostic-agents');
 
@@ -183,27 +190,76 @@ const writer = new Agent(adapter, {
   description: 'Turn findings into short status updates.',
 });
 
+const delegationRuntime = new DelegationRuntime();
+
 const workflow = new Workflow({
   id: 'daily-sync',
   steps: [
     new AgentWorkflowStep({
       id: 'research',
       agent: researcher,
+      delegationRuntime,
+      delegationContract: new DelegationContract({
+        id: 'research-contract',
+        assignee: 'researcher',
+        requiredInputs: ['prompt'],
+      }),
       prompt: 'List three runtime capabilities in bullet form.',
     }),
     new AgentWorkflowStep({
       id: 'draft_update',
       agent: writer,
       dependsOn: ['research'],
-      prompt: ({ results }) =>
-        `Turn this research into a short update:\n${results.research.output}`,
+      delegationRuntime,
+      delegationContract: new DelegationContract({
+        id: 'writer-contract',
+        assignee: 'writer',
+        requiredInputs: ['prompt'],
+      }),
+      prompt: ({ results }) => `Turn this research into a short update:\n${results.research.output}`,
     }),
   ],
 });
 
-const runner = new WorkflowRunner();
-const run = await runner.run(workflow, { input: 'Prepare a daily sync update' });
+const runner = new WorkflowRunner({ workflow });
+const run = await runner.run('Prepare a daily sync update');
 console.log(run.output);
+```
+
+## Planning and scheduling example
+
+```js
+const {
+  PlanningRuntime,
+  BackgroundJobScheduler,
+  InMemoryJobStore,
+} = require('agnostic-agents');
+
+const planning = new PlanningRuntime({
+  planner: async ({ input }) => [{ id: 'plan-1', task: input }],
+  executor: async ({ plan }) => ({ completed: true, planLength: plan.length }),
+  verifier: async ({ result }) => ({ status: result.completed ? 'passed' : 'recover' }),
+});
+
+const planningRun = await planning.run('Summarize the runtime state');
+console.log(planningRun.output);
+
+const scheduler = new BackgroundJobScheduler({
+  store: new InMemoryJobStore(),
+  handlers: {
+    sync: async payload => ({ ok: true, topic: payload.topic }),
+  },
+});
+
+await scheduler.schedule({
+  id: 'nightly-sync',
+  handler: 'sync',
+  payload: { topic: 'runtime' },
+  runAt: new Date().toISOString(),
+});
+
+const dueJobs = await scheduler.runDueJobs();
+console.log(dueJobs);
 ```
 
 ## Tool contract
@@ -225,23 +281,26 @@ The agent validates tool arguments against `parameters`, applies schema defaults
 - `npm run example:openai`
 - `npm run example:gemini`
 - `npm run example:openai-runtime`
+- `npm run example:openai-v3-runtime`
 
 Additional examples live in [`examples/`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples).
 
 Maintained `v1` examples are documented in [`examples/README.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples/README.md).
 
-## Current v2 scope
+## Current v3 scope
 
 This package currently targets:
 
 - provider-agnostic tool calling
-- inspectable runs with checkpoints and events
+- inspectable runs with checkpoints, replay, branching, events, and assessments
 - approval-gated, pausable, resumable, and cancellable execution
 - layered memory
-- grounded retrieval with provenance
-- workflow orchestration on top of the runtime
-- provider fallback routing
+- grounded retrieval with provenance and evidence tracking
+- workflow orchestration and explicit delegation on top of the runtime
+- planning, recovery, and recurring background execution
+- provider fallback routing with cost/risk/task-type hints
 - MCP tool discovery
+- eval and learning-loop primitives for runtime benchmarking
 
 Legacy `Task` and `Orchestrator` remain for compatibility, but the maintained orchestration layer is `Workflow` / `WorkflowRunner`.
 
@@ -286,8 +345,9 @@ Detailed command and environment documentation is available in [`docs/testing.md
 
 Package publish contents are documented in [`docs/package-audit.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/package-audit.md).
 
-The maintained runtime demo is:
+Maintained runtime demos are:
 
 ```bash
 npm run example:openai-runtime
+npm run example:openai-v3-runtime
 ```
