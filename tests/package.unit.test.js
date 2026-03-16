@@ -1469,16 +1469,68 @@ describe('Package/module unit tests', () => {
         input: 'bad run',
         status: 'failed',
         errors: [{ message: 'boom' }],
-        state: { selfVerification: { action: 'require_approval' } },
+        pendingApproval: { toolName: 'send_status_update' },
+        state: {
+          selfVerification: { action: 'require_approval' },
+          assessment: { confidence: 0.45, evidenceConflicts: 1 },
+        },
       })
     );
-    learningLoop.recordEvaluation({ total: 1, passed: 0, failed: 1, results: [] });
+    learningLoop.recordEvaluation({
+      total: 1,
+      passed: 0,
+      failed: 1,
+      results: [
+        {
+          id: 'eval-1',
+          passed: false,
+          category: 'tooling',
+          error: 'status tool timed out',
+          feedback: [{ category: 'integration', message: 'remote control plane timed out' }],
+        },
+      ],
+    });
 
     expect(learningLoop.buildRecommendations()).toEqual(
       expect.arrayContaining([
         'Investigate failed runs and add replay-based regression coverage.',
         'Tighten prompts, tool contracts, or policies for scenarios failing the eval harness.',
         'Review verifier denials and require approval or stronger routing for risky actions.',
+      ])
+    );
+    expect(learningLoop.summarize()).toEqual(
+      expect.objectContaining({
+        failedRuns: 1,
+        approvalBlocks: 1,
+        lowConfidenceRuns: 1,
+        evidenceConflictRuns: 1,
+        feedbackItems: 2,
+        feedbackByCategory: expect.objectContaining({
+          tooling: 1,
+          integration: 1,
+        }),
+      })
+    );
+    expect(learningLoop.buildAdaptiveRecommendations()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'eval-failures',
+          category: 'evaluation',
+          priority: 'high',
+        }),
+        expect.objectContaining({
+          id: 'governance-pressure',
+          category: 'governance',
+          priority: 'high',
+        }),
+        expect.objectContaining({
+          id: 'grounding-quality',
+          category: 'routing',
+        }),
+        expect.objectContaining({
+          id: 'tooling-stability',
+          category: 'operations',
+        }),
       ])
     );
   });

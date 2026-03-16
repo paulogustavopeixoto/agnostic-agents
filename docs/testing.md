@@ -42,8 +42,8 @@ Optional provider model overrides:
 
 ## Secret handling for tests
 
-Test credentials should follow the baseline secret guidance in [`docs/secret-handling.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/secret-handling.md).
-For tools that need host-supplied credentials, follow the auth propagation model in [`docs/tool-auth-propagation.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/tool-auth-propagation.md).
+Test credentials should follow the baseline secret guidance in [`docs/secret-handling.md`](secret-handling.md).
+For tools that need host-supplied credentials, follow the auth propagation model in [`docs/tool-auth-propagation.md`](tool-auth-propagation.md).
 
 In practice:
 
@@ -64,7 +64,7 @@ In practice:
 
 ## Provider certification
 
-Provider support claims should follow the certification process in [`docs/provider-certification.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/provider-certification.md).
+Provider support claims should follow the certification process in [`docs/provider-certification.md`](provider-certification.md).
 
 In practice:
 

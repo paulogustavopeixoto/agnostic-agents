@@ -103,6 +103,6 @@ When a distributed continuation fails, inspect:
 
 ## Maintained reference example
 
-- [`examples/referenceDistributedHandoff.js`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples/referenceDistributedHandoff.js)
-- [`examples/referenceQueueWorker.js`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples/referenceQueueWorker.js)
-- [`examples/referenceDistributedIncident.js`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples/referenceDistributedIncident.js)
+- [`examples/referenceDistributedHandoff.js`](../examples/referenceDistributedHandoff.js)
+- [`examples/referenceQueueWorker.js`](../examples/referenceQueueWorker.js)
+- [`examples/referenceDistributedIncident.js`](../examples/referenceDistributedIncident.js)

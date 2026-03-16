@@ -4,9 +4,9 @@ This document is the maintained entry point for version-to-version migration in 
 
 Use it when upgrading across the major runtime phases that shaped the current package:
 
-- [`docs/migration-v1-to-v2.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/migration-v1-to-v2.md)
-- [`docs/migration-v2-to-v3.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/migration-v2-to-v3.md)
-- [`docs/migration-v3-to-v4.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/migration-v3-to-v4.md)
+- [`docs/migration-v1-to-v2.md`](migration-v1-to-v2.md)
+- [`docs/migration-v2-to-v3.md`](migration-v2-to-v3.md)
+- [`docs/migration-v3-to-v4.md`](migration-v3-to-v4.md)
 
 ## Which guide should you use?
 

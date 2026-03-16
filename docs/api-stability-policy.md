@@ -12,11 +12,11 @@ The goal is to keep the package strong as an open-source runtime OS:
 
 For this package, the public API is the combination of:
 
-- exports from [`index.js`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/index.js)
-- the published type surface in [`index.d.ts`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/index.d.ts)
+- exports from [`index.js`](../index.js)
+- the published type surface in [`index.d.ts`](../index.d.ts)
 - documented maintained behaviors in:
-  - [`README.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/README.md)
-  - [`docs/api-reference.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/api-reference.md)
+  - [`README.md`](../README.md)
+  - [`docs/api-reference.md`](api-reference.md)
   - maintained docs and examples referenced from the README
 
 If behavior is undocumented, unexported, or only reachable through internal files, it should not be treated as a stable public contract.
@@ -152,8 +152,8 @@ as equivalent to a maintained support promise.
 
 Use:
 
-- [`docs/provider-certification.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/provider-certification.md)
-- [`docs/provider-compatibility.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/provider-compatibility.md)
+- [`docs/provider-certification.md`](provider-certification.md)
+- [`docs/provider-compatibility.md`](provider-compatibility.md)
 
 ## 8. Release expectations
 

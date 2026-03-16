@@ -100,7 +100,7 @@ This order protects replay, incident debugging, and scheduling first.
 
 See:
 
-- [`examples/referenceDurableBackends.js`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples/referenceDurableBackends.js)
+- [`examples/referenceDurableBackends.js`](../examples/referenceDurableBackends.js)
 
 That example shows:
 

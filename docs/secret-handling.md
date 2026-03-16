@@ -45,7 +45,7 @@ Do not store secrets in:
 ### Tools
 
 - tools that call external systems should receive credentials from the host process, not from model-generated arguments
-- use the auth propagation model in [`docs/tool-auth-propagation.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/tool-auth-propagation.md) so required bindings are supplied through tool context instead of prompt-visible arguments
+- use the auth propagation model in [`docs/tool-auth-propagation.md`](tool-auth-propagation.md) so required bindings are supplied through tool context instead of prompt-visible arguments
 - use `ToolPolicy` allowlists and denylists to keep the model away from unapproved secret-bearing tools
 - mark side-effecting tools with accurate `sideEffectLevel` metadata so governance and audit surfaces behave correctly
 

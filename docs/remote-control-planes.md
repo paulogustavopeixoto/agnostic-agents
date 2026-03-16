@@ -65,4 +65,4 @@ For a remote control plane:
 
 ## Maintained reference example
 
-- [`examples/referenceRemoteControlPlane.js`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples/referenceRemoteControlPlane.js)
+- [`examples/referenceRemoteControlPlane.js`](../examples/referenceRemoteControlPlane.js)

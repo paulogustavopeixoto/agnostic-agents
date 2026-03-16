@@ -116,7 +116,7 @@ Auth propagation should be used together with:
 Auth propagation decides how credentials reach tools.
 It does not replace approval or policy decisions.
 
-For distributed runtimes, see [`docs/distributed-identities.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/distributed-identities.md).
+For distributed runtimes, see [`docs/distributed-identities.md`](distributed-identities.md).
 
 ## Recommended practices
 

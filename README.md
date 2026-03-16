@@ -26,7 +26,7 @@ The package ships a maintained `index.d.ts` so TypeScript projects get typed acc
 - `RAG`: grounded retrieval helper with provenance, reranking, retrievers, Pinecone support, or the built-in `LocalVectorStore`.
 - `FallbackRouter`: capability-aware provider fallback routing with cost/risk/task-type hints.
 - `BackgroundJobScheduler`: recurring and delayed job execution with pluggable job stores.
-- `EvidenceGraph` / `EvalHarness` / `LearningLoop`: runtime evidence tracking, eval execution, and learning signals from runs and benchmarks.
+- `EvidenceGraph` / `EvalHarness` / `LearningLoop`: runtime evidence tracking, eval execution, learning signals from runs and benchmarks, and adaptive recommendation summaries.
 - `EventBus` / `ConsoleDebugSink` / `FileAuditSink` / `WebhookEventSink` / `RuntimeEventRedactor`: structured runtime events, debug sinks, JSONL audit logging, external event forwarding, and PII-safe redaction helpers.
 - `ToolPolicy` / `GovernanceHooks` / `WebhookGovernanceAdapter` / `ApprovalInbox` / `StorageBackendRegistry`: governance policy controls, external review hooks, remote control-plane forwarding, and stable runtime storage contracts.
 - environment adapters for browser, shell, API, queue, and file-backed execution environments.
@@ -323,30 +323,30 @@ The agent validates tool arguments against `parameters`, applies schema defaults
 - `npm run example:reference-deployment-split`
 - `npm run example:reference-distributed-recovery`
 
-Additional examples live in [`examples/`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples).
+Additional examples live in [`examples/`](examples).
 
-Maintained `v1` examples are documented in [`examples/README.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples/README.md).
+Maintained `v1` examples are documented in [`examples/README.md`](examples/README.md).
 
-Reference deployment patterns are documented in [`docs/reference-integrations.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/reference-integrations.md).
-The maintained package reference is documented in [`docs/api-reference.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/api-reference.md).
-Version-to-version upgrade paths are documented in [`docs/migration-guides.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/migration-guides.md).
-The public API stability, deprecation, and versioning rules are documented in [`docs/api-stability-policy.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/api-stability-policy.md).
-Copy-paste provider quickstarts are documented in [`docs/provider-quickstarts.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/provider-quickstarts.md).
-Benchmarking and regression-eval guidance is documented in [`docs/benchmarking.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/benchmarking.md).
-Comparison benchmark fixtures are documented in [`docs/benchmark-fixtures.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/benchmark-fixtures.md).
-Plugin authoring guidance is documented in [`docs/plugin-authoring.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/plugin-authoring.md).
-MCP interoperability guidance is documented in [`docs/mcp-interoperability.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/mcp-interoperability.md).
-OpenAPI integration examples are documented in [`docs/openapi-examples.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/openapi-examples.md).
-Real product-pattern recipes are documented in [`docs/cookbook.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/cookbook.md).
-Operator triage, replay, branching, and recovery workflows are documented in [`docs/operator-workflows.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/operator-workflows.md).
-Operator-facing deployment guidance is documented in [`docs/operator-architecture.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/operator-architecture.md).
-Production-oriented storage backend guidance is documented in [`docs/storage-backends.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/storage-backends.md).
-Distributed execution and handoff guidance is documented in [`docs/distributed-execution.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/distributed-execution.md).
-Remote control-plane guidance is documented in [`docs/remote-control-planes.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/remote-control-planes.md).
-Distributed identity and auth-scope guidance is documented in [`docs/distributed-identities.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/distributed-identities.md).
+Reference deployment patterns are documented in [`docs/reference-integrations.md`](docs/reference-integrations.md).
+The maintained package reference is documented in [`docs/api-reference.md`](docs/api-reference.md).
+Version-to-version upgrade paths are documented in [`docs/migration-guides.md`](docs/migration-guides.md).
+The public API stability, deprecation, and versioning rules are documented in [`docs/api-stability-policy.md`](docs/api-stability-policy.md).
+Copy-paste provider quickstarts are documented in [`docs/provider-quickstarts.md`](docs/provider-quickstarts.md).
+Benchmarking and regression-eval guidance is documented in [`docs/benchmarking.md`](docs/benchmarking.md).
+Comparison benchmark fixtures are documented in [`docs/benchmark-fixtures.md`](docs/benchmark-fixtures.md).
+Plugin authoring guidance is documented in [`docs/plugin-authoring.md`](docs/plugin-authoring.md).
+MCP interoperability guidance is documented in [`docs/mcp-interoperability.md`](docs/mcp-interoperability.md).
+OpenAPI integration examples are documented in [`docs/openapi-examples.md`](docs/openapi-examples.md).
+Real product-pattern recipes are documented in [`docs/cookbook.md`](docs/cookbook.md).
+Operator triage, replay, branching, and recovery workflows are documented in [`docs/operator-workflows.md`](docs/operator-workflows.md).
+Operator-facing deployment guidance is documented in [`docs/operator-architecture.md`](docs/operator-architecture.md).
+Production-oriented storage backend guidance is documented in [`docs/storage-backends.md`](docs/storage-backends.md).
+Distributed execution and handoff guidance is documented in [`docs/distributed-execution.md`](docs/distributed-execution.md).
+Remote control-plane guidance is documented in [`docs/remote-control-planes.md`](docs/remote-control-planes.md).
+Distributed identity and auth-scope guidance is documented in [`docs/distributed-identities.md`](docs/distributed-identities.md).
 
-Secret-handling expectations for adapters, tools, logs, traces, and tests are documented in [`docs/secret-handling.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/secret-handling.md).
-Tool auth propagation for host-controlled credentials is documented in [`docs/tool-auth-propagation.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/tool-auth-propagation.md).
+Secret-handling expectations for adapters, tools, logs, traces, and tests are documented in [`docs/secret-handling.md`](docs/secret-handling.md).
+Tool auth propagation for host-controlled credentials is documented in [`docs/tool-auth-propagation.md`](docs/tool-auth-propagation.md).
 
 ## Current v4 scope
 
@@ -384,9 +384,9 @@ Each adapter exposes `getCapabilities()` with the normalized capability map:
 
 Use this to decide whether to expose optional features in your app.
 
-See [`docs/provider-compatibility.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/provider-compatibility.md) for provider-specific notes.
-Certification levels and support-claim rules are defined in [`docs/provider-certification.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/provider-certification.md).
-Secret handling and redaction guidance is documented in [`docs/secret-handling.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/secret-handling.md).
+See [`docs/provider-compatibility.md`](docs/provider-compatibility.md) for provider-specific notes.
+Certification levels and support-claim rules are defined in [`docs/provider-certification.md`](docs/provider-certification.md).
+Secret handling and redaction guidance is documented in [`docs/secret-handling.md`](docs/secret-handling.md).
 
 ## Development
 
@@ -405,9 +405,9 @@ npm run test:all
 
 Live tests use `.env` keys and only run when `RUN_LIVE_API_TESTS=1` is set by the script. Provider-account limitations such as quota, billing, or model availability are treated as skippable smoke-test conditions rather than framework failures.
 
-Detailed command and environment documentation is available in [`docs/testing.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/testing.md).
+Detailed command and environment documentation is available in [`docs/testing.md`](docs/testing.md).
 
-Package publish contents are documented in [`docs/package-audit.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/package-audit.md).
+Package publish contents are documented in [`docs/package-audit.md`](docs/package-audit.md).
 
 Maintained runtime demos are:
 

@@ -4,8 +4,8 @@ This is the maintained high-level API reference for the public surface of `agnos
 
 It is aligned with:
 
-- [`index.d.ts`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/index.d.ts)
-- the root package exports in [`index.js`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/index.js)
+- [`index.d.ts`](../index.d.ts)
+- the root package exports in [`index.js`](../index.js)
 
 Use this document as the quick reference for the supported package surface.
 
@@ -431,7 +431,16 @@ Evaluation runner for scenario-based checks.
 
 ### `LearningLoop`
 
-Records runs and evaluation summaries for operational learning signals.
+Records runs, evaluation summaries, and structured feedback for operational learning signals.
+
+Key methods:
+
+- `recordRun(run)`
+- `recordEvaluation(report)`
+- `recordFeedback(item)`
+- `summarize()`
+- `buildRecommendations()`
+- `buildAdaptiveRecommendations()`
 
 ## Environment and provider adapters
 

@@ -271,12 +271,12 @@ Use these defaults unless you have a strong reason not to:
 
 ## Maintained operator example
 
-See [`examples/referenceOperatorWorkflow.js`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples/referenceOperatorWorkflow.js) for a runnable reference that demonstrates:
+See [`examples/referenceOperatorWorkflow.js`](../examples/referenceOperatorWorkflow.js) for a runnable reference that demonstrates:
 
 - tree inspection
 - incident reporting
 - trace diffing
 - partial trace export
 
-For cross-service and queue-native incident reconstruction, see [`examples/referenceDistributedIncident.js`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples/referenceDistributedIncident.js).
-For structured distributed recovery planning, see [`examples/referenceDistributedRecovery.js`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples/referenceDistributedRecovery.js).
+For cross-service and queue-native incident reconstruction, see [`examples/referenceDistributedIncident.js`](../examples/referenceDistributedIncident.js).
+For structured distributed recovery planning, see [`examples/referenceDistributedRecovery.js`](../examples/referenceDistributedRecovery.js).

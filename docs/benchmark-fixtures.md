@@ -11,7 +11,7 @@ What it does maintain now is a shared comparison fixture set so benchmark runs c
 
 See:
 
-- [`tests/fixtures/benchmark-framework-fixtures.json`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/tests/fixtures/benchmark-framework-fixtures.json)
+- [`tests/fixtures/benchmark-framework-fixtures.json`](../tests/fixtures/benchmark-framework-fixtures.json)
 
 That fixture defines the current comparison dimensions for:
 
@@ -51,6 +51,6 @@ They are only the maintained comparison scaffold.
 
 See:
 
-- [`tests/benchmark-fixtures.unit.test.js`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/tests/benchmark-fixtures.unit.test.js)
+- [`tests/benchmark-fixtures.unit.test.js`](../tests/benchmark-fixtures.unit.test.js)
 
 That test ensures the fixture schema stays stable as the benchmark discipline evolves.

@@ -74,7 +74,7 @@ Use it for:
 
 See:
 
-- [`examples/referenceEvalBenchmarks.js`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples/referenceEvalBenchmarks.js)
+- [`examples/referenceEvalBenchmarks.js`](../examples/referenceEvalBenchmarks.js)
 
 It demonstrates a minimal benchmark report across:
 
@@ -87,8 +87,8 @@ It demonstrates a minimal benchmark report across:
 
 See:
 
-- [`tests/evals.unit.test.js`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/tests/evals.unit.test.js)
-- [`examples/referenceReplayBenchmarks.js`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples/referenceReplayBenchmarks.js)
+- [`tests/evals.unit.test.js`](../tests/evals.unit.test.js)
+- [`examples/referenceReplayBenchmarks.js`](../examples/referenceReplayBenchmarks.js)
 
 This test is the current baseline regression suite for the maintained benchmark categories above.
 

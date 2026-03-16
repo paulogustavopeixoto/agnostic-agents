@@ -2,8 +2,8 @@
 
 This document describes the normalized adapter contract and current certification status in `agnostic-agents`.
 
-For how certification levels are defined, see [`docs/provider-certification.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/provider-certification.md).
-For minimal setup snippets, see [`docs/provider-quickstarts.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/provider-quickstarts.md).
+For how certification levels are defined, see [`docs/provider-certification.md`](provider-certification.md).
+For minimal setup snippets, see [`docs/provider-quickstarts.md`](provider-quickstarts.md).
 
 ## Shared contract
 

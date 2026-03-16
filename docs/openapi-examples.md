@@ -63,13 +63,13 @@ If the imported API requires auth:
 
 - keep tokens in host-controlled configuration
 - avoid putting tokens in prompts
-- prefer runtime-side auth handling as documented in [`docs/secret-handling.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/secret-handling.md)
+- prefer runtime-side auth handling as documented in [`docs/secret-handling.md`](secret-handling.md)
 
 ## 4. Maintained reference example
 
 See:
 
-- [`examples/referenceOpenApiImport.js`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples/referenceOpenApiImport.js)
+- [`examples/referenceOpenApiImport.js`](../examples/referenceOpenApiImport.js)
 
 That example shows:
 

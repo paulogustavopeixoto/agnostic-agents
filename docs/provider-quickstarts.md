@@ -8,7 +8,7 @@ Each snippet is intentionally minimal:
 - define one local tool
 - run one agent call
 
-For certification level and capability notes, see [`docs/provider-compatibility.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/provider-compatibility.md).
+For certification level and capability notes, see [`docs/provider-compatibility.md`](provider-compatibility.md).
 
 ## Shared pattern
 
@@ -65,7 +65,7 @@ console.log(response);
 
 Reference example:
 
-- [`examples/openaiExample.js`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples/openaiExample.js)
+- [`examples/openaiExample.js`](../examples/openaiExample.js)
 
 ## Gemini
 
@@ -105,7 +105,7 @@ console.log(response);
 
 Reference example:
 
-- [`examples/geminiExample.js`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples/geminiExample.js)
+- [`examples/geminiExample.js`](../examples/geminiExample.js)
 
 ## Anthropic
 
@@ -146,7 +146,7 @@ console.log(response);
 
 Reference example:
 
-- [`examples/anthropicExample.js`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples/anthropicExample.js)
+- [`examples/anthropicExample.js`](../examples/anthropicExample.js)
 
 ## Hugging Face
 
@@ -187,7 +187,7 @@ console.log(response);
 
 Reference example:
 
-- [`examples/huggingFaceExample.js`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples/huggingFaceExample.js)
+- [`examples/huggingFaceExample.js`](../examples/huggingFaceExample.js)
 
 ## DeepSeek
 
@@ -228,7 +228,7 @@ console.log(response);
 
 Reference example:
 
-- [`examples/deepseekExample.js`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples/deepseekExample.js)
+- [`examples/deepseekExample.js`](../examples/deepseekExample.js)
 
 ## When to move beyond these snippets
 

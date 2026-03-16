@@ -132,7 +132,7 @@ Without those, the runtime may be technically powerful but operationally weak.
 
 ## Reference files
 
-- [`docs/operator-workflows.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/operator-workflows.md)
-- [`docs/reference-integrations.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/reference-integrations.md)
-- [`examples/referenceOperatorWorkflow.js`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples/referenceOperatorWorkflow.js)
-- [`examples/referenceDeploymentSplit.js`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples/referenceDeploymentSplit.js)
+- [`docs/operator-workflows.md`](operator-workflows.md)
+- [`docs/reference-integrations.md`](reference-integrations.md)
+- [`examples/referenceOperatorWorkflow.js`](../examples/referenceOperatorWorkflow.js)
+- [`examples/referenceDeploymentSplit.js`](../examples/referenceDeploymentSplit.js)

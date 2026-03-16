@@ -15,7 +15,7 @@ Use this pattern when you want an HTTP service that:
 
 Reference file:
 
-- [`examples/referenceExpressRuntimeServer.js`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples/referenceExpressRuntimeServer.js)
+- [`examples/referenceExpressRuntimeServer.js`](../examples/referenceExpressRuntimeServer.js)
 
 Use it for:
 
@@ -43,7 +43,7 @@ Use this pattern when you want a background runtime that:
 
 Reference file:
 
-- [`examples/referenceQueueWorker.js`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples/referenceQueueWorker.js)
+- [`examples/referenceQueueWorker.js`](../examples/referenceQueueWorker.js)
 
 Use it for:
 
@@ -68,7 +68,7 @@ Use this pattern when you want to inspect a past run without re-executing the li
 
 Reference file:
 
-- [`examples/referenceIncidentDebug.js`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples/referenceIncidentDebug.js)
+- [`examples/referenceIncidentDebug.js`](../examples/referenceIncidentDebug.js)
 
 Use it for:
 
@@ -85,8 +85,8 @@ Key runtime pieces:
 - `TraceDiffer`
 - `FileRunStore`
 
-For operator triage and recovery procedures, see [`docs/operator-workflows.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/operator-workflows.md).
-For distributed handoff and correlation guidance, see [`docs/distributed-execution.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/distributed-execution.md).
+For operator triage and recovery procedures, see [`docs/operator-workflows.md`](operator-workflows.md).
+For distributed handoff and correlation guidance, see [`docs/distributed-execution.md`](distributed-execution.md).
 
 ## 4. Suggested production split
 
@@ -109,12 +109,12 @@ For most serious systems, split the runtime into separate processes:
 
 That keeps the runtime portable and lets each deployment choose its own transport, UI, and persistence.
 
-For a fuller operator-facing architecture view, see [`docs/operator-architecture.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/operator-architecture.md).
-For remote governance callback patterns, see [`docs/remote-control-planes.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/remote-control-planes.md).
+For a fuller operator-facing architecture view, see [`docs/operator-architecture.md`](operator-architecture.md).
+For remote governance callback patterns, see [`docs/remote-control-planes.md`](remote-control-planes.md).
 
 Maintained split reference:
 
-- [`examples/referenceDeploymentSplit.js`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples/referenceDeploymentSplit.js)
+- [`examples/referenceDeploymentSplit.js`](../examples/referenceDeploymentSplit.js)
 
 ## 5. Storage recommendation
 

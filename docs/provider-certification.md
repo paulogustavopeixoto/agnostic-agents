@@ -36,7 +36,7 @@ Requirements:
   - `supports(capability)`
   - tool-call normalization if supported
   - unsupported capability rejection via `AdapterCapabilityError`
-- provider capability map is documented in [`docs/provider-compatibility.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/provider-compatibility.md)
+- provider capability map is documented in [`docs/provider-compatibility.md`](provider-compatibility.md)
 
 This means the adapter matches the runtime contract.
 It does not yet mean the provider is operationally verified in a live account.
@@ -48,7 +48,7 @@ Use this level when the adapter passes live smoke tests in this repo.
 Requirements:
 
 - Level 1 complete
-- live test exists in [`tests/live/adapters.live.test.js`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/tests/live/adapters.live.test.js)
+- live test exists in [`tests/live/adapters.live.test.js`](../tests/live/adapters.live.test.js)
 - live text generation passes against a real provider account
 - if the adapter exposes embeddings or another key capability that the package relies on heavily, at least one such capability is live-tested too
 
@@ -90,7 +90,7 @@ Every maintained adapter should have:
 - live smoke coverage when credentials and provider conditions allow
 - documented default test model
 - documented limitations or account caveats
-- secret handling documented according to [`docs/secret-handling.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/secret-handling.md)
+- secret handling documented according to [`docs/secret-handling.md`](secret-handling.md)
 
 ## Certification workflow for changes
 

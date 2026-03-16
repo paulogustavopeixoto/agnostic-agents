@@ -421,7 +421,10 @@ export class EvalHarness {
 export class LearningLoop {
   recordRun(run: Run | JsonObject): void;
   recordEvaluation(report: JsonObject): void;
+  recordFeedback(item: JsonObject): JsonObject;
   summarize(): JsonObject;
+  buildRecommendations(): string[];
+  buildAdaptiveRecommendations(): JsonObject[];
 }
 
 export class BaseEnvironmentAdapter {

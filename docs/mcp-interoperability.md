@@ -91,7 +91,7 @@ Use `MCPDiscoveryLoader` when you want MCP tools to enter the system through the
 
 Reference example:
 
-- [`examples/MCPDiscoveryLoaderExample.js`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples/MCPDiscoveryLoaderExample.js)
+- [`examples/MCPDiscoveryLoaderExample.js`](../examples/MCPDiscoveryLoaderExample.js)
 
 This is the best fit when MCP discovery is part of a broader tool-loading workflow.
 
@@ -114,7 +114,7 @@ For MCP connections:
 
 - keep `apiKey` in host-controlled configuration
 - do not put MCP credentials in model-visible prompts
-- use the secret-handling guide in [`docs/secret-handling.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/secret-handling.md)
+- use the secret-handling guide in [`docs/secret-handling.md`](secret-handling.md)
 
 ## Current boundary
 
@@ -130,6 +130,6 @@ That distinction matters for support claims.
 
 ## Related docs
 
-- [`docs/plugin-authoring.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/plugin-authoring.md)
-- [`docs/provider-quickstarts.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/provider-quickstarts.md)
-- [`docs/secret-handling.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/secret-handling.md)
+- [`docs/plugin-authoring.md`](plugin-authoring.md)
+- [`docs/provider-quickstarts.md`](provider-quickstarts.md)
+- [`docs/secret-handling.md`](secret-handling.md)

@@ -179,6 +179,6 @@ const extension = {
 
 ## Related surfaces
 
-- [`docs/api-reference.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/api-reference.md)
-- [`docs/operator-workflows.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/operator-workflows.md)
-- [`docs/api-stability-policy.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/api-stability-policy.md)
+- [`docs/api-reference.md`](api-reference.md)
+- [`docs/operator-workflows.md`](operator-workflows.md)
+- [`docs/api-stability-policy.md`](api-stability-policy.md)
