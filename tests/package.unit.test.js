@@ -20,6 +20,7 @@ const { EvidenceGraph } = require('../src/runtime/EvidenceGraph');
 const { EvalHarness } = require('../src/runtime/EvalHarness');
 const { LearningLoop } = require('../src/runtime/LearningLoop');
 const { GovernanceHooks } = require('../src/runtime/GovernanceHooks');
+const { ExtensionHost } = require('../src/runtime/ExtensionHost');
 const { RunTreeInspector } = require('../src/runtime/RunTreeInspector');
 const { IncidentDebugger } = require('../src/runtime/IncidentDebugger');
 const { TraceDiffer } = require('../src/runtime/TraceDiffer');
@@ -76,6 +77,7 @@ describe('Package/module unit tests', () => {
     expect(pkg.EvalHarness).toBeDefined();
     expect(pkg.LearningLoop).toBeDefined();
     expect(pkg.GovernanceHooks).toBeDefined();
+    expect(pkg.ExtensionHost).toBeDefined();
     expect(pkg.ApprovalInbox).toBeDefined();
     expect(pkg.BackgroundJobScheduler).toBeDefined();
     expect(pkg.DelegationRuntime).toBeDefined();
@@ -185,6 +187,30 @@ describe('Package/module unit tests', () => {
     expect(parent.metrics.tokenUsage.total).toBe(5);
     expect(parent.metrics.cost).toBe(0.25);
     expect(parent.metrics.timings.modelMs).toBe(42);
+  });
+
+  test('RunInspector summarizes aggregated child-run metrics', () => {
+    const parent = new Run({ input: 'parent' });
+    const childA = new Run({ input: 'a' });
+    const childB = new Run({ input: 'b' });
+    childA.recordUsage({ prompt: 3, completion: 2, total: 5 });
+    childA.recordCost(0.1);
+    childA.recordTiming('modelMs', 10);
+    childB.recordUsage({ prompt: 4, completion: 1, total: 5 });
+    childB.recordCost(0.2);
+    childB.recordTiming('modelMs', 20);
+
+    parent.aggregateChildRun(childA);
+    parent.aggregateChildRun(childB);
+
+    expect(pkg.RunInspector.summarize(parent).childRunAggregate).toEqual(
+      expect.objectContaining({
+        count: 2,
+        tokenUsage: { prompt: 7, completion: 3, total: 10 },
+        cost: 0.30000000000000004,
+        timings: expect.objectContaining({ modelMs: 30 }),
+      })
+    );
   });
 
   test('Run can branch from a checkpoint snapshot', () => {
@@ -388,6 +414,11 @@ describe('Package/module unit tests', () => {
     expect(tree.id).toBe(parent.id);
     expect(tree.children).toHaveLength(1);
     expect(tree.children[0].children).toHaveLength(1);
+    expect(tree.subtreeMetrics).toEqual(
+      expect.objectContaining({
+        runCount: 3,
+      })
+    );
 
     const rendered = RunTreeInspector.render(tree);
     expect(rendered).toContain(parent.id);
@@ -448,6 +479,9 @@ describe('Package/module unit tests', () => {
         runId: failed.id,
         rootRunId: root.id,
         status: 'failed',
+        aggregatedMetrics: expect.objectContaining({
+          runCount: 2,
+        }),
         failure: expect.objectContaining({ message: 'boom' }),
         failedSteps: [expect.objectContaining({ id: 'step-1' })],
         comparison: expect.objectContaining({
@@ -870,6 +904,67 @@ describe('Package/module unit tests', () => {
 
     await hooks.dispatch('approval_requested', { runId: 'run-1' }, {});
     expect(seen).toEqual(['approval:run-1', 'event:approval_requested']);
+  });
+
+  test('ExtensionHost aggregates contributions and extends runtime surfaces', async () => {
+    const sinkEvents = [];
+    const governanceEvents = [];
+    const host = new ExtensionHost({
+      extensions: [
+        {
+          name: 'audit-pack',
+          contributes: {
+            eventSinks: [
+              {
+                handleEvent: async event => {
+                  sinkEvents.push(event.type);
+                },
+              },
+            ],
+            governanceHooks: [
+              async type => {
+                governanceEvents.push(type);
+              },
+            ],
+            policyRules: [
+              {
+                id: 'block-delete',
+                toolNames: ['delete_records'],
+                action: 'deny',
+                reason: 'blocked',
+              },
+            ],
+            evalScenarios: [{ id: 'scenario-1' }],
+          },
+        },
+      ],
+    });
+
+    const eventBus = host.extendEventBus();
+    await eventBus.emit({ type: 'run_started' }, null);
+
+    const hooks = host.extendGovernanceHooks();
+    await hooks.dispatch('approval_requested', { runId: 'run-1' }, {});
+
+    const policy = host.extendToolPolicy();
+    const tool = new Tool({
+      name: 'delete_records',
+      parameters: { type: 'object', properties: {} },
+      implementation: async () => ({ ok: true }),
+    });
+
+    expect(host.listExtensions()).toEqual([
+      expect.objectContaining({ name: 'audit-pack' }),
+    ]);
+    expect(host.getEvalScenarios()).toEqual([{ id: 'scenario-1' }]);
+    expect(policy.evaluate(tool, {})).toEqual(
+      expect.objectContaining({
+        action: 'deny',
+        ruleId: 'block-delete',
+      })
+    );
+    expect(sinkEvents).toEqual(['run_started']);
+    expect(governanceEvents).toEqual(['approval_requested']);
   });
 
   test('ExecutionGraph builds dependency edges from workflows', () => {

@@ -51,6 +51,7 @@ class IncidentDebugger {
       rootRunId,
       status: run.status,
       summary,
+      aggregatedMetrics: runTree?.subtreeMetrics || null,
       failure,
       failedSteps,
       lastCheckpoint,

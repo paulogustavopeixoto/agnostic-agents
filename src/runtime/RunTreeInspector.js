@@ -18,6 +18,7 @@ class RunTreeInspector {
           input: run.input,
           lineage: run.metadata?.lineage || null,
           summary: RunInspector.summarize(run),
+          subtreeMetrics: null,
           children: [],
         },
       ])
@@ -41,6 +42,7 @@ class RunTreeInspector {
         return leftCreated.localeCompare(rightCreated);
       });
       node.children.forEach(sortNode);
+      node.subtreeMetrics = RunTreeInspector._aggregateSubtreeMetrics(node);
       return node;
     };
 
@@ -74,6 +76,35 @@ class RunTreeInspector {
     });
 
     return lines.join('\n');
+  }
+
+  static _aggregateSubtreeMetrics(node) {
+    const baseMetrics = node.summary?.metrics || {};
+    const aggregate = {
+      runCount: 1,
+      tokenUsage: {
+        prompt: baseMetrics.tokenUsage?.prompt || 0,
+        completion: baseMetrics.tokenUsage?.completion || 0,
+        total: baseMetrics.tokenUsage?.total || 0,
+      },
+      cost: baseMetrics.cost || 0,
+      timings: { ...(baseMetrics.timings || {}) },
+    };
+
+    for (const child of node.children) {
+      const childAggregate = child.subtreeMetrics || RunTreeInspector._aggregateSubtreeMetrics(child);
+      aggregate.runCount += childAggregate.runCount;
+      aggregate.tokenUsage.prompt += childAggregate.tokenUsage.prompt || 0;
+      aggregate.tokenUsage.completion += childAggregate.tokenUsage.completion || 0;
+      aggregate.tokenUsage.total += childAggregate.tokenUsage.total || 0;
+      aggregate.cost += childAggregate.cost || 0;
+
+      for (const [key, value] of Object.entries(childAggregate.timings || {})) {
+        aggregate.timings[key] = (aggregate.timings[key] || 0) + (value || 0);
+      }
+    }
+
+    return aggregate;
   }
 }
 

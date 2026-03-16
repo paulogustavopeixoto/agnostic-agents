@@ -672,6 +672,63 @@ describe('Agent', () => {
     );
   });
 
+  test('applies extension host policy, governance, and event contributions', async () => {
+    const tool = new Tool({
+      name: 'delete_records',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string' },
+        },
+        required: ['query'],
+      },
+      implementation: async () => ({ ok: true }),
+    });
+
+    mockAdapter.generateText = jest.fn().mockResolvedValue({
+      message: '',
+      toolCalls: [{ name: 'delete_records', arguments: { query: 'all' }, id: 'tool_use_1' }],
+    });
+
+    const seen = [];
+    const agent = new Agent(mockAdapter, {
+      tools: [tool],
+      retryManager,
+      extensionHost: [
+        {
+          name: 'deny-delete-extension',
+          contributes: {
+            eventSinks: [
+              {
+                handleEvent: async event => {
+                  seen.push(`event:${event.type}`);
+                },
+              },
+            ],
+            governanceHooks: [
+              async type => {
+                seen.push(`governance:${type}`);
+              },
+            ],
+            policyRules: [
+              {
+                id: 'deny-delete',
+                toolNames: ['delete_records'],
+                action: 'deny',
+                reason: 'extension denied delete',
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    await expect(agent.run('Use tool to delete')).rejects.toBeInstanceOf(ToolPolicyError);
+    expect(seen).toEqual(
+      expect.arrayContaining(['event:tool_requested', 'event:policy_decision', 'governance:policy_decision'])
+    );
+  });
+
   test('pauses and resumes a run outside approval flow', async () => {
     const runStore = new InMemoryRunStore();
     const agent = new Agent(mockAdapter, { runStore });

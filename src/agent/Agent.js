@@ -9,6 +9,7 @@ const { ConsoleDebugSink } = require('../runtime/ConsoleDebugSink');
 const { RunInspector } = require('../runtime/RunInspector');
 const { ApprovalInbox } = require('../runtime/ApprovalInbox');
 const { GovernanceHooks } = require('../runtime/GovernanceHooks');
+const { ExtensionHost } = require('../runtime/ExtensionHost');
 const {
   AdapterCapabilityError,
   InvalidToolCallError,
@@ -57,8 +58,15 @@ class Agent {
       verifier = null,
       approvalInbox = null,
       governanceHooks = null,
+      extensionHost = null,
     } = {}
   ) {
+    this.extensionHost =
+      extensionHost instanceof ExtensionHost
+        ? extensionHost
+        : extensionHost
+          ? new ExtensionHost({ extensions: Array.isArray(extensionHost) ? extensionHost : [extensionHost] })
+          : null;
     this.adapter = adapter;
     this.toolRegistry = null;
     this.tools = this._normalizeTools(tools);
@@ -69,17 +77,26 @@ class Agent {
     this.retryManager = retryManager;
     this.mcpClient = mcpClient;
     this.runStore = runStore;
-    this.toolPolicy = toolPolicy instanceof ToolPolicy ? toolPolicy : new ToolPolicy(toolPolicy || {});
+    this.toolPolicy = this.extensionHost
+      ? this.extensionHost.extendToolPolicy(toolPolicy)
+      : toolPolicy instanceof ToolPolicy
+        ? toolPolicy
+        : new ToolPolicy(toolPolicy || {});
     this.onEvent = onEvent;
-    this.eventBus = eventBus instanceof EventBus ? eventBus : new EventBus(eventBus || {});
+    this.eventBus = this.extensionHost
+      ? this.extensionHost.extendEventBus(eventBus)
+      : eventBus instanceof EventBus
+        ? eventBus
+        : new EventBus(eventBus || {});
     if (debug) {
       this.eventBus.addSink(new ConsoleDebugSink());
     }
     this.debug = debug;
     this.verifier = verifier;
     this.approvalInbox = approvalInbox instanceof ApprovalInbox ? approvalInbox : approvalInbox || null;
-    this.governanceHooks =
-      governanceHooks instanceof GovernanceHooks
+    this.governanceHooks = this.extensionHost
+      ? this.extensionHost.extendGovernanceHooks(governanceHooks)
+      : governanceHooks instanceof GovernanceHooks
         ? governanceHooks
         : governanceHooks
           ? new GovernanceHooks(governanceHooks)

@@ -8,6 +8,7 @@ const { EvidenceGraph } = require('./EvidenceGraph');
 const { EvalHarness } = require('./EvalHarness');
 const { LearningLoop } = require('./LearningLoop');
 const { GovernanceHooks } = require('./GovernanceHooks');
+const { ExtensionHost } = require('./ExtensionHost');
 const { ApprovalInbox } = require('./ApprovalInbox');
 const { BackgroundJobScheduler } = require('./BackgroundJobScheduler');
 const { DelegationRuntime } = require('./DelegationRuntime');
@@ -43,6 +44,7 @@ module.exports = {
   EvalHarness,
   LearningLoop,
   GovernanceHooks,
+  ExtensionHost,
   ApprovalInbox,
   BackgroundJobScheduler,
   DelegationRuntime,
