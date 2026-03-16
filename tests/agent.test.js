@@ -776,6 +776,27 @@ describe('Agent', () => {
     expect(generateSpy.mock.calls.length).toBe(generateCountBeforeReplay);
   });
 
+  test('can partially replay an agent run from a checkpoint snapshot', async () => {
+    const runStore = new InMemoryRunStore();
+    const agent = new Agent(mockAdapter, { runStore });
+
+    const sourceRun = await agent.run('Replay me partially');
+    const checkpointId = sourceRun.checkpoints[sourceRun.checkpoints.length - 1].id;
+    const partialReplayRun = await agent.replayRun(sourceRun.id, { checkpointId });
+
+    expect(partialReplayRun.id).not.toBe(sourceRun.id);
+    expect(partialReplayRun.metadata.replay).toEqual(
+      expect.objectContaining({
+        mode: 'partial_frozen_trace',
+        sourceRunId: sourceRun.id,
+        sourceCheckpointId: checkpointId,
+      })
+    );
+    expect(partialReplayRun.events.map(event => event.type)).toEqual(
+      expect.arrayContaining(['replay_started', 'replay_completed'])
+    );
+  });
+
   test('runs a verifier pass before risky tool execution', async () => {
     const tool = new Tool({
       name: 'send_email',

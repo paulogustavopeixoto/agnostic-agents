@@ -19,6 +19,39 @@ class TraceSerializer {
 
     return Run.fromJSON(trace.run || {});
   }
+
+  static exportPartialRun(run, { checkpointId = null, metadata = {} } = {}) {
+    const sourceRun = run instanceof Run ? run : Run.fromJSON(run);
+    const checkpoint = sourceRun.getCheckpoint(checkpointId);
+    if (!checkpoint) {
+      throw new Error(
+        checkpointId
+          ? `Checkpoint "${checkpointId}" not found on run "${sourceRun.id}".`
+          : `Run "${sourceRun.id}" has no checkpoints to export from.`
+      );
+    }
+
+    const partialRun = sourceRun.branchFromCheckpoint(checkpoint.id, {
+      id: `${sourceRun.id}:partial:${Date.now()}`,
+      metadata: {
+        replaySourceRunId: sourceRun.id,
+        replayCheckpointId: checkpoint.id,
+      },
+    });
+
+    return {
+      schemaVersion: '1.0',
+      format: 'agnostic-agents-run-trace',
+      exportedAt: new Date().toISOString(),
+      metadata: {
+        ...metadata,
+        mode: 'partial',
+        sourceRunId: sourceRun.id,
+        checkpointId: checkpoint.id,
+      },
+      run: partialRun.toJSON(),
+    };
+  }
 }
 
 module.exports = { TraceSerializer };

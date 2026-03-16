@@ -30,6 +30,27 @@ class FileRunStore {
       throw error;
     }
   }
+
+  async listRuns() {
+    try {
+      await fs.mkdir(this.directory, { recursive: true });
+      const entries = await fs.readdir(this.directory);
+      const runs = await Promise.all(
+        entries
+          .filter(entry => entry.endsWith('.json'))
+          .map(async entry =>
+            Run.fromJSON(JSON.parse(await fs.readFile(path.join(this.directory, entry), 'utf8')))
+          )
+      );
+      return runs;
+    } catch (error) {
+      if (error.code === 'ENOENT') {
+        return [];
+      }
+
+      throw error;
+    }
+  }
 }
 
 module.exports = { FileRunStore };

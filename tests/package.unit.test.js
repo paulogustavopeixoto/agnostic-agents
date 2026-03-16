@@ -19,6 +19,8 @@ const { Run } = require('../src/runtime/Run');
 const { EvidenceGraph } = require('../src/runtime/EvidenceGraph');
 const { EvalHarness } = require('../src/runtime/EvalHarness');
 const { LearningLoop } = require('../src/runtime/LearningLoop');
+const { RunTreeInspector } = require('../src/runtime/RunTreeInspector');
+const { TraceDiffer } = require('../src/runtime/TraceDiffer');
 const { ApprovalInbox } = require('../src/runtime/ApprovalInbox');
 const { BackgroundJobScheduler } = require('../src/runtime/BackgroundJobScheduler');
 const { DelegationRuntime } = require('../src/runtime/DelegationRuntime');
@@ -63,6 +65,7 @@ describe('Package/module unit tests', () => {
     expect(pkg.OpenAPILoader).toBeDefined();
     expect(pkg.ApiLoader).toBeDefined();
     expect(pkg.Run).toBeDefined();
+    expect(pkg.RunTreeInspector).toBeDefined();
     expect(pkg.ToolPolicy).toBeDefined();
     expect(pkg.EventBus).toBeDefined();
     expect(pkg.TraceSerializer).toBeDefined();
@@ -90,6 +93,7 @@ describe('Package/module unit tests', () => {
     expect(pkg.AgentWorkflowStep).toBeDefined();
     expect(pkg.WorkflowRunner).toBeDefined();
     expect(pkg.RunInspector).toBeDefined();
+    expect(pkg.TraceDiffer).toBeDefined();
     expect(pkg.ConsoleDebugSink).toBeDefined();
     expect(pkg.InvalidToolCallError).toBeDefined();
     expect(pkg.RunPausedError).toBeDefined();
@@ -224,6 +228,58 @@ describe('Package/module unit tests', () => {
     expect(imported.output).toBe('done');
   });
 
+  test('TraceSerializer can export a partial run from a checkpoint', () => {
+    const run = new Run({ input: 'partial-trace' });
+    run.setStatus('running');
+    run.addMessage({ role: 'user', content: 'hello' });
+    run.addCheckpoint({
+      id: 'cp-1',
+      label: 'snapshot',
+      snapshot: run.createCheckpointSnapshot(),
+      status: run.status,
+    });
+
+    const trace = TraceSerializer.exportPartialRun(run, { checkpointId: 'cp-1' });
+    expect(trace.metadata).toEqual(
+      expect.objectContaining({
+        mode: 'partial',
+        sourceRunId: run.id,
+        checkpointId: 'cp-1',
+      })
+    );
+    expect(trace.run.metadata.lineage).toEqual(
+      expect.objectContaining({
+        branchOriginRunId: run.id,
+        branchCheckpointId: 'cp-1',
+      })
+    );
+  });
+
+  test('TraceDiffer reports divergence between runs', () => {
+    const left = new Run({ input: 'left' });
+    left.setStatus('completed');
+    left.output = 'left-output';
+    left.addEvent({ type: 'run_started' });
+    left.addEvent({ type: 'run_completed' });
+
+    const right = new Run({ input: 'right' });
+    right.setStatus('failed');
+    right.output = 'right-output';
+    right.addEvent({ type: 'run_started' });
+    right.addEvent({ type: 'run_failed' });
+    right.addStep({ id: 'step-1', type: 'model', status: 'failed' });
+
+    expect(TraceDiffer.diff(left, right)).toEqual(
+      expect.objectContaining({
+        statusChanged: true,
+        outputChanged: true,
+        eventTypesAdded: ['run_failed'],
+        eventTypesRemoved: ['run_completed'],
+        firstDivergingEventIndex: 1,
+      })
+    );
+  });
+
   test('EvidenceGraph collects nodes and edges', () => {
     const graph = new EvidenceGraph();
     graph.addNode({ id: 'q1', type: 'query', label: 'What happened?' });
@@ -303,6 +359,54 @@ describe('Package/module unit tests', () => {
     const fileStore = new FileRunStore({ directory: tmpDir });
     await fileStore.saveRun(run);
     await expect(fileStore.getRun(run.id)).resolves.toMatchObject({ id: run.id });
+    await expect(fileStore.listRuns()).resolves.toEqual([
+      expect.objectContaining({ id: run.id }),
+    ]);
+  });
+
+  test('RunTreeInspector builds and renders a parent-child run tree', async () => {
+    const store = new InMemoryRunStore();
+    const parent = new Run({ input: 'parent', metadata: { lineage: { rootRunId: 'root-1' } } });
+    const child = new Run({
+      input: 'child',
+      metadata: { lineage: { rootRunId: parent.id, parentRunId: parent.id } },
+    });
+    const grandchild = new Run({
+      input: 'grandchild',
+      metadata: { lineage: { rootRunId: parent.id, parentRunId: child.id } },
+    });
+
+    await store.saveRun(parent);
+    await store.saveRun(child);
+    await store.saveRun(grandchild);
+
+    const tree = await RunTreeInspector.build(store, { rootRunId: parent.id });
+    expect(tree.id).toBe(parent.id);
+    expect(tree.children).toHaveLength(1);
+    expect(tree.children[0].children).toHaveLength(1);
+
+    const rendered = RunTreeInspector.render(tree);
+    expect(rendered).toContain(parent.id);
+    expect(rendered).toContain(child.id);
+    expect(rendered).toContain(grandchild.id);
+  });
+
+  test('RunTreeInspector works with FileRunStore-backed runs', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'run-tree-'));
+    const store = new FileRunStore({ directory: tmpDir });
+    const root = new Run({ input: 'root' });
+    const child = new Run({
+      input: 'child',
+      metadata: { lineage: { rootRunId: root.id, parentRunId: root.id } },
+    });
+
+    await store.saveRun(root);
+    await store.saveRun(child);
+
+    const roots = await RunTreeInspector.build(store);
+    expect(roots).toHaveLength(1);
+    expect(roots[0].id).toBe(root.id);
+    expect(roots[0].children[0].id).toBe(child.id);
   });
 
   test('ToolPolicy honors explicit approval requirements', async () => {

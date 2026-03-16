@@ -1,5 +1,7 @@
 const { Run } = require('./Run');
 const { RunInspector } = require('./RunInspector');
+const { RunTreeInspector } = require('./RunTreeInspector');
+const { TraceDiffer } = require('./TraceDiffer');
 const { TraceSerializer } = require('./TraceSerializer');
 const { EvidenceGraph } = require('./EvidenceGraph');
 const { EvalHarness } = require('./EvalHarness');
@@ -31,6 +33,8 @@ const { WorkflowRunner } = require('./workflow/WorkflowRunner');
 module.exports = {
   Run,
   RunInspector,
+  RunTreeInspector,
+  TraceDiffer,
   TraceSerializer,
   EvidenceGraph,
   EvalHarness,

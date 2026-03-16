@@ -1404,7 +1404,10 @@ class Agent {
     return branchedRun;
   }
 
-  async replayRun(runId, { persist = true, metadata = {}, replayRunId = null } = {}) {
+  async replayRun(
+    runId,
+    { persist = true, metadata = {}, replayRunId = null, checkpointId = null } = {}
+  ) {
     if (!this.runStore?.getRun) {
       throw new RunNotFoundError('Cannot replay a run without a configured runStore.');
     }
@@ -1415,14 +1418,30 @@ class Agent {
     }
 
     const sourceRun = storedRun instanceof Run ? storedRun : Run.fromJSON(storedRun);
-    const replayRun = Run.fromJSON(sourceRun.toJSON());
-    replayRun.id = replayRunId || `${sourceRun.id}:replay:${Date.now()}`;
+    const replayRun =
+      checkpointId
+        ? sourceRun.branchFromCheckpoint(checkpointId, {
+            id: replayRunId || `${sourceRun.id}:partial-replay:${Date.now()}`,
+            metadata: {
+              description: this.description,
+              ...metadata,
+            },
+          })
+        : Run.fromJSON(sourceRun.toJSON());
+    replayRun.id =
+      replayRunId ||
+      replayRun.id ||
+      `${sourceRun.id}:${checkpointId ? 'partial-replay' : 'replay'}:${Date.now()}`;
+    if (!checkpointId) {
+      replayRun.id = replayRunId || `${sourceRun.id}:replay:${Date.now()}`;
+    }
     replayRun.metadata = {
       ...replayRun.metadata,
       ...metadata,
       replay: {
-        mode: 'frozen_trace',
+        mode: checkpointId ? 'partial_frozen_trace' : 'frozen_trace',
         sourceRunId: sourceRun.id,
+        sourceCheckpointId: checkpointId || null,
         replayedAt: new Date().toISOString(),
       },
       lineage: {
@@ -1448,30 +1467,36 @@ class Agent {
     replayRun.setStatus('running');
     await this._emitEvent(replayRun, 'replay_started', {
       sourceRunId: sourceRun.id,
-      mode: 'frozen_trace',
+      sourceCheckpointId: checkpointId || null,
+      mode: checkpointId ? 'partial_frozen_trace' : 'frozen_trace',
     });
     await this._checkpointRun(replayRun, 'replay_started', {
       sourceRunId: sourceRun.id,
-      mode: 'frozen_trace',
+      sourceCheckpointId: checkpointId || null,
+      mode: checkpointId ? 'partial_frozen_trace' : 'frozen_trace',
     });
 
-    replayRun.output = sourceRun.output;
-    replayRun.state = JSON.parse(JSON.stringify(sourceRun.state || {}));
-    replayRun.messages = JSON.parse(JSON.stringify(sourceRun.messages || []));
-    replayRun.steps = JSON.parse(JSON.stringify(sourceRun.steps || []));
-    replayRun.toolCalls = JSON.parse(JSON.stringify(sourceRun.toolCalls || []));
-    replayRun.toolResults = JSON.parse(JSON.stringify(sourceRun.toolResults || []));
-    replayRun.metrics = JSON.parse(JSON.stringify(sourceRun.metrics || replayRun.metrics));
-    replayRun.errors = JSON.parse(JSON.stringify(sourceRun.errors || []));
-    replayRun.setStatus(sourceRun.status);
+    if (!checkpointId) {
+      replayRun.output = sourceRun.output;
+      replayRun.state = JSON.parse(JSON.stringify(sourceRun.state || {}));
+      replayRun.messages = JSON.parse(JSON.stringify(sourceRun.messages || []));
+      replayRun.steps = JSON.parse(JSON.stringify(sourceRun.steps || []));
+      replayRun.toolCalls = JSON.parse(JSON.stringify(sourceRun.toolCalls || []));
+      replayRun.toolResults = JSON.parse(JSON.stringify(sourceRun.toolResults || []));
+      replayRun.metrics = JSON.parse(JSON.stringify(sourceRun.metrics || replayRun.metrics));
+      replayRun.errors = JSON.parse(JSON.stringify(sourceRun.errors || []));
+      replayRun.setStatus(sourceRun.status);
+    }
 
     await this._emitEvent(replayRun, 'replay_completed', {
       sourceRunId: sourceRun.id,
-      status: sourceRun.status,
+      sourceCheckpointId: checkpointId || null,
+      status: checkpointId ? replayRun.status : sourceRun.status,
     });
     await this._checkpointRun(replayRun, 'replay_completed', {
       sourceRunId: sourceRun.id,
-      status: sourceRun.status,
+      sourceCheckpointId: checkpointId || null,
+      status: checkpointId ? replayRun.status : sourceRun.status,
     });
 
     if (persist) {

@@ -29,6 +29,8 @@ const { ApiLoader } = require('./src/api/ApiLoader');
 const {
   Run,
   RunInspector,
+  RunTreeInspector,
+  TraceDiffer,
   TraceSerializer,
   EvidenceGraph,
   EvalHarness,
@@ -100,6 +102,8 @@ module.exports = {
   ApiLoader,
   Run,
   RunInspector,
+  RunTreeInspector,
+  TraceDiffer,
   TraceSerializer,
   EvidenceGraph,
   EvalHarness,

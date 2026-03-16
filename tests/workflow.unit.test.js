@@ -315,6 +315,36 @@ describe('Workflow runtime', () => {
     );
   });
 
+  test('can partially replay a workflow run from a checkpoint snapshot', async () => {
+    const runStore = new InMemoryRunStore();
+    const workflow = new Workflow({
+      id: 'partial-replay-flow',
+      steps: [
+        {
+          id: 'collect',
+          run: async ({ input }) => ({ input }),
+        },
+      ],
+    });
+
+    const runner = new WorkflowRunner({ workflow, runStore });
+    const sourceRun = await runner.run('gamma');
+    const checkpointId = sourceRun.checkpoints[sourceRun.checkpoints.length - 1].id;
+    const replayRun = await runner.replayRun(sourceRun.id, { checkpointId });
+
+    expect(replayRun.id).not.toBe(sourceRun.id);
+    expect(replayRun.metadata.replay).toEqual(
+      expect.objectContaining({
+        mode: 'partial_frozen_trace',
+        sourceRunId: sourceRun.id,
+        sourceCheckpointId: checkpointId,
+      })
+    );
+    expect(replayRun.events.map(event => event.type)).toEqual(
+      expect.arrayContaining(['workflow_replay_started', 'workflow_replay_completed'])
+    );
+  });
+
   test('supports explicit delegation contracts for agent-backed steps', async () => {
     const adapter = {
       getCapabilities: () => ({ generateText: true, toolCalling: true }),
