@@ -30,7 +30,14 @@ class Tool {
     this.metadata = {
       examples: metadata.examples || [],
       tags: metadata.tags || [],
-      version: metadata.version || "1.0.0"
+      version: metadata.version || "1.0.0",
+      sideEffectLevel: metadata.sideEffectLevel || 'none',
+      timeout: metadata.timeout || null,
+      authRequirements: metadata.authRequirements || [],
+      idempotencyHint: metadata.idempotencyHint || 'unknown',
+      costHint: metadata.costHint || 'unknown',
+      retryabilityHint: metadata.retryabilityHint || 'unknown',
+      executionPolicy: metadata.executionPolicy || 'auto',
     };
   }
 

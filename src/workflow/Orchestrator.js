@@ -3,6 +3,8 @@ const { Agent } = require("../agent/Agent");
 const { Task } = require("./Task");
 const { RAG } = require("../rag/RAG");
 
+let hasWarnedOrchestratorDeprecation = false;
+
 class Orchestrator {
   /**
    * @param {object} options
@@ -15,6 +17,14 @@ class Orchestrator {
    * @param {RAG} [options.rag] - Optional RAG instance for shared retrieval context
    */
   constructor({ tasks, agents = [], process = "sequential", verbose = false, errorPolicy = "throw", retries = 0, rag = null, mcpClient = null }) {
+    if (!hasWarnedOrchestratorDeprecation) {
+      process.emitWarning(
+        'Orchestrator is deprecated in favor of the runtime workflow API (WorkflowRunner).',
+        { code: 'AGENTS_ORCHESTRATOR_DEPRECATED' }
+      );
+      hasWarnedOrchestratorDeprecation = true;
+    }
+
     this.tasks = tasks.map(task => {
       if (mcpClient && !task.mcpClient) task.mcpClient = mcpClient;
       return task;

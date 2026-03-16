@@ -5,6 +5,8 @@ const { RetryManager } = require('../utils/RetryManager');
 const { Tool } = require('../tools/adapters/Tool');
 const { MCPTool } = require('../mcp/MCPTool');
 
+let hasWarnedTaskDeprecation = false;
+
 class Task {
   /**
    * @param {object} options
@@ -36,6 +38,14 @@ class Task {
     retryManager = new RetryManager({ retries: 3, baseDelay: 1000, maxDelay: 10000 }),
     mcpClient = null
   }) {
+    if (!hasWarnedTaskDeprecation) {
+      process.emitWarning(
+        'Task is deprecated in favor of the runtime workflow API (Workflow, WorkflowStep, AgentWorkflowStep, WorkflowRunner).',
+        { code: 'AGENTS_TASK_DEPRECATED' }
+      );
+      hasWarnedTaskDeprecation = true;
+    }
+
     this.name = name || "untitledTask";
     this.description = description;
     this.agent = agent;

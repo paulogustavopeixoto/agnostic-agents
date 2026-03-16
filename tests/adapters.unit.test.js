@@ -9,6 +9,7 @@ const { AnthropicAdapter } = require('../src/llm/Anthropic');
 const { HFAdapter } = require('../src/llm/HuggingFace');
 const { DeepSeekAdapter } = require('../src/llm/DeepSeek');
 const { RetryManager } = require('../src/utils/RetryManager');
+const { AdapterCapabilityError } = require('../src/errors');
 
 function disableRetries(adapter) {
   adapter.retryManager = new RetryManager({ retries: 0, baseDelay: 1, maxDelay: 1 });
@@ -193,10 +194,10 @@ describe('Adapter unit tests', () => {
       await expect(adapter.generateAudio('Hello')).resolves.toEqual(Buffer.from('mp3-data'));
       expect(createReadStreamSpy).toHaveBeenCalled();
       await expect(adapter.analyzeVideo(Buffer.from('x'))).rejects.toThrow(
-        'Video analysis not supported by OpenAIAdapter'
+        'OpenAIAdapter does not support analyzeVideo().'
       );
       await expect(adapter.generateVideo('Prompt')).rejects.toThrow(
-        'Video generation not supported by OpenAIAdapter'
+        'OpenAIAdapter does not support generateVideo().'
       );
     });
   });
@@ -315,14 +316,14 @@ describe('Adapter unit tests', () => {
     test('unsupported media methods throw', async () => {
       const adapter = disableRetries(new AnthropicAdapter('test-key'));
 
-      await expect(adapter.generateImage('x')).rejects.toThrow('Anthropic does not support image generation.');
-      await expect(adapter.analyzeImage('x')).rejects.toThrow('Anthropic does not support image analysis.');
-      await expect(adapter.embedChunks(['x'])).rejects.toThrow('Anthropic does not support embeddings.');
+      await expect(adapter.generateImage('x')).rejects.toThrow('AnthropicAdapter does not support generateImage().');
+      await expect(adapter.analyzeImage('x')).rejects.toThrow('AnthropicAdapter does not support analyzeImage().');
+      await expect(adapter.embedChunks(['x'])).rejects.toThrow('AnthropicAdapter does not support embedChunks().');
       await expect(adapter.transcribeAudio(Buffer.from('x'))).rejects.toThrow(
-        'Audio transcription not supported by AnthropicAdapter'
+        'AnthropicAdapter does not support transcribeAudio().'
       );
       await expect(adapter.generateAudio('x')).rejects.toThrow(
-        'Audio generation not supported by AnthropicAdapter'
+        'AnthropicAdapter does not support generateAudio().'
       );
     });
   });
@@ -354,7 +355,7 @@ describe('Adapter unit tests', () => {
       await expect(adapter.analyzeImage(Buffer.from('img'))).resolves.toBe('image caption');
       await expect(adapter.embedChunks(['hello'])).resolves.toEqual([[0.9, 0.1]]);
       await expect(adapter.generateVideo('clip')).rejects.toThrow(
-        'Video generation not supported by HuggingFaceAdapter'
+        'HFAdapter does not support generateVideo().'
       );
       expect(warnSpy).not.toHaveBeenCalled();
     });
@@ -400,13 +401,13 @@ describe('Adapter unit tests', () => {
         adapter.generateToolResult({ user: 'hi' }, { name: 'lookup', arguments: {} }, { ok: true })
       ).resolves.toBe('deepseek final answer');
       await expect(adapter.embedChunks(['hello'])).resolves.toEqual([{ embedding: [1, 2, 3] }]);
-      await expect(adapter.generateImage('x')).rejects.toThrow('DeepSeek does not support image generation.');
-      await expect(adapter.analyzeImage('x')).rejects.toThrow('DeepSeek does not support image analysis.');
+      await expect(adapter.generateImage('x')).rejects.toThrow('DeepSeekAdapter does not support generateImage().');
+      await expect(adapter.analyzeImage('x')).rejects.toThrow('DeepSeekAdapter does not support analyzeImage().');
       await expect(adapter.transcribeAudio(Buffer.from('x'))).rejects.toThrow(
-        'Audio transcription not supported by DeepSeekAdapter'
+        'DeepSeekAdapter does not support transcribeAudio().'
       );
       await expect(adapter.generateAudio('x')).rejects.toThrow(
-        'Audio generation not supported by DeepSeekAdapter'
+        'DeepSeekAdapter does not support generateAudio().'
       );
     });
 
@@ -460,6 +461,22 @@ describe('Adapter unit tests', () => {
           videoAnalysis: expect.any(Boolean),
           videoGeneration: expect.any(Boolean),
         }));
+      }
+    });
+
+    test('unsupported capabilities reject with AdapterCapabilityError consistently', async () => {
+      const cases = [
+        { adapter: new OpenAIAdapter('test-key'), method: 'generateVideo', args: ['prompt'] },
+        { adapter: new AnthropicAdapter('test-key'), method: 'generateImage', args: ['prompt'] },
+        { adapter: new AnthropicAdapter('test-key'), method: 'analyzeVideo', args: [Buffer.from('x')] },
+        { adapter: new HFAdapter('test-key'), method: 'generateVideo', args: ['prompt'] },
+        { adapter: new DeepSeekAdapter('test-key'), method: 'analyzeImage', args: ['prompt'] },
+      ];
+
+      for (const testCase of cases) {
+        await expect(testCase.adapter[testCase.method](...testCase.args)).rejects.toBeInstanceOf(
+          AdapterCapabilityError
+        );
       }
     });
   });

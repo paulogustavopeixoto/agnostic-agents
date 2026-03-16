@@ -1,5 +1,17 @@
 // src/llm/BaseProvider.js
 const { RetryManager } = require('../utils/RetryManager');
+const { AdapterCapabilityError } = require('../errors');
+
+const METHOD_CAPABILITY_MAP = {
+  generateToolResult: 'toolCalling',
+  analyzeImage: 'imageAnalysis',
+  generateImage: 'imageGeneration',
+  embedChunks: 'embeddings',
+  transcribeAudio: 'audioTranscription',
+  generateAudio: 'audioGeneration',
+  analyzeVideo: 'videoAnalysis',
+  generateVideo: 'videoGeneration',
+};
 
 class BaseProvider {
   constructor({
@@ -25,6 +37,21 @@ class BaseProvider {
     return { ...this.capabilities };
   }
 
+  supports(capability) {
+    return Boolean(this.capabilities?.[capability]);
+  }
+
+  _unsupportedCapability(methodName) {
+    const capability = METHOD_CAPABILITY_MAP[methodName];
+    if (!capability) {
+      return new Error(`${methodName} must be implemented by subclass`);
+    }
+
+    return new AdapterCapabilityError(
+      `${this.constructor.name} does not support ${methodName}().`
+    );
+  }
+
   /**
    * Generate text based on input messages.
    * @param {object[]|string} messages - Array of message objects or a single string
@@ -44,6 +71,10 @@ class BaseProvider {
    * @returns {Promise<string>} - Generated text response
    */
   async generateToolResult(messages, toolCall, toolResult, config = {}) {
+    if (!this.supports('toolCalling')) {
+      throw this._unsupportedCapability('generateToolResult');
+    }
+
     throw new Error('generateToolResult must be implemented by subclass');
   }
 
@@ -54,7 +85,7 @@ class BaseProvider {
    * @returns {Promise<string>} - Image description text
    */
   async analyzeImage(imageData, config = {}) {
-    throw new Error('analyzeImage must be implemented by subclass');
+    throw this._unsupportedCapability('analyzeImage');
   }
 
   /**
@@ -64,7 +95,7 @@ class BaseProvider {
    * @returns {Promise<object[]>} - Array of embedding objects
    */
   async embedChunks(texts, config = {}) {
-    throw new Error('embedChunks must be implemented by subclass');
+    throw this._unsupportedCapability('embedChunks');
   }
 
   /**
@@ -74,7 +105,7 @@ class BaseProvider {
    * @returns {Promise<string>} - Transcribed text
    */
   async transcribeAudio(audioData, config = {}) {
-    throw new Error('transcribeAudio must be implemented by subclass');
+    throw this._unsupportedCapability('transcribeAudio');
   }
 
   /**
@@ -84,7 +115,7 @@ class BaseProvider {
    * @returns {Promise<Buffer>} - Audio data as a Buffer
    */
   async generateAudio(text, config = {}) {
-    throw new Error('generateAudio must be implemented by subclass');
+    throw this._unsupportedCapability('generateAudio');
   }
 
   /**
@@ -94,7 +125,7 @@ class BaseProvider {
    * @returns {Promise<string>} - Video description text
    */
   async analyzeVideo(videoData, config = {}) {
-    throw new Error('analyzeVideo must be implemented by subclass');
+    throw this._unsupportedCapability('analyzeVideo');
   }
 
   /**
@@ -104,7 +135,11 @@ class BaseProvider {
    * @returns {Promise<Buffer|string>} - Video data as a Buffer or URL
    */
   async generateVideo(text, config = {}) {
-    throw new Error('generateVideo must be implemented by subclass');
+    throw this._unsupportedCapability('generateVideo');
+  }
+
+  async generateImage(promptObject, config = {}) {
+    throw this._unsupportedCapability('generateImage');
   }
 }
 

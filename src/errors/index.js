@@ -13,10 +13,25 @@ class ToolNotFoundError extends AgentError {}
 
 class ToolExecutionError extends AgentError {}
 
+class ToolPolicyError extends AgentError {}
+
+class ApprovalRequiredError extends AgentError {}
+
+class RunNotFoundError extends AgentError {}
+
+class RunPausedError extends AgentError {}
+
+class RunCancelledError extends AgentError {}
+
 module.exports = {
   AgentError,
   AdapterCapabilityError,
   InvalidToolCallError,
   ToolNotFoundError,
   ToolExecutionError,
+  ToolPolicyError,
+  ApprovalRequiredError,
+  RunNotFoundError,
+  RunPausedError,
+  RunCancelledError,
 };

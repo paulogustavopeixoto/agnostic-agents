@@ -27,7 +27,7 @@ class OpenAIAdapter extends BaseProvider {
     this.apiKey = apiKey;
     this.openai = new OpenAI({ apiKey });
     this.model = options.model || "gpt-4o-mini";
-    this.retryManager = new RetryManager({ retries: 3, baseDelay: 1000, maxDelay: 10000 });
+    this.retryManager = options.retryManager || this.retryManager;
   }
 
   /**
@@ -331,7 +331,7 @@ class OpenAIAdapter extends BaseProvider {
    * @returns {Promise<string>} - Video description text
    */
   async analyzeVideo(videoData, config = {}) {
-    throw new Error('Video analysis not supported by OpenAIAdapter');
+    throw this._unsupportedCapability('analyzeVideo');
   }
 
   /**
@@ -341,7 +341,7 @@ class OpenAIAdapter extends BaseProvider {
    * @returns {Promise<Buffer|string>} - Video data as a Buffer or URL
    */
   async generateVideo(text, config = {}) {
-    throw new Error('Video generation not supported by OpenAIAdapter');
+    throw this._unsupportedCapability('generateVideo');
   }
 }
 

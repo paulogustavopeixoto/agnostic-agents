@@ -132,35 +132,35 @@ class AnthropicAdapter extends BaseProvider {
    * Anthropic doesn’t support image generation.
    */
   async generateImage(promptObject, config = {}) {
-    throw new Error("Anthropic does not support image generation.");
+    throw this._unsupportedCapability('generateImage');
   }
 
   /**
    * Anthropic doesn’t support image analysis.
    */
   async analyzeImage(imageData, config = {}) {
-    throw new Error("Anthropic does not support image analysis.");
+    throw this._unsupportedCapability('analyzeImage');
   }
 
   /**
    * Anthropic doesn’t support embeddings.
    */
   async embedChunks(chunks, options = {}) {
-    throw new Error("Anthropic does not support embeddings.");
+    throw this._unsupportedCapability('embedChunks');
   }
 
   /**
    * Anthropic doesn’t support Audio transcription.
    */
   async transcribeAudio(audioData, config = {}) {
-    throw new Error('Audio transcription not supported by AnthropicAdapter');
+    throw this._unsupportedCapability('transcribeAudio');
   }
 
   /**
    * Anthropic doesn’t support Audio generation.
    */
   async generateAudio(text, config = {}) {
-    throw new Error('Audio generation not supported by AnthropicAdapter');
+    throw this._unsupportedCapability('generateAudio');
   }
 }
 

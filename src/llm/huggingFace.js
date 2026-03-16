@@ -178,11 +178,11 @@ class HFAdapter extends BaseProvider {
   }
 
   async transcribeAudio(audioData, config = {}) {
-    throw new Error('Audio transcription not supported by HuggingFaceAdapter');
+    throw this._unsupportedCapability('transcribeAudio');
   }
 
   async generateAudio(text, config = {}) {
-    throw new Error('Audio generation not supported by HuggingFaceAdapter');
+    throw this._unsupportedCapability('generateAudio');
   }
 
   /**
@@ -242,7 +242,7 @@ class HFAdapter extends BaseProvider {
    * @returns {Promise<Buffer|string>} - Video data as a Buffer or URL
    */
   async generateVideo(text, config = {}) {
-    throw new Error('Video generation not supported by HuggingFaceAdapter');
+    throw this._unsupportedCapability('generateVideo');
   }
 }
 

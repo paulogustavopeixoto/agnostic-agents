@@ -18,7 +18,7 @@ class GeminiAdapter extends BaseProvider {
     });
     this.genAI = new GoogleGenerativeAI(apiKey);
     this.model = config.model || 'gemini-1.5-pro'; // Initialize model
-    this.retryManager = new RetryManager({ retries: 3, baseDelay: 1000, maxDelay: 10000 });
+    this.retryManager = config.retryManager || this.retryManager;
   }
 
   async generateText(messages, config = {}) {

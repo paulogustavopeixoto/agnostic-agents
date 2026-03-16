@@ -110,14 +110,14 @@ class DeepSeekAdapter extends BaseProvider {
    * DeepSeek doesn’t support image generation.
    */
   async generateImage(promptObject, config = {}) {
-    throw new Error("DeepSeek does not support image generation.");
+    throw this._unsupportedCapability('generateImage');
   }
 
   /**
    * DeepSeek doesn’t support image analysis.
    */
   async analyzeImage(imageData, config = {}) {
-    throw new Error("DeepSeek does not support image analysis.");
+    throw this._unsupportedCapability('analyzeImage');
   }
 
   /**
@@ -141,11 +141,11 @@ class DeepSeekAdapter extends BaseProvider {
   }
 
   async transcribeAudio(audioData, config = {}) {
-    throw new Error('Audio transcription not supported by DeepSeekAdapter');
+    throw this._unsupportedCapability('transcribeAudio');
   }
 
   async generateAudio(text, config = {}) {
-    throw new Error('Audio generation not supported by DeepSeekAdapter');
+    throw this._unsupportedCapability('generateAudio');
   }
 }
 

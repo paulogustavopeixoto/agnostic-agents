@@ -3,14 +3,19 @@ const { Agent } = require('./src/agent/Agent');
 const { Tool } = require('./src/tools/adapters/Tool');
 const { MCPDiscoveryLoader } = require('./src/tools/adapters/MCPDiscoveryLoader');
 const { Memory } = require('./src/agent/Memory'); 
+const { InMemoryLayerStore } = require('./src/agent/memory/InMemoryLayerStore');
+const { FileLayerStore } = require('./src/agent/memory/FileLayerStore');
 const { OpenAIAdapter } = require('./src/llm/OpenAi');
 const { GeminiAdapter } = require('./src/llm/Gemini');
 const { HFAdapter } = require('./src/llm/HuggingFace');
 const { AnthropicAdapter } = require('./src/llm/Anthropic');
 const { DeepSeekAdapter } = require('./src/llm/DeepSeek');
+const { FallbackRouter } = require('./src/llm/FallbackRouter');
 const { PineconeManager } = require('./src/db/PineconeManager');
 const { LocalVectorStore } = require('./src/db/LocalVectorStore');
 const { RAG } = require('./src/rag/RAG');
+const { BaseRetriever } = require('./src/rag/retrievers/BaseRetriever');
+const { VectorStoreRetriever } = require('./src/rag/retrievers/VectorStoreRetriever');
 const { Task } = require('./src/workflow/Task');
 const { Orchestrator } = require('./src/workflow/Orchestrator');
 const { RetryManager } = require('./src/utils');
@@ -22,25 +27,48 @@ const { MCPClient } = require('./src/mcp/MCPClient');
 const { OpenAPILoader } = require('./src/api/OpenAPILoader');
 const { ApiLoader } = require('./src/api/ApiLoader');
 const {
+  Run,
+  RunInspector,
+  ToolPolicy,
+  EventBus,
+  ConsoleDebugSink,
+  InMemoryRunStore,
+  FileRunStore,
+  Workflow,
+  WorkflowStep,
+  AgentWorkflowStep,
+  WorkflowRunner,
+} = require('./src/runtime');
+const {
   AgentError,
   AdapterCapabilityError,
   InvalidToolCallError,
   ToolNotFoundError,
   ToolExecutionError,
+  ToolPolicyError,
+  ApprovalRequiredError,
+  RunNotFoundError,
+  RunPausedError,
+  RunCancelledError,
 } = require('./src/errors');
 
 module.exports = {
   Agent,
   Tool,
   Memory,
+  InMemoryLayerStore,
+  FileLayerStore,
   OpenAIAdapter,
   GeminiAdapter,
   AnthropicAdapter,
   HFAdapter,
   DeepSeekAdapter,
+  FallbackRouter,
   PineconeManager,
   LocalVectorStore,
   RAG,
+  BaseRetriever,
+  VectorStoreRetriever,
   Task,
   Orchestrator,
   RetryManager,
@@ -52,9 +80,25 @@ module.exports = {
   OpenAPILoader,
   MCPDiscoveryLoader,
   ApiLoader,
+  Run,
+  RunInspector,
+  ToolPolicy,
+  EventBus,
+  ConsoleDebugSink,
+  InMemoryRunStore,
+  FileRunStore,
+  Workflow,
+  WorkflowStep,
+  AgentWorkflowStep,
+  WorkflowRunner,
   AgentError,
   AdapterCapabilityError,
   InvalidToolCallError,
   ToolNotFoundError,
   ToolExecutionError,
+  ToolPolicyError,
+  ApprovalRequiredError,
+  RunNotFoundError,
+  RunPausedError,
+  RunCancelledError,
 };

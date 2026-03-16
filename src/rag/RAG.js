@@ -1,6 +1,7 @@
 // src/rag/RAG.js
 const { chunkText } = require('../utils/chunkText');
 const { RetryManager } = require('../utils/RetryManager');
+const { VectorStoreRetriever } = require('./retrievers/VectorStoreRetriever');
 
 class RAG {
   /**
@@ -17,8 +18,11 @@ class RAG {
   constructor({ 
     adapter, 
     vectorStore, 
+    retriever = null,
     indexName, 
     chunkSize = 500, 
+    chunkOverlap = 50,
+    chunkStrategy = 'fixed',
     topK = 5, 
     namespace, 
     retryManager = new RetryManager({ retries: 3, baseDelay: 1000, maxDelay: 10000 }) 
@@ -34,8 +38,15 @@ class RAG {
     }
     this.adapter = adapter;
     this.vectorStore = vectorStore;
+    this.retriever =
+      retriever ||
+      (vectorStore
+        ? new VectorStoreRetriever({ adapter, vectorStore, indexName, namespace, topK })
+        : null);
     this.indexName = indexName;
     this.chunkSize = chunkSize;
+    this.chunkOverlap = chunkOverlap;
+    this.chunkStrategy = chunkStrategy;
     this.topK = topK;
     this.namespace = namespace;
     this.retryManager = retryManager; // New: RetryManager for resilience
@@ -49,7 +60,8 @@ class RAG {
    */
   async query(prompt, options = {}) {
     if (!this.vectorStore) throw new Error("Query requires a vector store.");
-    const context = await this.retryManager.execute(() => this.search(prompt, options));
+    const retrieval = await this.retryManager.execute(() => this.searchWithProvenance(prompt, options));
+    const context = retrieval.matches.map(match => match.text);
     const fullPrompt = {
       system: options.system || "You are a helpful assistant using provided context.",
       user: `Context:\n${context.join("\n")}\n\nQuery: ${prompt}`,
@@ -57,6 +69,11 @@ class RAG {
     const response = await this.retryManager.execute(() => 
       this.adapter.generateText(fullPrompt, options.adapterOptions || {})
     );
+
+    if (response && typeof response === 'object') {
+      response.retrieval = retrieval;
+    }
+
     return response;
   }
 
@@ -67,24 +84,40 @@ class RAG {
    * @returns {Promise<string[]>} - Array of text results.
    */
   async search(query, options = {}) {
-    if (!this.vectorStore) throw new Error("Search requires a vector store.");
-    const embeddings = await this.retryManager.execute(() => this.adapter.embedChunks([query]));
-    const queryVector = embeddings[0].embedding;
-    const results = await this.retryManager.execute(() => 
-      this.vectorStore.query({
-        indexName: this.indexName,
-        vector: queryVector,
-        topK: options.topK || this.topK,
-        namespace: options.namespace || this.namespace,
-        filter: options.filter || {},
-      })
-    );
+    const retrieval = await this.searchWithProvenance(query, options);
+    return retrieval.matches.map(match => match.text);
+  }
 
-    let matches = results.matches.map(match => match.metadata.text);
+  /**
+   * Search for relevant chunks/documents with provenance.
+   * @param {string} query - Search query.
+   * @param {object} [options] - { topK, namespace, filter, rerank }
+   * @returns {Promise<object>} - Structured retrieval payload with matches and provenance.
+   */
+  async searchWithProvenance(query, options = {}) {
+    if (!this.vectorStore) throw new Error("Search requires a vector store.");
+    if (!this.retriever?.search) {
+      throw new Error("Search requires a retriever.");
+    }
+
+    let retrieval = await this.retryManager.execute(() =>
+      this.retriever.search(query, options)
+    );
+    let matches = (retrieval.matches || []).map(match => ({
+      ...match,
+      normalizedScore:
+        typeof match.score === 'number'
+          ? Math.max(0, Math.min(1, Number(match.score.toFixed(4))))
+          : null,
+    }));
     if (options.rerank) {
       matches = await this.retryManager.execute(() => this._rerank(query, matches, options.rerank));
     }
-    return matches;
+
+    return {
+      ...retrieval,
+      matches,
+    };
   }
 
   /**
@@ -93,8 +126,26 @@ class RAG {
    * @param {number} [chunkSize] - Override default chunk size.
    * @returns {string[]} - Array of chunks.
    */
-  chunk(text, chunkSize = this.chunkSize) {
-    return chunkText(text, chunkSize);
+  chunk(text, chunkSize = this.chunkSize, options = {}) {
+    const strategy = options.strategy || this.chunkStrategy;
+    const overlap = options.overlap ?? this.chunkOverlap;
+
+    if (strategy === 'paragraph') {
+      const paragraphs = text
+        .split(/\n\s*\n/g)
+        .map(part => part.trim())
+        .filter(Boolean);
+
+      if (paragraphs.length > 0) {
+        return paragraphs.flatMap(paragraph =>
+          paragraph.length > chunkSize
+            ? chunkText(paragraph, chunkSize, overlap)
+            : [paragraph]
+        );
+      }
+    }
+
+    return chunkText(text, chunkSize, overlap, options.numChunks || null);
   }
 
   /**
@@ -109,7 +160,13 @@ class RAG {
     const validTexts = texts.filter(t => typeof t === 'string' && t.trim().length > 0);
     if (!validTexts.length) throw new Error("No valid text provided for indexing.");
 
-    const chunkPromises = validTexts.map(text => this.chunk(text));
+    const chunkPromises = validTexts.map(text =>
+      this.chunk(text, options.chunkSize || this.chunkSize, {
+        overlap: options.chunkOverlap ?? this.chunkOverlap,
+        strategy: options.chunkStrategy || this.chunkStrategy,
+        numChunks: options.numChunks || null,
+      })
+    );
     const chunksArray = await Promise.all(chunkPromises);
     const chunks = chunksArray.flat();
 
@@ -120,7 +177,12 @@ class RAG {
     const vectors = embeddings.map((emb, i) => ({
       id: `${Date.now()}-${i}`,
       values: emb.embedding,
-      metadata: { text: chunks[i], ...(options.metadata || {}) },
+      metadata: {
+        text: chunks[i],
+        chunkIndex: i,
+        chunkStrategy: options.chunkStrategy || this.chunkStrategy,
+        ...(options.metadata || {}),
+      },
     }));
     const { insertedIds } = await this.retryManager.execute(() => 
       this.vectorStore.upsert({
@@ -197,15 +259,46 @@ class RAG {
   }
 
   /**
-   * Internal method to rerank search results (stub—requires adapter-specific logic).
+   * Internal method to rerank search results.
    * @param {string} query - Original query.
-   * @param {string[]} results - Retrieved text chunks.
-   * @param {string} strategy - Reranking strategy (e.g., "cosine").
-   * @returns {Promise<string[]>} - Reranked results.
+   * @param {object[]} results - Retrieved text chunks.
+   * @param {string|function} strategy - Reranking strategy or custom function.
+   * @returns {Promise<object[]>} - Reranked results.
    */
   async _rerank(query, results, strategy = "cosine") {
-    console.warn("Reranking not fully implemented—returning original results.");
-    return results; // Future: Add retry logic here if implemented
+    if (typeof strategy === 'function') {
+      return strategy(query, results);
+    }
+
+    if (strategy !== 'lexical' && strategy !== 'cosine') {
+      return results;
+    }
+
+    const queryTerms = new Set(
+      String(query)
+        .toLowerCase()
+        .split(/\W+/)
+        .filter(Boolean)
+    );
+
+    return [...results]
+      .map(result => {
+        const resultTerms = String(result.text || '')
+          .toLowerCase()
+          .split(/\W+/)
+          .filter(Boolean);
+        const overlap = resultTerms.filter(term => queryTerms.has(term)).length;
+        const lexicalScore = queryTerms.size ? overlap / queryTerms.size : 0;
+        return {
+          ...result,
+          rerankScore: Number(lexicalScore.toFixed(4)),
+        };
+      })
+      .sort((a, b) => {
+        const aScore = (a.rerankScore ?? 0) + (a.score ?? 0);
+        const bScore = (b.rerankScore ?? 0) + (b.score ?? 0);
+        return bScore - aScore;
+      });
   }
 }
 
