@@ -3,6 +3,7 @@ const { RunInspector } = require('./RunInspector');
 const { RunTreeInspector } = require('./RunTreeInspector');
 const { IncidentDebugger } = require('./IncidentDebugger');
 const { TraceDiffer } = require('./TraceDiffer');
+const { TraceCorrelation } = require('./TraceCorrelation');
 const { TraceSerializer } = require('./TraceSerializer');
 const { EvidenceGraph } = require('./EvidenceGraph');
 const { EvalHarness } = require('./EvalHarness');
@@ -19,6 +20,7 @@ const { EventBus } = require('./EventBus');
 const { ConsoleDebugSink } = require('./ConsoleDebugSink');
 const { FileAuditSink } = require('./FileAuditSink');
 const { RuntimeEventRedactor } = require('./RuntimeEventRedactor');
+const { DistributedRunEnvelope } = require('./DistributedRunEnvelope');
 const { BaseRunStore } = require('./stores/BaseRunStore');
 const { BaseJobStore } = require('./stores/BaseJobStore');
 const { InMemoryRunStore } = require('./stores/InMemoryRunStore');
@@ -44,6 +46,7 @@ module.exports = {
   RunTreeInspector,
   IncidentDebugger,
   TraceDiffer,
+  TraceCorrelation,
   TraceSerializer,
   EvidenceGraph,
   EvalHarness,
@@ -60,6 +63,7 @@ module.exports = {
   ConsoleDebugSink,
   FileAuditSink,
   RuntimeEventRedactor,
+  DistributedRunEnvelope,
   BaseRunStore,
   BaseJobStore,
   InMemoryRunStore,

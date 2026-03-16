@@ -35,4 +35,26 @@ describe('Maintained examples', () => {
     expect(stdout).toContain('forecast');
     expect(stdout).toContain('Retrieved context');
   });
+
+  test('reference queue worker example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceQueueWorker.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Queued envelope');
+    expect(stdout).toContain('Remote worker result');
+    expect(stdout).toContain("stage: 'replay'");
+  });
+
+  test('reference distributed incident example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceDistributedIncident.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Distributed incident report');
+    expect(stdout).toContain('Correlation metadata');
+    expect(stdout).toContain('destinationWorker');
+  });
 });

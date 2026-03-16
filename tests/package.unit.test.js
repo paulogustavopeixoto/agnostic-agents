@@ -28,6 +28,8 @@ const { StorageBackendRegistry } = require('../src/runtime/StorageBackendRegistr
 const { RunTreeInspector } = require('../src/runtime/RunTreeInspector');
 const { IncidentDebugger } = require('../src/runtime/IncidentDebugger');
 const { TraceDiffer } = require('../src/runtime/TraceDiffer');
+const { DistributedRunEnvelope } = require('../src/runtime/DistributedRunEnvelope');
+const { TraceCorrelation } = require('../src/runtime/TraceCorrelation');
 const { ApprovalInbox } = require('../src/runtime/ApprovalInbox');
 const { BackgroundJobScheduler } = require('../src/runtime/BackgroundJobScheduler');
 const { DelegationRuntime } = require('../src/runtime/DelegationRuntime');
@@ -75,6 +77,7 @@ describe('Package/module unit tests', () => {
     expect(pkg.OpenAPILoader).toBeDefined();
     expect(pkg.ApiLoader).toBeDefined();
     expect(pkg.Run).toBeDefined();
+    expect(pkg.DistributedRunEnvelope).toBeDefined();
     expect(pkg.RunTreeInspector).toBeDefined();
     expect(pkg.IncidentDebugger).toBeDefined();
     expect(pkg.ToolPolicy).toBeDefined();
@@ -112,6 +115,7 @@ describe('Package/module unit tests', () => {
     expect(pkg.WorkflowRunner).toBeDefined();
     expect(pkg.RunInspector).toBeDefined();
     expect(pkg.TraceDiffer).toBeDefined();
+    expect(pkg.TraceCorrelation).toBeDefined();
     expect(pkg.ConsoleDebugSink).toBeDefined();
     expect(pkg.InvalidToolCallError).toBeDefined();
     expect(pkg.RunPausedError).toBeDefined();
@@ -213,6 +217,83 @@ describe('Package/module unit tests', () => {
     expect(parent.metrics.tokenUsage.total).toBe(5);
     expect(parent.metrics.cost).toBe(0.25);
     expect(parent.metrics.timings.modelMs).toBe(42);
+  });
+
+  test('DistributedRunEnvelope creates and validates distributed handoff payloads', () => {
+    const run = new Run({ id: 'run-123', input: 'handoff me' });
+    const envelope = DistributedRunEnvelope.create(run, {
+      runtimeKind: 'agent',
+      action: 'branch',
+      checkpointId: 'run-123:checkpoint:2',
+      metadata: { region: 'eu-west-1' },
+    });
+
+    expect(DistributedRunEnvelope.validate(envelope)).toEqual({
+      valid: true,
+      errors: [],
+    });
+    expect(DistributedRunEnvelope.parse(envelope)).toEqual(envelope);
+    expect(envelope).toEqual(
+      expect.objectContaining({
+        format: 'agnostic-agents-distributed-run-envelope',
+        runtimeKind: 'agent',
+        action: 'branch',
+        runId: 'run-123',
+        checkpointId: 'run-123:checkpoint:2',
+        metadata: expect.objectContaining({
+          region: 'eu-west-1',
+          sourceRunId: 'run-123',
+        }),
+      })
+    );
+  });
+
+  test('TraceCorrelation derives correlation ids from runs and envelopes', () => {
+    const run = new Run({
+      id: 'child-run',
+      metadata: {
+        lineage: {
+          rootRunId: 'root-run',
+          parentRunId: 'parent-run',
+          branchOriginRunId: null,
+          branchCheckpointId: null,
+        },
+      },
+    });
+    const envelope = DistributedRunEnvelope.create(run, {
+      runtimeKind: 'agent',
+      action: 'replay',
+      checkpointId: 'child-run:checkpoint:2',
+    });
+
+    expect(TraceCorrelation.fromRun(run)).toEqual(
+      expect.objectContaining({
+        traceId: 'root-run',
+        spanId: 'child-run',
+        parentSpanId: 'parent-run',
+      })
+    );
+    expect(TraceCorrelation.fromEnvelope(envelope)).toEqual(
+      expect.objectContaining({
+        traceId: 'root-run',
+        spanId: 'child-run',
+        checkpointId: 'child-run:checkpoint:2',
+        runtimeKind: 'agent',
+        action: 'replay',
+      })
+    );
+    expect(
+      TraceCorrelation.annotateMetadata(
+        { queue: 'worker-a' },
+        { traceId: 'root-run', spanId: 'child-run' }
+      )
+    ).toEqual({
+      queue: 'worker-a',
+      correlation: {
+        traceId: 'root-run',
+        spanId: 'child-run',
+      },
+    });
   });
 
   test('RunInspector summarizes aggregated child-run metrics', () => {

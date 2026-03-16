@@ -6,6 +6,7 @@ const { RunInspector } = require('../RunInspector');
 const { RetryManager } = require('../../utils/RetryManager');
 const { BaseRunStore } = require('../stores/BaseRunStore');
 const { InMemoryRunStore } = require('../stores/InMemoryRunStore');
+const { DistributedRunEnvelope } = require('../DistributedRunEnvelope');
 const { Workflow } = require('./Workflow');
 const { ExecutionGraph } = require('./ExecutionGraph');
 const { RunNotFoundError, RunCancelledError } = require('../../errors');
@@ -468,6 +469,64 @@ class WorkflowRunner {
     }
 
     return branchedRun;
+  }
+
+  async createDistributedEnvelope(
+    runId,
+    { action = 'resume', checkpointId = null, metadata = {} } = {}
+  ) {
+    if (!this.runStore?.getRun) {
+      throw new RunNotFoundError(
+        'Cannot create a distributed workflow envelope without a configured runStore.'
+      );
+    }
+
+    const storedRun = await this.runStore.getRun(runId);
+    if (!storedRun) {
+      throw new RunNotFoundError(`Run "${runId}" not found.`);
+    }
+
+    const run = storedRun instanceof Run ? storedRun : Run.fromJSON(storedRun);
+    return DistributedRunEnvelope.create(run, {
+      runtimeKind: 'workflow',
+      action,
+      checkpointId,
+      metadata: {
+        workflowId: this.workflow.id,
+        workflowName: this.workflow.name,
+        ...metadata,
+      },
+    });
+  }
+
+  async continueDistributedRun(envelope) {
+    const parsed = DistributedRunEnvelope.parse(envelope);
+    if (parsed.runtimeKind !== 'workflow') {
+      throw new RunNotFoundError(
+        `Distributed run envelope runtime "${parsed.runtimeKind}" cannot be continued by WorkflowRunner.`
+      );
+    }
+
+    if (parsed.action === 'resume') {
+      return this.resumeRun(parsed.runId);
+    }
+
+    if (parsed.action === 'branch') {
+      const branch = await this.branchRun(parsed.runId, {
+        checkpointId: parsed.checkpointId,
+        metadata: parsed.metadata,
+      });
+      return this.resumeRun(branch.id);
+    }
+
+    if (parsed.action === 'replay') {
+      return this.replayRun(parsed.runId, {
+        checkpointId: parsed.checkpointId,
+        metadata: parsed.metadata,
+      });
+    }
+
+    throw new RunNotFoundError(`Unsupported distributed run action "${parsed.action}".`);
   }
 
   async replayRun(

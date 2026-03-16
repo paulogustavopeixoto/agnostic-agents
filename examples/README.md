@@ -38,7 +38,7 @@ These examples are intended as reference deployment patterns rather than feature
   - shows how to expose runtime-backed runs over HTTP with approvals and inspection
 - `referenceQueueWorker.js`
   - no API key required
-  - shows how to run planning and scheduling in a worker process
+  - shows queue-based distributed continuation where one process creates a run and a worker process consumes a handoff envelope from a shared queue
 - `referenceIncidentDebug.js`
   - no API key required
   - shows how to inspect stored runs and export a portable trace bundle
@@ -57,6 +57,12 @@ These examples are intended as reference deployment patterns rather than feature
 - `referenceDurableBackends.js`
   - no API key required
   - shows custom durable run/job/layer store implementations and registry usage
+- `referenceDistributedHandoff.js`
+  - no API key required
+  - shows a run created in one process and continued in another through a shared run store and distributed handoff envelope
+- `referenceDistributedIncident.js`
+  - no API key required
+  - shows distributed incident reconstruction with correlation metadata, incident reports, and portable trace export
 
 ## Legacy / advanced examples
 

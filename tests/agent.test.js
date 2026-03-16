@@ -999,6 +999,48 @@ describe('Agent', () => {
     );
   });
 
+  test('can create and continue a distributed agent replay envelope', async () => {
+    const runStore = new InMemoryRunStore();
+    const agent = new Agent(mockAdapter, { runStore });
+
+    const sourceRun = await agent.run('Distribute this run');
+    const checkpointId = sourceRun.checkpoints[sourceRun.checkpoints.length - 1].id;
+    const envelope = await agent.createDistributedEnvelope(sourceRun.id, {
+      action: 'replay',
+      checkpointId,
+      metadata: { destination: 'worker-b' },
+    });
+    const replayRun = await agent.continueDistributedRun(envelope);
+
+    expect(envelope).toEqual(
+      expect.objectContaining({
+        runtimeKind: 'agent',
+        action: 'replay',
+        runId: sourceRun.id,
+        checkpointId,
+        metadata: expect.objectContaining({
+          destination: 'worker-b',
+          sourceRunId: sourceRun.id,
+        }),
+      })
+    );
+    expect(replayRun.metadata.replay).toEqual(
+      expect.objectContaining({
+        mode: 'partial_frozen_trace',
+        sourceRunId: sourceRun.id,
+        sourceCheckpointId: checkpointId,
+      })
+    );
+    expect(replayRun.status).toBe('paused');
+    expect(replayRun.pendingPause).toEqual(
+      expect.objectContaining({
+        stage: 'replay',
+        sourceRunId: sourceRun.id,
+        sourceCheckpointId: checkpointId,
+      })
+    );
+  });
+
   test('runs a verifier pass before risky tool execution', async () => {
     const tool = new Tool({
       name: 'send_email',

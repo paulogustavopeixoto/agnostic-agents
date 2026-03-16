@@ -10,6 +10,7 @@ const { RunInspector } = require('../runtime/RunInspector');
 const { ApprovalInbox } = require('../runtime/ApprovalInbox');
 const { GovernanceHooks } = require('../runtime/GovernanceHooks');
 const { ExtensionHost } = require('../runtime/ExtensionHost');
+const { DistributedRunEnvelope } = require('../runtime/DistributedRunEnvelope');
 const { BaseRunStore } = require('../runtime/stores/BaseRunStore');
 const {
   AdapterCapabilityError,
@@ -1484,6 +1485,57 @@ class Agent {
     }
 
     return branchedRun;
+  }
+
+  async createDistributedEnvelope(
+    runId,
+    { action = 'resume', checkpointId = null, metadata = {} } = {}
+  ) {
+    if (!this.runStore?.getRun) {
+      throw new RunNotFoundError('Cannot create a distributed envelope without a configured runStore.');
+    }
+
+    const storedRun = await this.runStore.getRun(runId);
+    if (!storedRun) {
+      throw new RunNotFoundError(`Run "${runId}" not found.`);
+    }
+
+    const run = storedRun instanceof Run ? storedRun : Run.fromJSON(storedRun);
+    return DistributedRunEnvelope.create(run, {
+      runtimeKind: 'agent',
+      action,
+      checkpointId,
+      metadata,
+    });
+  }
+
+  async continueDistributedRun(envelope, config = {}) {
+    const parsed = DistributedRunEnvelope.parse(envelope);
+    if (parsed.runtimeKind !== 'agent') {
+      throw new RunNotFoundError(`Envelope runtimeKind "${parsed.runtimeKind}" is not valid for Agent.`);
+    }
+
+    if (parsed.action === 'resume') {
+      return this.resumeRun(parsed.runId, config);
+    }
+
+    if (parsed.action === 'branch') {
+      const branch = await this.branchRun(parsed.runId, {
+        checkpointId: parsed.checkpointId || null,
+        metadata: parsed.metadata || {},
+      });
+
+      return this.resumeRun(branch.id, config);
+    }
+
+    if (parsed.action === 'replay') {
+      return this.replayRun(parsed.runId, {
+        checkpointId: parsed.checkpointId || null,
+        metadata: parsed.metadata || {},
+      });
+    }
+
+    throw new RunNotFoundError(`Unsupported distributed run action "${parsed.action}".`);
   }
 
   async replayRun(

@@ -1,59 +1,95 @@
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+
 const {
-  BackgroundJobScheduler,
-  PlanningRuntime,
-  InMemoryJobStore,
-  InMemoryRunStore,
+  Agent,
+  FileRunStore,
+  QueueEnvironmentAdapter,
   RunInspector,
 } = require('../index');
 
+function createAdapter(label) {
+  return {
+    getCapabilities: () => ({ generateText: true, toolCalling: false }),
+    generateText: async messages => ({
+      message: `${label}: ${messages[messages.length - 1].content}`,
+    }),
+  };
+}
+
 async function createWorker() {
-  const runStore = new InMemoryRunStore();
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'agnostic-queue-worker-'));
+  const runStore = new FileRunStore({ directory });
+  const queue = [];
+  const queueAdapter = new QueueEnvironmentAdapter({ name: 'runtime-job-queue' });
 
-  const planningRuntime = new PlanningRuntime({
-    runStore,
-    planner: async ({ input }) => [
-      { id: 'collect', task: `Collect inputs for ${input.topic}` },
-      { id: 'summarize', task: `Summarize topic ${input.topic}` },
-    ],
-    executor: async ({ plan }) => ({
-      completed: true,
-      planLength: plan.length,
-    }),
-    verifier: async ({ result }) => ({
-      status: result.completed ? 'passed' : 'recover',
-      reason: result.completed ? 'background job completed' : 'executor reported incomplete result',
-    }),
-  });
+  const producer = new Agent(createAdapter('producer'), { runStore });
+  const worker = new Agent(createAdapter('worker'), { runStore });
 
-  const scheduler = new BackgroundJobScheduler({
-    store: new InMemoryJobStore(),
-    handlers: {
-      planning_job: async payload => {
-        const run = await planningRuntime.run(payload);
-        return {
-          runId: run.id,
-          summary: RunInspector.summarize(run),
-        };
+  async function enqueue(payload) {
+    queue.push(payload);
+    return { queued: true, queueLength: queue.length };
+  }
+
+  async function processNextMessage() {
+    const payload = queue.shift();
+    if (!payload) {
+      return null;
+    }
+
+    const run = await worker.continueDistributedRun(payload.envelope);
+    return {
+      queue: payload.queue,
+      runId: run.id,
+      summary: RunInspector.summarize(run),
+    };
+  }
+
+  async function createQueuedRun(input) {
+    const run = await producer.run(input);
+    const envelope = await producer.createDistributedEnvelope(run.id, {
+      action: 'replay',
+      checkpointId: run.checkpoints[run.checkpoints.length - 1].id,
+      metadata: {
+        queue: queueAdapter.name || 'runtime-job-queue',
+        transport: 'queue',
       },
-    },
-  });
+    });
 
-  return { scheduler, planningRuntime, runStore };
+    await enqueue({
+      queue: queueAdapter.name || 'runtime-job-queue',
+      envelope,
+    });
+
+    return { run, envelope };
+  }
+
+  return {
+    queue,
+    queueAdapter,
+    producer,
+    worker,
+    runStore,
+    enqueue,
+    processNextMessage,
+    createQueuedRun,
+  };
 }
 
 async function main() {
-  const { scheduler } = await createWorker();
-  await scheduler.schedule({
-    id: 'nightly-runtime-sync',
-    handler: 'planning_job',
-    payload: { topic: 'runtime-os' },
-    runAt: new Date().toISOString(),
-    intervalMs: 60_000,
-    maxRuns: 1,
-  });
+  const queueWorker = await createWorker();
+  const { run, envelope } = await queueWorker.createQueuedRun('Prepare the queued continuation.');
+  const remoteResult = await queueWorker.processNextMessage();
 
-  const dueJobs = await scheduler.runDueJobs();
-  console.dir(dueJobs, { depth: null });
+  console.log('Queued envelope:');
+  console.dir(envelope, { depth: null });
+
+  console.log('\nProducer run summary:');
+  console.dir(RunInspector.summarize(run), { depth: null });
+
+  console.log('\nRemote worker result:');
+  console.dir(remoteResult, { depth: null });
 }
 
 if (require.main === module) {

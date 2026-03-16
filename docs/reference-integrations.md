@@ -37,9 +37,9 @@ Key runtime pieces:
 Use this pattern when you want a background runtime that:
 
 - pulls work from a queue or scheduler
-- executes jobs with runtime persistence
-- records runs for inspection and replay
-- supports recurring tasks
+- executes queued continuations with runtime persistence
+- records runs for inspection, replay, and handoff recovery
+- supports recurring tasks when paired with a scheduler
 
 Reference file:
 
@@ -47,6 +47,8 @@ Reference file:
 
 Use it for:
 
+- queued remote continuation
+- worker pools that consume persisted run envelopes
 - nightly syncs
 - long-running enrichment jobs
 - internal research pipelines
@@ -54,9 +56,10 @@ Use it for:
 
 Key runtime pieces:
 
-- `BackgroundJobScheduler`
-- `PlanningRuntime`
-- `InMemoryJobStore` or `FileJobStore`
+- `DistributedRunEnvelope`
+- `TraceCorrelation`
+- `Agent` or `WorkflowRunner`
+- `QueueEnvironmentAdapter`
 - `InMemoryRunStore` or `FileRunStore`
 
 ## 3. Offline incident debugging and replay
@@ -83,6 +86,7 @@ Key runtime pieces:
 - `FileRunStore`
 
 For operator triage and recovery procedures, see [`docs/operator-workflows.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/operator-workflows.md).
+For distributed handoff and correlation guidance, see [`docs/distributed-execution.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/distributed-execution.md).
 
 ## 4. Suggested production split
 

@@ -17,7 +17,7 @@ The package ships a maintained `index.d.ts` so TypeScript projects get typed acc
 - `Agent`: runtime-backed agent execution with tool calling, approvals, pause/resume, cancellation, replay, run assessment, self-verification, memory context, retrieval augmentation, and multimodal helper methods.
 - `Tool`: JSON Schema based tool definition that adapters can export to provider-specific formats.
 - `Run` / `RunInspector`: inspectable run model with events, checkpoints, timings, usage, lineage, assessments, and errors.
-- `RunTreeInspector` / `IncidentDebugger` / `TraceSerializer` / `TraceDiffer`: run trees, incident workflows, portable traces, and replay diffing for runtime control.
+- `DistributedRunEnvelope` / `TraceCorrelation` / `RunTreeInspector` / `IncidentDebugger` / `TraceSerializer` / `TraceDiffer`: distributed handoff envelopes, correlation metadata, run trees, incident workflows, portable traces, and replay diffing for runtime control.
 - `Workflow` / `WorkflowStep` / `AgentWorkflowStep` / `WorkflowRunner`: dependency-aware orchestration built on the runtime.
 - `DelegationRuntime` / `DelegationContract`: explicit multi-agent delegation with governed contracts and child-run tracking.
 - `PlanningRuntime`: plan, verify, recover execution flow for higher-order runtime tasks.
@@ -230,6 +230,28 @@ const run = await runner.run('Prepare a daily sync update');
 console.log(run.output);
 ```
 
+## Distributed handoff example
+
+Use a shared run store when one process creates a run and another process continues it.
+
+```js
+const { Agent, FileRunStore } = require('agnostic-agents');
+
+const runStore = new FileRunStore({ directory: './runtime-runs' });
+const processA = new Agent(adapterA, { runStore });
+const processB = new Agent(adapterB, { runStore });
+
+const run = await processA.run('Prepare the handoff.');
+const envelope = await processA.createDistributedEnvelope(run.id, {
+  action: 'replay',
+  checkpointId: run.checkpoints[run.checkpoints.length - 1].id,
+  metadata: { handoffTarget: 'worker-b', transport: 'service_call' },
+});
+
+const remoteRun = await processB.continueDistributedRun(envelope);
+console.log(remoteRun.status);
+```
+
 ## Planning and scheduling example
 
 ```js
@@ -294,6 +316,8 @@ The agent validates tool arguments against `parameters`, applies schema defaults
 - `npm run example:reference-replay-benchmarks`
 - `npm run example:reference-openapi`
 - `npm run example:reference-durable-backends`
+- `npm run example:reference-distributed-handoff`
+- `npm run example:reference-distributed-incident`
 
 Additional examples live in [`examples/`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples).
 
@@ -313,6 +337,7 @@ Real product-pattern recipes are documented in [`docs/cookbook.md`](/Users/paulo
 Operator triage, replay, branching, and recovery workflows are documented in [`docs/operator-workflows.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/operator-workflows.md).
 Operator-facing deployment guidance is documented in [`docs/operator-architecture.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/operator-architecture.md).
 Production-oriented storage backend guidance is documented in [`docs/storage-backends.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/storage-backends.md).
+Distributed execution and handoff guidance is documented in [`docs/distributed-execution.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/distributed-execution.md).
 
 Secret-handling expectations for adapters, tools, logs, traces, and tests are documented in [`docs/secret-handling.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/secret-handling.md).
 Tool auth propagation for host-controlled credentials is documented in [`docs/tool-auth-propagation.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/tool-auth-propagation.md).
@@ -383,4 +408,7 @@ Maintained runtime demos are:
 ```bash
 npm run example:openai-runtime
 npm run example:openai-v3-runtime
+npm run example:openai-v4-runtime
+npm run example:reference-distributed-handoff
+npm run example:reference-distributed-incident
 ```

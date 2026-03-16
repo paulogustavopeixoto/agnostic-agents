@@ -15,6 +15,7 @@ These workflows assume you are using the maintained runtime surfaces:
 - `RunInspector`
 - `RunTreeInspector`
 - `IncidentDebugger`
+- `TraceCorrelation`
 - `TraceDiffer`
 - `TraceSerializer`
 
@@ -191,6 +192,36 @@ Action:
 - diff it against a healthy child run if one exists
 - only replay the affected branch unless the root orchestration also diverged
 
+### Queue handoff failure
+
+Symptoms:
+
+- a queued continuation never reaches `replay_completed` or `workflow_replay_completed`
+- queue metadata is present but the worker run is missing
+- incident report shows a failed remote continuation after the handoff
+
+Action:
+
+- verify the source run and checkpoint were persisted before the envelope was queued
+- inspect correlation metadata such as `traceId`, `spanId`, `queue`, and `workerId`
+- replay from the same checkpoint only after confirming the original queue message was not partially consumed twice
+- export a bundle with both source and worker runs before mutating queue state
+
+### Service-to-service continuation failure
+
+Symptoms:
+
+- the receiving service cannot continue the envelope
+- lineage exists but the remote service cannot resolve the run or checkpoint
+- run tree shows the source run without the expected remote continuation
+
+Action:
+
+- verify the receiving service has access to the same durable `runStore`
+- confirm the envelope `runtimeKind`, `action`, and `checkpointId` match the target runtime
+- compare envelope correlation metadata against the remote run metadata
+- branch from the persisted checkpoint if the original remote continuation path is no longer trustworthy
+
 ## Operator defaults
 
 Use these defaults unless you have a strong reason not to:
@@ -209,3 +240,5 @@ See [`examples/referenceOperatorWorkflow.js`](/Users/paulopeixoto/Desktop/PauloR
 - incident reporting
 - trace diffing
 - partial trace export
+
+For cross-service and queue-native incident reconstruction, see [`examples/referenceDistributedIncident.js`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/examples/referenceDistributedIncident.js).

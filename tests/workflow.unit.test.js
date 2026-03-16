@@ -353,6 +353,58 @@ describe('Workflow runtime', () => {
     );
   });
 
+  test('can create and continue a distributed workflow replay envelope', async () => {
+    const runStore = new InMemoryRunStore();
+    const workflow = new Workflow({
+      id: 'distributed-replay-flow',
+      steps: [
+        {
+          id: 'collect',
+          run: async ({ input }) => ({ input }),
+        },
+      ],
+    });
+
+    const runner = new WorkflowRunner({ workflow, runStore });
+    const sourceRun = await runner.run('delta');
+    const checkpointId = sourceRun.checkpoints[sourceRun.checkpoints.length - 1].id;
+    const envelope = await runner.createDistributedEnvelope(sourceRun.id, {
+      action: 'replay',
+      checkpointId,
+      metadata: { destination: 'workflow-worker-b' },
+    });
+    const replayRun = await runner.continueDistributedRun(envelope);
+
+    expect(envelope).toEqual(
+      expect.objectContaining({
+        runtimeKind: 'workflow',
+        action: 'replay',
+        runId: sourceRun.id,
+        checkpointId,
+        metadata: expect.objectContaining({
+          workflowId: 'distributed-replay-flow',
+          destination: 'workflow-worker-b',
+          sourceRunId: sourceRun.id,
+        }),
+      })
+    );
+    expect(replayRun.metadata.replay).toEqual(
+      expect.objectContaining({
+        mode: 'partial_frozen_trace',
+        sourceRunId: sourceRun.id,
+        sourceCheckpointId: checkpointId,
+      })
+    );
+    expect(replayRun.status).toBe('paused');
+    expect(replayRun.pendingPause).toEqual(
+      expect.objectContaining({
+        stage: 'workflow_replay',
+        sourceRunId: sourceRun.id,
+        sourceCheckpointId: checkpointId,
+      })
+    );
+  });
+
   test('supports explicit delegation contracts for agent-backed steps', async () => {
     const adapter = {
       getCapabilities: () => ({ generateText: true, toolCalling: true }),

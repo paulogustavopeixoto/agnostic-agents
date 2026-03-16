@@ -69,6 +69,8 @@ export class Agent {
   pauseRun(runId: string, options?: JsonObject): Promise<Run>;
   cancelRun(runId: string, options?: JsonObject): Promise<Run>;
   branchRun(runId: string, options?: JsonObject): Promise<Run>;
+  createDistributedEnvelope(runId: string, options?: JsonObject): Promise<JsonObject>;
+  continueDistributedRun(envelope: JsonObject, config?: JsonObject): Promise<Run>;
   replayRun(runId: string, options?: JsonObject): Promise<Run>;
 }
 
@@ -180,6 +182,20 @@ export class Run {
 
 export class RunInspector {
   static summarize(run: Run): RunSummary;
+}
+
+export class DistributedRunEnvelope {
+  static readonly SCHEMA_VERSION: string;
+  static readonly FORMAT: string;
+  static create(run: Run | JsonObject, options?: JsonObject): JsonObject;
+  static validate(envelope?: JsonObject): { valid: boolean; errors: string[] };
+  static parse(envelope?: JsonObject): JsonObject;
+}
+
+export class TraceCorrelation {
+  static fromRun(run: Run | JsonObject, metadata?: JsonObject): JsonObject;
+  static fromEnvelope(envelope: JsonObject, metadata?: JsonObject): JsonObject;
+  static annotateMetadata(metadata?: JsonObject, correlation?: JsonObject): JsonObject;
 }
 
 export class RunTreeInspector {
@@ -411,6 +427,8 @@ export class WorkflowRunner {
   resumeRun(runId: string, options?: JsonObject): Promise<Run>;
   cancelRun(runId: string, options?: JsonObject): Promise<Run>;
   branchRun(runId: string, options?: JsonObject): Promise<Run>;
+  createDistributedEnvelope(runId: string, options?: JsonObject): Promise<JsonObject>;
+  continueDistributedRun(envelope: JsonObject): Promise<Run>;
   replayRun(runId: string, options?: JsonObject): Promise<Run>;
 }
 
