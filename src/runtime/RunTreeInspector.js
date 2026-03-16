@@ -2,7 +2,19 @@ const { Run } = require('./Run');
 const { RunInspector } = require('./RunInspector');
 const { BaseRunStore } = require('./stores/BaseRunStore');
 
+/**
+ * Builds and renders run trees from a run store so operators can inspect
+ * parent/child execution structure instead of isolated run records.
+ */
 class RunTreeInspector {
+  /**
+   * Loads runs from a store and assembles them into one or more rooted trees.
+   *
+   * @param {BaseRunStore} runStore
+   * @param {object} [options]
+   * @param {string|null} [options.rootRunId]
+   * @returns {Promise<object[]|object|null>}
+   */
   static async build(runStore, { rootRunId = null } = {}) {
     BaseRunStore.assert(runStore, 'RunTreeInspector runStore');
 
@@ -56,6 +68,14 @@ class RunTreeInspector {
     return roots;
   }
 
+  /**
+   * Renders a run tree as ASCII text for CLIs, logs, and incident reports.
+   *
+   * @param {object[]|object|null} tree
+   * @param {object} [options]
+   * @param {boolean} [options.includeStatus]
+   * @returns {string}
+   */
   static render(tree, { includeStatus = true } = {}) {
     const roots = Array.isArray(tree) ? tree : tree ? [tree] : [];
     const lines = [];

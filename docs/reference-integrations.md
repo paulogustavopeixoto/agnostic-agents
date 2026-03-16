@@ -82,6 +82,8 @@ Key runtime pieces:
 - `TraceDiffer`
 - `FileRunStore`
 
+For operator triage and recovery procedures, see [`docs/operator-workflows.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/operator-workflows.md).
+
 ## 4. Suggested production split
 
 For most serious systems, split the runtime into separate processes:
@@ -102,6 +104,8 @@ For most serious systems, split the runtime into separate processes:
   - drives incident debugging
 
 That keeps the runtime portable and lets each deployment choose its own transport, UI, and persistence.
+
+For a fuller operator-facing architecture view, see [`docs/operator-architecture.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/operator-architecture.md).
 
 ## 5. Storage recommendation
 

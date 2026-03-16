@@ -14,6 +14,25 @@ The format is intentionally simple:
 
 ### Removed
 
+## 1.0.44
+
+### Added
+
+- `v5` production-maturity documentation including API reference, migration guides, API stability policy, provider quickstarts, secret handling, tool auth propagation, operator workflows, operator architecture, benchmarking guidance, benchmark fixtures, storage backend guidance, MCP interoperability, OpenAPI examples, and cookbook patterns
+- maintained operator, eval, replay-benchmark, OpenAPI import, and durable-backend reference examples
+- governance hardening surfaces including `FileAuditSink`, `RuntimeEventRedactor`, tool allowlist/blocklist controls, and host-controlled tool auth propagation
+- baseline eval coverage for prompt regression, tool selection accuracy, RAG grounding, replay regression, and framework-comparison fixture validation
+
+### Changed
+
+- completed the `v5` roadmap around operator experience, durability guidance, governance maturity, public contract clarity, and benchmark discipline
+- expanded the published package surface to include the new maintained `v5` docs and reference examples
+- normalized public JSDoc across the maintained runtime-control classes so the source-level contract is easier to follow
+
+### Fixed
+
+- package docs and roadmap now align with the current `v5` runtime maturity surface instead of stopping at the earlier `v4` baseline
+
 ## 1.0.43
 
 ### Added

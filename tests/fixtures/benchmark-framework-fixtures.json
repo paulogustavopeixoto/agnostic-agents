@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "1.0",
+  "suite": "runtime-control-baseline",
+  "dimensions": [
+    "prompt_regression",
+    "tool_selection_accuracy",
+    "rag_grounding",
+    "replay_regression"
+  ],
+  "frameworks": [
+    {
+      "id": "agnostic-agents",
+      "type": "local_baseline",
+      "fixtures": [
+        "prompt_regression",
+        "tool_selection_accuracy",
+        "rag_grounding",
+        "replay_regression"
+      ]
+    },
+    {
+      "id": "langgraph",
+      "type": "comparison_fixture",
+      "fixtures": [
+        "prompt_regression",
+        "tool_selection_accuracy",
+        "rag_grounding",
+        "replay_regression"
+      ]
+    },
+    {
+      "id": "autogen",
+      "type": "comparison_fixture",
+      "fixtures": [
+        "prompt_regression",
+        "tool_selection_accuracy",
+        "rag_grounding",
+        "replay_regression"
+      ]
+    },
+    {
+      "id": "crewai",
+      "type": "comparison_fixture",
+      "fixtures": [
+        "prompt_regression",
+        "tool_selection_accuracy",
+        "rag_grounding",
+        "replay_regression"
+      ]
+    }
+  ]
+}

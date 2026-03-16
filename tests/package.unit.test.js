@@ -21,6 +21,8 @@ const { EvidenceGraph } = require('../src/runtime/EvidenceGraph');
 const { EvalHarness } = require('../src/runtime/EvalHarness');
 const { LearningLoop } = require('../src/runtime/LearningLoop');
 const { GovernanceHooks } = require('../src/runtime/GovernanceHooks');
+const { FileAuditSink } = require('../src/runtime/FileAuditSink');
+const { RuntimeEventRedactor } = require('../src/runtime/RuntimeEventRedactor');
 const { ExtensionHost } = require('../src/runtime/ExtensionHost');
 const { StorageBackendRegistry } = require('../src/runtime/StorageBackendRegistry');
 const { RunTreeInspector } = require('../src/runtime/RunTreeInspector');
@@ -82,6 +84,8 @@ describe('Package/module unit tests', () => {
     expect(pkg.EvalHarness).toBeDefined();
     expect(pkg.LearningLoop).toBeDefined();
     expect(pkg.GovernanceHooks).toBeDefined();
+    expect(pkg.FileAuditSink).toBeDefined();
+    expect(pkg.RuntimeEventRedactor).toBeDefined();
     expect(pkg.ExtensionHost).toBeDefined();
     expect(pkg.StorageBackendRegistry).toBeDefined();
     expect(pkg.ApprovalInbox).toBeDefined();
@@ -681,6 +685,113 @@ describe('Package/module unit tests', () => {
     );
   });
 
+  test('ToolPolicy supports allowlists and denylists', () => {
+    const policy = new ToolPolicy({
+      allowTools: ['safe_tool'],
+      denyTools: ['blocked_tool'],
+    });
+
+    const safeTool = new Tool({
+      name: 'safe_tool',
+      parameters: { type: 'object', properties: {} },
+      implementation: async () => ({ ok: true }),
+    });
+    const blockedTool = new Tool({
+      name: 'blocked_tool',
+      parameters: { type: 'object', properties: {} },
+      implementation: async () => ({ ok: true }),
+    });
+    const unknownTool = new Tool({
+      name: 'unknown_tool',
+      parameters: { type: 'object', properties: {} },
+      implementation: async () => ({ ok: true }),
+    });
+
+    expect(policy.evaluate(blockedTool, {}, {})).toEqual({
+      action: 'deny',
+      reason: 'Tool "blocked_tool" is blocked by policy.',
+      source: 'denylist',
+    });
+    expect(policy.evaluate(unknownTool, {}, {})).toEqual({
+      action: 'deny',
+      reason: 'Tool "unknown_tool" is not in the policy allowlist.',
+      source: 'allowlist',
+    });
+    expect(policy.evaluate(safeTool, {}, {})).toEqual({
+      action: 'allow',
+      reason: null,
+      source: 'default',
+    });
+  });
+
+  test('FileAuditSink logs risky side-effecting runtime events', async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agnostic-agents-audit-'));
+    const filePath = path.join(tempDir, 'audit.log');
+    const sink = new FileAuditSink({ filePath });
+    const run = new Run({ input: 'audit me' });
+    run.addToolCall({
+      name: 'send_status_update',
+      metadata: { sideEffectLevel: 'external_write' },
+    });
+
+    await sink.handleEvent({ type: 'run_completed', payload: { output: 'done' } }, run);
+    await sink.handleEvent({ type: 'model_response', payload: { output: 'ignored' } }, run);
+
+    const lines = fs
+      .readFileSync(filePath, 'utf8')
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map(line => JSON.parse(line));
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toEqual(
+      expect.objectContaining({
+        eventType: 'run_completed',
+        runId: run.id,
+        status: run.status,
+        payload: { output: 'done' },
+      })
+    );
+  });
+
+  test('FileAuditSink supports pii-safe audit logging', async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agnostic-agents-audit-safe-'));
+    const filePath = path.join(tempDir, 'audit.log');
+    const sink = new FileAuditSink({ filePath, piiSafe: true });
+    const run = new Run({ input: 'audit me safely' });
+    run.addToolCall({
+      name: 'send_status_update',
+      metadata: { sideEffectLevel: 'external_write' },
+    });
+
+    await sink.handleEvent(
+      {
+        type: 'tool_completed',
+        payload: {
+          metadata: { sideEffectLevel: 'external_write' },
+          arguments: {
+            email: 'paulo@example.com',
+            authToken: 'super-secret-token',
+          },
+        },
+      },
+      run
+    );
+
+    const [entry] = fs
+      .readFileSync(filePath, 'utf8')
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map(line => JSON.parse(line));
+
+    expect(entry.payload.arguments).toEqual({
+      email: '[REDACTED]',
+      authToken: '[REDACTED]',
+    });
+  });
+
   test('EventBus dispatches events to function and object sinks', async () => {
     const seen = [];
     const eventBus = new EventBus({
@@ -698,6 +809,54 @@ describe('Package/module unit tests', () => {
 
     await eventBus.emit({ type: 'run_started' }, {});
     expect(seen).toEqual(['fn:run_started', 'obj:run_started']);
+  });
+
+  test('ConsoleDebugSink can redact sensitive fields in pii-safe mode', async () => {
+    const logger = { debug: jest.fn() };
+    const sink = new pkg.ConsoleDebugSink({ logger, piiSafe: true });
+
+    await sink.handleEvent({
+      type: 'approval_requested',
+      payload: {
+        headers: { Authorization: 'Bearer secret' },
+        authToken: 'sensitive-token',
+      },
+    });
+
+    expect(logger.debug).toHaveBeenCalledWith(
+      '[agnostic-agents]',
+      JSON.stringify({
+        type: 'approval_requested',
+        payload: {
+          headers: { Authorization: '[REDACTED]' },
+          authToken: '[REDACTED]',
+        },
+      })
+    );
+  });
+
+  test('RuntimeEventRedactor redacts nested sensitive values', () => {
+    const redactor = new RuntimeEventRedactor();
+
+    expect(
+      redactor.redact({
+        token: 'abc',
+        nested: {
+          email: 'user@example.com',
+          headers: {
+            Authorization: 'Bearer abc',
+          },
+        },
+      })
+    ).toEqual({
+      token: '[REDACTED]',
+      nested: {
+        email: '[REDACTED]',
+        headers: {
+          Authorization: '[REDACTED]',
+        },
+      },
+    });
   });
 
   test('FallbackRouter falls through providers and exposes merged capabilities', async () => {

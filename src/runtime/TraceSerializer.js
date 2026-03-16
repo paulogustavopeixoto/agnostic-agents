@@ -1,5 +1,9 @@
 const { Run } = require('./Run');
 
+/**
+ * Portable trace serializer for durable run export, replay preparation,
+ * and external tooling integrations.
+ */
 class TraceSerializer {
   static get SCHEMA_VERSION() {
     return '1.1';
@@ -13,6 +17,11 @@ class TraceSerializer {
     return 'agnostic-agents-trace-bundle';
   }
 
+  /**
+   * Describes the supported portable trace schema.
+   *
+   * @returns {object}
+   */
   static describeSchema() {
     return {
       schemaVersion: TraceSerializer.SCHEMA_VERSION,
@@ -23,6 +32,13 @@ class TraceSerializer {
     };
   }
 
+  /**
+   * Exports a full run trace using the maintained run-trace schema.
+   *
+   * @param {Run|object} run
+   * @param {object} [metadata]
+   * @returns {object}
+   */
   static exportRun(run, metadata = {}) {
     const sourceRun = run instanceof Run ? run : Run.fromJSON(run);
     return {
@@ -35,6 +51,12 @@ class TraceSerializer {
     };
   }
 
+  /**
+   * Imports a full run trace back into a Run instance.
+   *
+   * @param {object} trace
+   * @returns {Run}
+   */
   static importRun(trace = {}) {
     const validation = TraceSerializer.validateTrace(trace);
     if (!validation.valid) {
@@ -44,6 +66,15 @@ class TraceSerializer {
     return Run.fromJSON(trace.run || {});
   }
 
+  /**
+   * Exports a checkpoint-derived partial trace for replay or recovery tooling.
+   *
+   * @param {Run|object} run
+   * @param {object} [options]
+   * @param {string|null} [options.checkpointId]
+   * @param {object} [options.metadata]
+   * @returns {object}
+   */
   static exportPartialRun(run, { checkpointId = null, metadata = {} } = {}) {
     const sourceRun = run instanceof Run ? run : Run.fromJSON(run);
     const checkpoint = sourceRun.getCheckpoint(checkpointId);
@@ -78,6 +109,13 @@ class TraceSerializer {
     };
   }
 
+  /**
+   * Exports multiple runs as a portable bundle for external tooling.
+   *
+   * @param {Array<Run|object>} runs
+   * @param {object} [metadata]
+   * @returns {object}
+   */
   static exportBundle(runs = [], metadata = {}) {
     const traces = runs.map(run => TraceSerializer.exportRun(run));
     return {
@@ -94,6 +132,12 @@ class TraceSerializer {
     };
   }
 
+  /**
+   * Imports a portable bundle into Run instances.
+   *
+   * @param {object} bundle
+   * @returns {Run[]}
+   */
   static importBundle(bundle = {}) {
     const validation = TraceSerializer.validateTrace(bundle, { allowBundle: true });
     if (!validation.valid || bundle.format !== TraceSerializer.BUNDLE_FORMAT) {
@@ -103,6 +147,14 @@ class TraceSerializer {
     return (bundle.traces || []).map(trace => TraceSerializer.importRun(trace));
   }
 
+  /**
+   * Validates a trace or trace bundle against the maintained schema.
+   *
+   * @param {object} [trace]
+   * @param {object} [options]
+   * @param {boolean} [options.allowBundle]
+   * @returns {{valid:boolean, errors:string[], warnings:string[]}}
+   */
   static validateTrace(trace = {}, { allowBundle = false } = {}) {
     const errors = [];
     const warnings = [];

@@ -169,6 +169,86 @@ describe('Agent', () => {
     expect(response).toContain('Result for test');
   });
 
+  test('propagates required auth bindings to tool context without exposing them as arguments', async () => {
+    const implementation = jest.fn(async (args, context) => ({
+      query: args.query,
+      auth: context.auth,
+      token: context.getAuth('apiToken'),
+    }));
+    const tool = new Tool({
+      name: 'secure_search',
+      description: 'Search with host-provided auth',
+      parameters: {
+        type: 'object',
+        properties: { query: { type: 'string' } },
+        required: ['query'],
+      },
+      metadata: { authRequirements: ['apiToken', 'workspaceId'] },
+      implementation,
+    });
+
+    const agent = new Agent(mockAdapter, {
+      tools: [tool],
+      retryManager,
+      authContext: {
+        apiToken: 'server-only-token',
+        workspaceId: 'workspace-123',
+        ignoredBinding: 'unused',
+      },
+    });
+
+    const result = await agent._handleToolCall(
+      { name: 'secure_search', arguments: { query: 'status' }, id: 'tool_use_1' },
+      {}
+    );
+
+    expect(implementation).toHaveBeenCalledWith(
+      { query: 'status' },
+      expect.objectContaining({
+        auth: {
+          apiToken: 'server-only-token',
+          workspaceId: 'workspace-123',
+        },
+        getAuth: expect.any(Function),
+      })
+    );
+    expect(result).toEqual({
+      query: 'status',
+      auth: {
+        apiToken: 'server-only-token',
+        workspaceId: 'workspace-123',
+      },
+      token: 'server-only-token',
+    });
+  });
+
+  test('denies tool execution when required auth bindings are missing', async () => {
+    const tool = new Tool({
+      name: 'secure_search',
+      description: 'Search with host-provided auth',
+      parameters: {
+        type: 'object',
+        properties: { query: { type: 'string' } },
+        required: ['query'],
+      },
+      metadata: { authRequirements: ['apiToken'] },
+      implementation: async ({ query }) => ({ query }),
+    });
+
+    const agent = new Agent(mockAdapter, {
+      tools: [tool],
+      retryManager,
+      authContext: {},
+    });
+
+    await expect(
+      agent._handleToolCall(
+        { name: 'secure_search', arguments: { query: 'status' }, id: 'tool_use_1' },
+        {}
+      )
+    ).rejects.toBeInstanceOf(ToolPolicyError);
+  });
+
   test('executes an MCP tool', async () => {
     const mcpTool = new MCPTool({
       name: 'web_search',

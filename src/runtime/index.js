@@ -17,6 +17,8 @@ const { PlanningRuntime } = require('./PlanningRuntime');
 const { ToolPolicy } = require('./ToolPolicy');
 const { EventBus } = require('./EventBus');
 const { ConsoleDebugSink } = require('./ConsoleDebugSink');
+const { FileAuditSink } = require('./FileAuditSink');
+const { RuntimeEventRedactor } = require('./RuntimeEventRedactor');
 const { BaseRunStore } = require('./stores/BaseRunStore');
 const { BaseJobStore } = require('./stores/BaseJobStore');
 const { InMemoryRunStore } = require('./stores/InMemoryRunStore');
@@ -56,6 +58,8 @@ module.exports = {
   ToolPolicy,
   EventBus,
   ConsoleDebugSink,
+  FileAuditSink,
+  RuntimeEventRedactor,
   BaseRunStore,
   BaseJobStore,
   InMemoryRunStore,

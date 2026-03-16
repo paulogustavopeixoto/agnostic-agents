@@ -1,6 +1,16 @@
 const { Run } = require('./Run');
 
+/**
+ * Lightweight structural diffing for run traces, branches, and replays.
+ */
 class TraceDiffer {
+  /**
+   * Compares two runs and returns a summarized divergence report.
+   *
+   * @param {Run|object} leftRun
+   * @param {Run|object} rightRun
+   * @returns {object}
+   */
   static diff(leftRun, rightRun) {
     const left = leftRun instanceof Run ? leftRun : Run.fromJSON(leftRun || {});
     const right = rightRun instanceof Run ? rightRun : Run.fromJSON(rightRun || {});

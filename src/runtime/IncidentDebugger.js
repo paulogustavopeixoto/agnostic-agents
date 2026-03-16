@@ -4,11 +4,27 @@ const { RunTreeInspector } = require('./RunTreeInspector');
 const { TraceDiffer } = require('./TraceDiffer');
 const { BaseRunStore } = require('./stores/BaseRunStore');
 
+/**
+ * Operator-facing incident helper that reconstructs a run, its tree, and
+ * recovery recommendations from durable runtime state.
+ */
 class IncidentDebugger {
+  /**
+   * @param {object} options
+   * @param {BaseRunStore} options.runStore
+   */
   constructor({ runStore } = {}) {
     this.runStore = BaseRunStore.assert(runStore, 'IncidentDebugger runStore');
   }
 
+  /**
+   * Creates a structured incident report for a run and an optional comparison run.
+   *
+   * @param {string} runId
+   * @param {object} [options]
+   * @param {string|null} [options.compareToRunId]
+   * @returns {Promise<object>}
+   */
   async createReport(runId, { compareToRunId = null } = {}) {
     if (!this.runStore?.getRun) {
       throw new Error('IncidentDebugger requires a runStore with getRun().');

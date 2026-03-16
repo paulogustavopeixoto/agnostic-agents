@@ -36,6 +36,8 @@ class Agent {
    * @param {Function|null} [options.askUser]
    * @param {object|null} [options.runStore]
    * @param {ToolPolicy|object|null} [options.toolPolicy]
+   * @param {object|null} [options.authContext]
+   * @param {Function|null} [options.resolveToolAuth]
    * @param {Function|null} [options.onEvent]
    * @param {EventBus|object|null} [options.eventBus]
    * @param {boolean} [options.debug]
@@ -53,6 +55,8 @@ class Agent {
       askUser = null,
       runStore = null,
       toolPolicy = null,
+      authContext = null,
+      resolveToolAuth = null,
       onEvent = null,
       eventBus = null,
       debug = false,
@@ -83,6 +87,8 @@ class Agent {
       : toolPolicy instanceof ToolPolicy
         ? toolPolicy
         : new ToolPolicy(toolPolicy || {});
+    this.authContext = authContext && typeof authContext === 'object' ? { ...authContext } : null;
+    this.resolveToolAuth = typeof resolveToolAuth === 'function' ? resolveToolAuth : null;
     this.onEvent = onEvent;
     this.eventBus = this.extensionHost
       ? this.extensionHost.extendEventBus(eventBus)
@@ -1206,6 +1212,42 @@ class Agent {
     });
   }
 
+  async _resolveToolAuth(toolInstance, runtime = {}) {
+    const requirements = toolInstance?.metadata?.authRequirements || [];
+    if (!requirements.length) {
+      return {};
+    }
+
+    const resolved =
+      typeof this.resolveToolAuth === 'function'
+        ? await this.resolveToolAuth(toolInstance, {
+            run: runtime.run || null,
+            agent: this,
+            requirements,
+          })
+        : this.authContext || {};
+
+    const auth = resolved && typeof resolved === 'object' ? { ...resolved } : {};
+    const filtered = {};
+    const missing = [];
+
+    for (const requirement of requirements) {
+      if (Object.prototype.hasOwnProperty.call(auth, requirement) && auth[requirement] != null) {
+        filtered[requirement] = auth[requirement];
+      } else {
+        missing.push(requirement);
+      }
+    }
+
+    if (missing.length) {
+      throw new ToolPolicyError(
+        `Tool "${toolInstance.name}" is missing required auth bindings: ${missing.join(', ')}`
+      );
+    }
+
+    return filtered;
+  }
+
   async _handleToolCall(toolCall, runtime = {}) {
     const toolInstance = this.tools.find(tool => tool.name === toolCall.name);
     if (!toolInstance) {
@@ -1213,7 +1255,13 @@ class Agent {
     }
 
     const resolvedArgs = await this.resolver.resolve(toolInstance, toolCall.arguments || {});
-    const toolContext = { toolCall, run: runtime.run || null };
+    const auth = await this._resolveToolAuth(toolInstance, runtime);
+    const toolContext = {
+      toolCall,
+      run: runtime.run || null,
+      auth,
+      getAuth: key => auth[key],
+    };
     const step = runtime.run
       ? this._startStep(runtime.run, 'tool', {
           toolName: toolCall.name,

@@ -90,6 +90,7 @@ Every maintained adapter should have:
 - live smoke coverage when credentials and provider conditions allow
 - documented default test model
 - documented limitations or account caveats
+- secret handling documented according to [`docs/secret-handling.md`](/Users/paulopeixoto/Desktop/PauloRepos/agnostic-agents/agnostic-agents/docs/secret-handling.md)
 
 ## Certification workflow for changes
 

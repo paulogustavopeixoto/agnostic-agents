@@ -42,6 +42,21 @@ These examples are intended as reference deployment patterns rather than feature
 - `referenceIncidentDebug.js`
   - no API key required
   - shows how to inspect stored runs and export a portable trace bundle
+- `referenceOperatorWorkflow.js`
+  - no API key required
+  - shows common operator tasks: run tree inspection, incident reporting, trace diffing, and partial trace export
+- `referenceEvalBenchmarks.js`
+  - no API key required
+  - shows maintained eval categories: prompt regression, tool selection accuracy, and RAG grounding
+- `referenceReplayBenchmarks.js`
+  - no API key required
+  - shows replay-based runtime regression checks over stored runs
+- `referenceOpenApiImport.js`
+  - no API key required
+  - shows importing a small OpenAPI spec into runtime tools
+- `referenceDurableBackends.js`
+  - no API key required
+  - shows custom durable run/job/layer store implementations and registry usage
 
 ## Legacy / advanced examples
 
