@@ -1,5 +1,8 @@
-class InMemoryJobStore {
+const { BaseJobStore } = require('./BaseJobStore');
+
+class InMemoryJobStore extends BaseJobStore {
   constructor() {
+    super();
     this.jobs = new Map();
   }
 

@@ -9,6 +9,7 @@ const { EvalHarness } = require('./EvalHarness');
 const { LearningLoop } = require('./LearningLoop');
 const { GovernanceHooks } = require('./GovernanceHooks');
 const { ExtensionHost } = require('./ExtensionHost');
+const { StorageBackendRegistry } = require('./StorageBackendRegistry');
 const { ApprovalInbox } = require('./ApprovalInbox');
 const { BackgroundJobScheduler } = require('./BackgroundJobScheduler');
 const { DelegationRuntime } = require('./DelegationRuntime');
@@ -16,6 +17,8 @@ const { PlanningRuntime } = require('./PlanningRuntime');
 const { ToolPolicy } = require('./ToolPolicy');
 const { EventBus } = require('./EventBus');
 const { ConsoleDebugSink } = require('./ConsoleDebugSink');
+const { BaseRunStore } = require('./stores/BaseRunStore');
+const { BaseJobStore } = require('./stores/BaseJobStore');
 const { InMemoryRunStore } = require('./stores/InMemoryRunStore');
 const { FileRunStore } = require('./stores/FileRunStore');
 const { InMemoryJobStore } = require('./stores/InMemoryJobStore');
@@ -45,6 +48,7 @@ module.exports = {
   LearningLoop,
   GovernanceHooks,
   ExtensionHost,
+  StorageBackendRegistry,
   ApprovalInbox,
   BackgroundJobScheduler,
   DelegationRuntime,
@@ -52,6 +56,8 @@ module.exports = {
   ToolPolicy,
   EventBus,
   ConsoleDebugSink,
+  BaseRunStore,
+  BaseJobStore,
   InMemoryRunStore,
   FileRunStore,
   InMemoryJobStore,

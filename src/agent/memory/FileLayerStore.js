@@ -1,8 +1,10 @@
 const fs = require('fs/promises');
 const path = require('path');
+const { BaseLayerStore } = require('./BaseLayerStore');
 
-class FileLayerStore {
+class FileLayerStore extends BaseLayerStore {
   constructor({ filePath } = {}) {
+    super();
     if (!filePath) {
       throw new Error('FileLayerStore requires a filePath.');
     }

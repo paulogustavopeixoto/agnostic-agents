@@ -1,7 +1,9 @@
 const { Run } = require('../Run');
+const { BaseRunStore } = require('./BaseRunStore');
 
-class InMemoryRunStore {
+class InMemoryRunStore extends BaseRunStore {
   constructor() {
+    super();
     this.runs = new Map();
   }
 

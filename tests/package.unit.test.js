@@ -5,6 +5,7 @@ const path = require('path');
 const pkg = require('../index');
 const { Tool } = require('../src/tools/adapters/Tool');
 const { Memory } = require('../src/agent/Memory');
+const { BaseLayerStore } = require('../src/agent/memory/BaseLayerStore');
 const { InMemoryLayerStore } = require('../src/agent/memory/InMemoryLayerStore');
 const { FileLayerStore } = require('../src/agent/memory/FileLayerStore');
 const { RetryManager } = require('../src/utils/RetryManager');
@@ -21,6 +22,7 @@ const { EvalHarness } = require('../src/runtime/EvalHarness');
 const { LearningLoop } = require('../src/runtime/LearningLoop');
 const { GovernanceHooks } = require('../src/runtime/GovernanceHooks');
 const { ExtensionHost } = require('../src/runtime/ExtensionHost');
+const { StorageBackendRegistry } = require('../src/runtime/StorageBackendRegistry');
 const { RunTreeInspector } = require('../src/runtime/RunTreeInspector');
 const { IncidentDebugger } = require('../src/runtime/IncidentDebugger');
 const { TraceDiffer } = require('../src/runtime/TraceDiffer');
@@ -31,6 +33,8 @@ const { PlanningRuntime } = require('../src/runtime/PlanningRuntime');
 const { TraceSerializer } = require('../src/runtime/TraceSerializer');
 const { ToolPolicy } = require('../src/runtime/ToolPolicy');
 const { EventBus } = require('../src/runtime/EventBus');
+const { BaseRunStore } = require('../src/runtime/stores/BaseRunStore');
+const { BaseJobStore } = require('../src/runtime/stores/BaseJobStore');
 const { InMemoryRunStore } = require('../src/runtime/stores/InMemoryRunStore');
 const { FileRunStore } = require('../src/runtime/stores/FileRunStore');
 const { InMemoryJobStore } = require('../src/runtime/stores/InMemoryJobStore');
@@ -58,6 +62,7 @@ describe('Package/module unit tests', () => {
     expect(pkg.Agent).toBeDefined();
     expect(pkg.Tool).toBeDefined();
     expect(pkg.Memory).toBeDefined();
+    expect(pkg.BaseLayerStore).toBeDefined();
     expect(pkg.InMemoryLayerStore).toBeDefined();
     expect(pkg.FileLayerStore).toBeDefined();
     expect(pkg.RAG).toBeDefined();
@@ -78,10 +83,13 @@ describe('Package/module unit tests', () => {
     expect(pkg.LearningLoop).toBeDefined();
     expect(pkg.GovernanceHooks).toBeDefined();
     expect(pkg.ExtensionHost).toBeDefined();
+    expect(pkg.StorageBackendRegistry).toBeDefined();
     expect(pkg.ApprovalInbox).toBeDefined();
     expect(pkg.BackgroundJobScheduler).toBeDefined();
     expect(pkg.DelegationRuntime).toBeDefined();
     expect(pkg.PlanningRuntime).toBeDefined();
+    expect(pkg.BaseRunStore).toBeDefined();
+    expect(pkg.BaseJobStore).toBeDefined();
     expect(pkg.InMemoryRunStore).toBeDefined();
     expect(pkg.FileRunStore).toBeDefined();
     expect(pkg.InMemoryJobStore).toBeDefined();
@@ -392,6 +400,47 @@ describe('Package/module unit tests', () => {
     await expect(fileStore.listRuns()).resolves.toEqual([
       expect.objectContaining({ id: run.id }),
     ]);
+    expect(memoryStore).toBeInstanceOf(BaseRunStore);
+    expect(fileStore).toBeInstanceOf(BaseRunStore);
+  });
+
+  test('job and layer stores implement stable backend interfaces', async () => {
+    const jobStore = new InMemoryJobStore();
+    const layerStore = new InMemoryLayerStore();
+
+    await jobStore.saveJob({ id: 'job-1', handler: 'ping' });
+    await layerStore.set('key', { value: 'v' });
+
+    expect(jobStore).toBeInstanceOf(BaseJobStore);
+    expect(layerStore).toBeInstanceOf(BaseLayerStore);
+    await expect(jobStore.getJob('job-1')).resolves.toEqual(expect.objectContaining({ id: 'job-1' }));
+    await expect(layerStore.get('key')).resolves.toEqual({ value: 'v' });
+  });
+
+  test('StorageBackendRegistry registers and returns validated backends', () => {
+    const runStore = new InMemoryRunStore();
+    const jobStore = new InMemoryJobStore();
+    const layerStore = new InMemoryLayerStore();
+    const registry = new StorageBackendRegistry();
+
+    registry.registerRunStore('memory', runStore);
+    registry.registerJobStore('jobs', jobStore);
+    registry.registerLayerStore('layer', layerStore);
+
+    expect(registry.getRunStore('memory')).toBe(runStore);
+    expect(registry.getJobStore('jobs')).toBe(jobStore);
+    expect(registry.getLayerStore('layer')).toBe(layerStore);
+    expect(registry.list()).toEqual({
+      runStores: ['memory'],
+      jobStores: ['jobs'],
+      layerStores: ['layer'],
+    });
+  });
+
+  test('storage-backed runtime components fail fast on invalid backends', () => {
+    expect(() => new BackgroundJobScheduler({ store: {} })).toThrow('BackgroundJobScheduler store must implement saveJob().');
+    expect(() => new IncidentDebugger({ runStore: {} })).toThrow('IncidentDebugger runStore must implement saveRun().');
+    expect(() => new Memory({ stores: { working: {} } })).toThrow('Memory working store must implement get().');
   });
 
   test('RunTreeInspector builds and renders a parent-child run tree', async () => {

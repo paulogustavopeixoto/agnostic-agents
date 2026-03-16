@@ -2,10 +2,11 @@ const { Run } = require('./Run');
 const { RunInspector } = require('./RunInspector');
 const { RunTreeInspector } = require('./RunTreeInspector');
 const { TraceDiffer } = require('./TraceDiffer');
+const { BaseRunStore } = require('./stores/BaseRunStore');
 
 class IncidentDebugger {
   constructor({ runStore } = {}) {
-    this.runStore = runStore;
+    this.runStore = BaseRunStore.assert(runStore, 'IncidentDebugger runStore');
   }
 
   async createReport(runId, { compareToRunId = null } = {}) {

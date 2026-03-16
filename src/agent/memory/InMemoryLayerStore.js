@@ -1,5 +1,8 @@
-class InMemoryLayerStore {
+const { BaseLayerStore } = require('./BaseLayerStore');
+
+class InMemoryLayerStore extends BaseLayerStore {
   constructor({ initial = {} } = {}) {
+    super();
     this.records = { ...initial };
   }
 

@@ -1,7 +1,9 @@
 const { InMemoryJobStore } = require('./stores/InMemoryJobStore');
+const { BaseJobStore } = require('./stores/BaseJobStore');
 
 class BackgroundJobScheduler {
   constructor({ store = new InMemoryJobStore(), handlers = {} } = {}) {
+    BaseJobStore.assert(store, 'BackgroundJobScheduler store');
     this.store = store;
     this.handlers = new Map();
 

@@ -4,6 +4,7 @@ const { EventBus } = require('../EventBus');
 const { ConsoleDebugSink } = require('../ConsoleDebugSink');
 const { RunInspector } = require('../RunInspector');
 const { RetryManager } = require('../../utils/RetryManager');
+const { BaseRunStore } = require('../stores/BaseRunStore');
 const { InMemoryRunStore } = require('../stores/InMemoryRunStore');
 const { Workflow } = require('./Workflow');
 const { ExecutionGraph } = require('./ExecutionGraph');
@@ -26,9 +27,9 @@ class WorkflowRunner {
     eventBus = null,
     onEvent = null,
     debug = false,
-  } = {}) {
+    } = {}) {
     this.workflow = workflow instanceof Workflow ? workflow : new Workflow(workflow || {});
-    this.runStore = runStore;
+    this.runStore = BaseRunStore.assert(runStore, 'WorkflowRunner runStore');
     this.retryManager = retryManager;
     this.eventBus = eventBus instanceof EventBus ? eventBus : new EventBus(eventBus || {});
     if (debug) {

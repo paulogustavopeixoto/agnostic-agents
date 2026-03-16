@@ -1,11 +1,10 @@
 const { Run } = require('./Run');
 const { RunInspector } = require('./RunInspector');
+const { BaseRunStore } = require('./stores/BaseRunStore');
 
 class RunTreeInspector {
   static async build(runStore, { rootRunId = null } = {}) {
-    if (!runStore?.listRuns) {
-      throw new Error('RunTreeInspector requires a runStore with listRuns().');
-    }
+    BaseRunStore.assert(runStore, 'RunTreeInspector runStore');
 
     const rawRuns = await runStore.listRuns();
     const runs = rawRuns.map(entry => (entry instanceof Run ? entry : Run.fromJSON(entry)));

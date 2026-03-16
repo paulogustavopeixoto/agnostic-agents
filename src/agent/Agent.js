@@ -10,6 +10,7 @@ const { RunInspector } = require('../runtime/RunInspector');
 const { ApprovalInbox } = require('../runtime/ApprovalInbox');
 const { GovernanceHooks } = require('../runtime/GovernanceHooks');
 const { ExtensionHost } = require('../runtime/ExtensionHost');
+const { BaseRunStore } = require('../runtime/stores/BaseRunStore');
 const {
   AdapterCapabilityError,
   InvalidToolCallError,
@@ -76,7 +77,7 @@ class Agent {
     this.rag = rag;
     this.retryManager = retryManager;
     this.mcpClient = mcpClient;
-    this.runStore = runStore;
+    this.runStore = runStore ? BaseRunStore.assert(runStore, 'Agent runStore') : null;
     this.toolPolicy = this.extensionHost
       ? this.extensionHost.extendToolPolicy(toolPolicy)
       : toolPolicy instanceof ToolPolicy

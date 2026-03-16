@@ -1,8 +1,10 @@
 const fs = require('fs/promises');
 const path = require('path');
+const { BaseJobStore } = require('./BaseJobStore');
 
-class FileJobStore {
+class FileJobStore extends BaseJobStore {
   constructor({ directory = path.join(process.cwd(), '.agnostic-agents', 'jobs') } = {}) {
+    super();
     this.directory = directory;
   }
 

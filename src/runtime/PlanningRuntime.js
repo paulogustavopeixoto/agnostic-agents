@@ -1,6 +1,7 @@
 const { randomUUID } = require('crypto');
 const { Run } = require('./Run');
 const { EventBus } = require('./EventBus');
+const { BaseRunStore } = require('./stores/BaseRunStore');
 const { InMemoryRunStore } = require('./stores/InMemoryRunStore');
 
 class PlanningRuntime {
@@ -25,7 +26,7 @@ class PlanningRuntime {
     this.executor = executor;
     this.verifier = verifier;
     this.recovery = recovery;
-    this.runStore = runStore;
+    this.runStore = BaseRunStore.assert(runStore, 'PlanningRuntime runStore');
     this.eventBus = eventBus instanceof EventBus ? eventBus : new EventBus(eventBus || {});
     this.onEvent = onEvent;
     this.maxRecoveryAttempts = maxRecoveryAttempts;

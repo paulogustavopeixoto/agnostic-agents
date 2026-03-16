@@ -1,5 +1,6 @@
 const { EventEmitter } = require('events');
 const { InMemoryLayerStore } = require('./memory/InMemoryLayerStore');
+const { BaseLayerStore } = require('./memory/BaseLayerStore');
 
 class Memory extends EventEmitter {
   constructor({
@@ -11,10 +12,16 @@ class Memory extends EventEmitter {
     super();
     this.vectorStore = vectorStore;
     this.adapter = adapter;
+    const workingStore = stores.working || new InMemoryLayerStore();
+    const profileStore = stores.profile || new InMemoryLayerStore();
+    const policyStore = stores.policy || new InMemoryLayerStore();
+    BaseLayerStore.assert(workingStore, 'Memory working store');
+    BaseLayerStore.assert(profileStore, 'Memory profile store');
+    BaseLayerStore.assert(policyStore, 'Memory policy store');
     this.stores = {
-      working: stores.working || new InMemoryLayerStore(),
-      profile: stores.profile || new InMemoryLayerStore(),
-      policy: stores.policy || new InMemoryLayerStore(),
+      working: workingStore,
+      profile: profileStore,
+      policy: policyStore,
     };
     this.policies = {
       conversationLimit: policies.conversationLimit || null,

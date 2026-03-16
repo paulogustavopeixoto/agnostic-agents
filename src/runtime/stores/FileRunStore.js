@@ -1,9 +1,11 @@
 const fs = require('fs/promises');
 const path = require('path');
 const { Run } = require('../Run');
+const { BaseRunStore } = require('./BaseRunStore');
 
-class FileRunStore {
+class FileRunStore extends BaseRunStore {
   constructor({ directory = path.join(process.cwd(), '.agnostic-agents', 'runs') } = {}) {
+    super();
     this.directory = directory;
   }
 

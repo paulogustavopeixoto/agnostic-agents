@@ -3,6 +3,7 @@ const { Agent } = require('./src/agent/Agent');
 const { Tool } = require('./src/tools/adapters/Tool');
 const { MCPDiscoveryLoader } = require('./src/tools/adapters/MCPDiscoveryLoader');
 const { Memory } = require('./src/agent/Memory'); 
+const { BaseLayerStore } = require('./src/agent/memory/BaseLayerStore');
 const { InMemoryLayerStore } = require('./src/agent/memory/InMemoryLayerStore');
 const { FileLayerStore } = require('./src/agent/memory/FileLayerStore');
 const { OpenAIAdapter } = require('./src/llm/OpenAi');
@@ -38,6 +39,7 @@ const {
   LearningLoop,
   GovernanceHooks,
   ExtensionHost,
+  StorageBackendRegistry,
   ApprovalInbox,
   BackgroundJobScheduler,
   DelegationRuntime,
@@ -45,6 +47,8 @@ const {
   ToolPolicy,
   EventBus,
   ConsoleDebugSink,
+  BaseRunStore,
+  BaseJobStore,
   InMemoryRunStore,
   FileRunStore,
   InMemoryJobStore,
@@ -79,6 +83,7 @@ module.exports = {
   Agent,
   Tool,
   Memory,
+  BaseLayerStore,
   InMemoryLayerStore,
   FileLayerStore,
   OpenAIAdapter,
@@ -114,6 +119,7 @@ module.exports = {
   LearningLoop,
   GovernanceHooks,
   ExtensionHost,
+  StorageBackendRegistry,
   ApprovalInbox,
   BackgroundJobScheduler,
   DelegationRuntime,
@@ -121,6 +127,8 @@ module.exports = {
   ToolPolicy,
   EventBus,
   ConsoleDebugSink,
+  BaseRunStore,
+  BaseJobStore,
   InMemoryRunStore,
   FileRunStore,
   InMemoryJobStore,
