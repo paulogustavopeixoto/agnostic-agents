@@ -119,4 +119,28 @@ describe('Maintained examples', () => {
     expect(stdout).toContain('Adaptive governance review');
     expect(stdout).toContain('Adaptive benchmark report');
   });
+
+  test('reference coordination review example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceCoordinationReview.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Structured critique review');
+    expect(stdout).toContain('Trust summary');
+    expect(stdout).toContain('Resolved coordination action');
+    expect(stdout).toContain('Coordination loop record');
+  });
+
+  test('reference decomposition advisor example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceDecompositionAdvisor.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Decomposition recommendation');
+    expect(stdout).toContain('split_and_delegate');
+    expect(stdout).toContain('researcher');
+    expect(stdout).toContain('writer');
+  });
 });

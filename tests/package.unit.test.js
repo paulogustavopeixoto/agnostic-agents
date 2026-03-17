@@ -16,6 +16,12 @@ const { FallbackRouter } = require('../src/llm/FallbackRouter');
 const { MCPClient } = require('../src/mcp/MCPClient');
 const { OpenAPILoader } = require('../src/api/OpenAPILoader');
 const { ApiLoader } = require('../src/api/ApiLoader');
+const { CritiqueProtocol } = require('../src/coordination/CritiqueProtocol');
+const { CritiqueSchemaRegistry } = require('../src/coordination/CritiqueSchemaRegistry');
+const { TrustRegistry } = require('../src/coordination/TrustRegistry');
+const { DisagreementResolver } = require('../src/coordination/DisagreementResolver');
+const { CoordinationLoop } = require('../src/coordination/CoordinationLoop');
+const { DecompositionAdvisor } = require('../src/coordination/DecompositionAdvisor');
 const { Run } = require('../src/runtime/Run');
 const { EvidenceGraph } = require('../src/runtime/EvidenceGraph');
 const { EvalHarness } = require('../src/runtime/EvalHarness');
@@ -89,6 +95,12 @@ describe('Package/module unit tests', () => {
     expect(pkg.MCPClient).toBeDefined();
     expect(pkg.OpenAPILoader).toBeDefined();
     expect(pkg.ApiLoader).toBeDefined();
+    expect(pkg.CritiqueProtocol).toBeDefined();
+    expect(pkg.CritiqueSchemaRegistry).toBeDefined();
+    expect(pkg.TrustRegistry).toBeDefined();
+    expect(pkg.DisagreementResolver).toBeDefined();
+    expect(pkg.CoordinationLoop).toBeDefined();
+    expect(pkg.DecompositionAdvisor).toBeDefined();
     expect(pkg.Run).toBeDefined();
     expect(pkg.DistributedRunEnvelope).toBeDefined();
     expect(pkg.ExecutionIdentity).toBeDefined();
@@ -196,6 +208,269 @@ describe('Package/module unit tests', () => {
       input_schema: tool.parameters,
     });
     await expect(tool.call({ expression: '1+1' })).resolves.toEqual({ result: '1+1' });
+  });
+
+  test('CritiqueProtocol and DisagreementResolver produce structured coordination outcomes', async () => {
+    const protocol = new CritiqueProtocol({
+      reviewers: [
+        {
+          id: 'critic-a',
+          review: async candidate => ({
+            criticId: 'critic-a',
+            verdict: 'reject',
+            failureType: 'reasoning',
+            severity: 'high',
+            confidence: 0.9,
+            recommendedAction: 'branch_and_retry',
+            rationale: `Reasoning chain in ${candidate.id} is incomplete.`,
+          }),
+        },
+        {
+          id: 'critic-b',
+          review: async candidate => ({
+            criticId: 'critic-b',
+            verdict: 'accept',
+            failureType: 'general',
+            severity: 'low',
+            confidence: 0.6,
+            recommendedAction: 'accept',
+            rationale: `${candidate.id} is acceptable.`,
+          }),
+        },
+      ],
+    });
+
+    const trustRegistry = new TrustRegistry();
+    trustRegistry.recordOutcome({
+      actorId: 'critic-a',
+      domain: 'reasoning',
+      success: true,
+      confidence: 0.95,
+    });
+    trustRegistry.recordOutcome({
+      actorId: 'critic-a',
+      domain: 'reasoning',
+      success: true,
+      confidence: 0.9,
+    });
+    trustRegistry.recordOutcome({
+      actorId: 'critic-b',
+      domain: 'reasoning',
+      success: false,
+      confidence: 0.4,
+    });
+
+    const review = await protocol.review({ id: 'candidate-1' });
+    const resolver = new DisagreementResolver({ trustRegistry });
+    const resolution = resolver.resolve(review.critiques, { domain: 'reasoning' });
+
+    expect(review.summary).toEqual(
+      expect.objectContaining({
+        total: 2,
+        disagreement: true,
+      })
+    );
+    expect(resolution).toEqual(
+      expect.objectContaining({
+        action: 'escalate',
+        disagreement: true,
+      })
+    );
+    expect(resolution.rankedCritiques[0]).toEqual(
+      expect.objectContaining({
+        criticId: 'critic-a',
+      })
+    );
+  });
+
+  test('CritiqueProtocol applies task-family critique schemas and taxonomies', async () => {
+    const schemaRegistry = new CritiqueSchemaRegistry({
+      schemas: {
+        release_review: {
+          taxonomy: {
+            grounding: {
+              severity: 'high',
+              verdict: 'reject',
+              recommendedAction: 'branch_and_retry',
+              requiredEvidence: ['citations'],
+            },
+            policy: {
+              severity: 'critical',
+              verdict: 'escalate',
+              recommendedAction: 'escalate',
+              requiredEvidence: ['approval_record'],
+            },
+          },
+        },
+      },
+    });
+
+    const protocol = new CritiqueProtocol({
+      schemaRegistry,
+      reviewers: [
+        {
+          id: 'schema-aware-reviewer',
+          review: async () => ({
+            criticId: 'schema-aware-reviewer',
+            failureType: 'grounding',
+            rationale: 'The release note has unsupported claims.',
+          }),
+        },
+      ],
+    });
+
+    const review = await protocol.review(
+      { id: 'candidate-3', taskFamily: 'release_review' },
+      { taskFamily: 'release_review' }
+    );
+
+    expect(review.critiques[0]).toEqual(
+      expect.objectContaining({
+        failureType: 'grounding',
+        severity: 'high',
+        verdict: 'reject',
+        recommendedAction: 'branch_and_retry',
+      })
+    );
+    expect(review.critiques[0].metadata).toEqual(
+      expect.objectContaining({
+        taskFamily: 'release_review',
+        requiredEvidence: ['citations'],
+      })
+    );
+  });
+
+  test('CoordinationLoop executes a resolved action and records trust-weighted history', async () => {
+    const trustRegistry = new TrustRegistry();
+    const loop = new CoordinationLoop({
+      trustRegistry,
+      critiqueProtocol: new CritiqueProtocol({
+        reviewers: [
+          {
+            id: 'critic-policy',
+            review: async () => ({
+              criticId: 'critic-policy',
+              verdict: 'escalate',
+              failureType: 'policy',
+              severity: 'critical',
+              confidence: 0.95,
+              recommendedAction: 'escalate',
+              rationale: 'Operator review is required.',
+            }),
+          },
+        ],
+      }),
+      handlers: {
+        escalate: async ({ candidate }) => ({
+          ok: true,
+          escalated: true,
+          candidateId: candidate.id,
+        }),
+      },
+    });
+
+    const record = await loop.coordinate({ id: 'candidate-2' }, { domain: 'policy' });
+
+    expect(record.resolution).toEqual(
+      expect.objectContaining({
+        action: 'escalate',
+      })
+    );
+    expect(record.result).toEqual(
+      expect.objectContaining({
+        action: 'escalate',
+        ok: true,
+        output: expect.objectContaining({
+          escalated: true,
+          candidateId: 'candidate-2',
+        }),
+      })
+    );
+    expect(loop.listHistory()).toHaveLength(1);
+    expect(trustRegistry.summarize()).toEqual(
+      expect.objectContaining({
+        totalRecords: 1,
+      })
+    );
+  });
+
+  test('DecompositionAdvisor recommends splitting or delegating based on task shape', () => {
+    const advisor = new DecompositionAdvisor();
+
+    const delegated = advisor.recommend(
+      {
+        id: 'task-1',
+        task: 'Prepare a manager-ready incident summary',
+        taskType: 'writing',
+        complexity: 0.7,
+        risk: 0.25,
+        requiredCapabilities: ['generateText'],
+      },
+      {
+        availableDelegates: [
+          {
+            id: 'writer',
+            capabilities: ['generateText'],
+            specializations: ['writing'],
+            trustScore: 0.9,
+          },
+        ],
+      }
+    );
+
+    expect(delegated).toEqual(
+      expect.objectContaining({
+        action: 'delegate',
+      })
+    );
+
+    const split = advisor.recommend(
+      {
+        id: 'task-2',
+        task: 'Investigate release health and prepare executive summary',
+        taskType: 'analysis',
+        complexity: 0.92,
+        risk: 0.4,
+        requiredCapabilities: ['generateText', 'retrieval'],
+        suggestedSubtasks: [
+          {
+            task: 'Investigate release health',
+            taskType: 'analysis',
+            requiredCapabilities: ['retrieval'],
+          },
+          {
+            task: 'Prepare executive summary',
+            taskType: 'writing',
+            requiredCapabilities: ['generateText'],
+          },
+        ],
+      },
+      {
+        availableDelegates: [
+          {
+            id: 'researcher',
+            capabilities: ['retrieval'],
+            specializations: ['analysis'],
+            trustScore: 0.88,
+          },
+          {
+            id: 'writer',
+            capabilities: ['generateText'],
+            specializations: ['writing'],
+            trustScore: 0.91,
+          },
+        ],
+      }
+    );
+
+    expect(split).toEqual(
+      expect.objectContaining({
+        action: 'split_and_delegate',
+      })
+    );
+    expect(split.suggestedPlan).toHaveLength(2);
+    expect(split.suggestedPlan[0].delegate).toEqual(expect.objectContaining({ id: 'researcher' }));
+    expect(split.suggestedPlan[1].delegate).toEqual(expect.objectContaining({ id: 'writer' }));
   });
 
   test('Run tracks state and serializes cleanly', () => {
@@ -1112,6 +1387,31 @@ describe('Package/module unit tests', () => {
       expect.objectContaining({
         action: 'require_approval',
         ruleId: 'approve-external',
+        source: 'rule',
+      })
+    );
+  });
+
+  test('ToolPolicy can accept dynamic policy rules at runtime', () => {
+    const policy = new ToolPolicy();
+    policy.addRule({
+      id: 'dynamic-approval',
+      sideEffectLevels: ['external_write'],
+      action: 'require_approval',
+      reason: 'Runtime-added policy requires approval.',
+    });
+
+    const tool = new Tool({
+      name: 'notify_user',
+      parameters: { type: 'object', properties: {} },
+      metadata: { sideEffectLevel: 'external_write' },
+      implementation: async () => ({ ok: true }),
+    });
+
+    expect(policy.evaluate(tool, {}, {})).toEqual(
+      expect.objectContaining({
+        action: 'require_approval',
+        ruleId: 'dynamic-approval',
         source: 'rule',
       })
     );

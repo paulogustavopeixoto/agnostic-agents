@@ -27,6 +27,7 @@ The package ships a maintained `index.d.ts` so TypeScript projects get typed acc
 - `FallbackRouter`: capability-aware provider fallback routing with cost/risk/task-type hints and optional history-aware routing advice.
 - `BackgroundJobScheduler`: recurring and delayed job execution with pluggable job stores.
 - `EvidenceGraph` / `EvalHarness` / `LearningLoop` / `BranchQualityAnalyzer` / `PolicyTuningAdvisor` / `VerifierEnsemble` / `ConfidencePolicy` / `AdaptiveRetryPolicy` / `HistoricalRoutingAdvisor` / `AdaptiveDecisionLedger` / `AdaptiveGovernanceGate`: runtime evidence tracking, eval execution, learning signals from runs and benchmarks, adaptive recommendation summaries, replay/branch quality comparison, policy-tuning suggestions, composed reviewer strategies, confidence-aware execution thresholds, adaptive retry/escalation control, history-aware provider routing, durable adaptive audit trails, and approval-aware review for material adaptive changes.
+- `CritiqueProtocol` / `CritiqueSchemaRegistry` / `TrustRegistry` / `DisagreementResolver` / `CoordinationLoop` / `DecompositionAdvisor`: a separate coordination layer for structured critique, task-family failure taxonomies, trust-weighted coordination, explicit disagreement resolution, a simple propose -> critique -> resolve -> act loop, and task decomposition/delegation recommendations above the runtime.
 - `EventBus` / `ConsoleDebugSink` / `FileAuditSink` / `WebhookEventSink` / `RuntimeEventRedactor`: structured runtime events, debug sinks, JSONL audit logging, external event forwarding, and PII-safe redaction helpers.
 - `ToolPolicy` / `GovernanceHooks` / `WebhookGovernanceAdapter` / `ApprovalInbox` / `StorageBackendRegistry`: governance policy controls, external review hooks, remote control-plane forwarding, and stable runtime storage contracts.
 - environment adapters for browser, shell, API, queue, and file-backed execution environments.
@@ -316,6 +317,8 @@ The agent validates tool arguments against `parameters`, applies schema defaults
 - `npm run example:reference-evals`
 - `npm run example:reference-replay-benchmarks`
 - `npm run example:reference-v7-audit`
+- `npm run example:reference-coordination-review`
+- `npm run example:reference-decomposition-advisor`
 - `npm run example:reference-openapi`
 - `npm run example:reference-durable-backends`
 - `npm run example:reference-distributed-handoff`
@@ -366,6 +369,8 @@ This package currently targets:
 - maintained benchmark references for replay regressions and adaptive routing/governance decisions
 - a single `v7` audit example for end-to-end adaptive-runtime verification logs
 - adaptive routing, verifier composition, confidence-aware execution, adaptive retry/escalation, and approval-aware adaptive governance
+- a separate in-repo coordination layer for structured critique and disagreement resolution above the runtime core
+- a maintained coordination loop example that turns critiques into an executed next action
 - MCP tool discovery
 - eval and learning-loop primitives for runtime benchmarking
 

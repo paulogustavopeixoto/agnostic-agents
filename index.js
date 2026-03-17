@@ -28,6 +28,14 @@ const { MCPClient } = require('./src/mcp/MCPClient');
 const { OpenAPILoader } = require('./src/api/OpenAPILoader');
 const { ApiLoader } = require('./src/api/ApiLoader');
 const {
+  CritiqueProtocol,
+  CritiqueSchemaRegistry,
+  TrustRegistry,
+  DisagreementResolver,
+  CoordinationLoop,
+  DecompositionAdvisor,
+} = require('./src/coordination');
+const {
   Run,
   RunInspector,
   RunTreeInspector,
@@ -125,6 +133,12 @@ module.exports = {
   OpenAPILoader,
   MCPDiscoveryLoader,
   ApiLoader,
+  CritiqueProtocol,
+  CritiqueSchemaRegistry,
+  TrustRegistry,
+  DisagreementResolver,
+  CoordinationLoop,
+  DecompositionAdvisor,
   Run,
   RunInspector,
   RunTreeInspector,

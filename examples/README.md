@@ -57,6 +57,12 @@ These examples are intended as reference deployment patterns rather than feature
 - `referenceV7Audit.js`
   - no API key required
   - prints a single end-to-end `v7` audit across learning, branch analysis, verifier composition, confidence policy, adaptive retry, routing, governance review, and adaptive benchmarks
+- `referenceCoordinationReview.js`
+  - no API key required
+  - shows a first coordination-layer slice where structured critics review a runtime summary, trust scores weight the critics, a disagreement resolver chooses the next action, and a coordination loop executes that action
+- `referenceDecompositionAdvisor.js`
+  - no API key required
+  - shows how the coordination layer can recommend direct execution, delegation, or split-and-delegate plans based on task complexity, risk, capabilities, and delegate trust
 - `referenceOpenApiImport.js`
   - no API key required
   - shows importing a small OpenAPI spec into runtime tools

@@ -159,6 +159,17 @@ class ToolPolicy {
     return { action: 'allow', reason: null };
   }
 
+  addRule(rule = {}) {
+    this.rules.push(rule);
+    return rule;
+  }
+
+  addRules(rules = []) {
+    const normalizedRules = Array.isArray(rules) ? rules : [rules];
+    this.rules.push(...normalizedRules);
+    return normalizedRules;
+  }
+
   _matchesRule(rule = {}, tool, args = {}, context = {}) {
     if (typeof rule.match === 'function') {
       return rule.match(tool, args, context) === true;

@@ -77,6 +77,64 @@ export class Agent {
   replayRun(runId: string, options?: JsonObject): Promise<Run>;
 }
 
+export class CritiqueProtocol {
+  constructor(options?: {
+    reviewers?: Array<((candidate: JsonObject, context?: JsonObject) => Promise<JsonObject | JsonObject[]> | JsonObject | JsonObject[]) | any>;
+    failureTypes?: string[];
+    schemaRegistry?: CritiqueSchemaRegistry | JsonObject | null;
+  });
+  review(candidate?: JsonObject, context?: JsonObject): Promise<JsonObject>;
+  normalizeCritique(critique?: JsonObject, candidate?: JsonObject, context?: JsonObject, reviewer?: any): JsonObject;
+  summarize(critiques?: JsonObject[]): JsonObject;
+}
+
+export class CritiqueSchemaRegistry {
+  constructor(options?: {
+    schemas?: JsonObject[] | Record<string, JsonObject>;
+  });
+  register(taskFamily: string, schema?: JsonObject): JsonObject;
+  resolve(candidateOrTaskFamily?: string | JsonObject | null, context?: JsonObject): JsonObject | null;
+  list(): JsonObject[];
+}
+
+export class TrustRegistry {
+  constructor(options?: { records?: JsonObject[] });
+  recordOutcome(outcome?: JsonObject): JsonObject;
+  getScore(actorId: string, options?: { domain?: string | null }): number;
+  rankActors(actorIds?: string[], options?: { domain?: string | null }): JsonObject[];
+  summarize(): JsonObject;
+}
+
+export class DisagreementResolver {
+  constructor(options?: {
+    trustRegistry?: TrustRegistry | JsonObject | null;
+    escalateOnDisagreement?: boolean;
+  });
+  resolve(critiques?: JsonObject[], context?: JsonObject): JsonObject;
+}
+
+export class CoordinationLoop {
+  constructor(options?: {
+    critiqueProtocol?: CritiqueProtocol | JsonObject | null;
+    trustRegistry?: TrustRegistry | JsonObject | null;
+    disagreementResolver?: DisagreementResolver | JsonObject | null;
+    handlers?: Record<string, (payload: JsonObject) => Promise<JsonObject> | JsonObject>;
+    history?: JsonObject[];
+  });
+  coordinate(candidate?: JsonObject, context?: JsonObject): Promise<JsonObject>;
+  listHistory(): JsonObject[];
+}
+
+export class DecompositionAdvisor {
+  constructor(options?: {
+    delegateComplexityThreshold?: number;
+    splitComplexityThreshold?: number;
+    escalateRiskThreshold?: number;
+  });
+  recommend(task?: JsonObject, options?: { availableDelegates?: JsonObject[] }): JsonObject;
+  rankDelegates(task?: JsonObject, delegates?: JsonObject[]): JsonObject[];
+}
+
 export interface RunMetrics {
   tokenUsage: {
     prompt: number;
@@ -405,6 +463,8 @@ export class ToolPolicy {
   constructor(options?: JsonObject);
   evaluate(tool: any, context?: JsonObject): JsonObject;
   verify(tool: any, context?: JsonObject): JsonObject;
+  addRule(rule?: JsonObject): JsonObject;
+  addRules(rules?: JsonObject[]): JsonObject[];
 }
 
 export class EvidenceGraph {
