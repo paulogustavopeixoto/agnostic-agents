@@ -70,6 +70,19 @@ describe('Maintained examples', () => {
     expect(stdout).toContain('completed');
   });
 
+  test('reference public control plane example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referencePublicControlPlane.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Public control-plane snapshot');
+    expect(stdout).toContain('renderedTree');
+    expect(stdout).toContain('incidentSummary');
+    expect(stdout).toContain('traceDiffSummary');
+    expect(stdout).toContain('agnostic-agents-trace-bundle');
+  });
+
   test('reference deployment split example runs', async () => {
     const examplePath = path.join(__dirname, '..', 'examples', 'referenceDeploymentSplit.js');
     const { stdout } = await execFileAsync(process.execPath, [examplePath], {

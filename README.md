@@ -372,7 +372,8 @@ If you are evaluating the package for serious runtime usage:
 2. read [docs/common-stack-integrations.md](docs/common-stack-integrations.md)
 3. run `reference-file-backed-stack`
 4. run `reference-deployment-split`
-5. review [docs/operator-workflows.md](docs/operator-workflows.md)
+5. run `reference-public-control-plane`
+6. review [docs/operator-workflows.md](docs/operator-workflows.md)
 
 ## Documentation Map
 
@@ -388,6 +389,8 @@ Runtime operations:
 - [Common stack integrations](docs/common-stack-integrations.md)
 - [Operator workflows](docs/operator-workflows.md)
 - [Operator architecture](docs/operator-architecture.md)
+- [Public control-plane references](docs/public-control-plane-references.md)
+- [Run and trace visualization](docs/run-trace-visualization.md)
 - [Distributed execution](docs/distributed-execution.md)
 - [Remote control planes](docs/remote-control-planes.md)
 - [Distributed identities](docs/distributed-identities.md)

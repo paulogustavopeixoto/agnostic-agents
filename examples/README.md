@@ -93,6 +93,9 @@ These examples are intended as reference deployment patterns rather than feature
 - `referenceRemoteControlPlane.js`
   - no API key required
   - shows governance callbacks and runtime events being forwarded to a remote control-plane service
+- `referencePublicControlPlane.js`
+  - no API key required
+  - shows a thin public control-plane view built from durable runs, run trees, incident reports, trace diffs, and portable trace bundles
 - `referenceDeploymentSplit.js`
   - no API key required
   - shows an API service, worker, and control plane sharing runtime stores and callback transports

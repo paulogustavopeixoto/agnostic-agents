@@ -90,7 +90,33 @@ Key runtime pieces:
 For operator triage and recovery procedures, see [`docs/operator-workflows.md`](operator-workflows.md).
 For distributed handoff and correlation guidance, see [`docs/distributed-execution.md`](distributed-execution.md).
 
-## 4. Suggested production split
+## 4. Public control plane and visualization
+
+Use this pattern when you want a thin service or UI layer that:
+
+- reads durable runs without owning runtime execution
+- renders lineage and run trees
+- shows incident summaries and recovery recommendations
+- compares traces across retries, branches, or releases
+
+Reference file:
+
+- [`examples/referencePublicControlPlane.js`](../examples/referencePublicControlPlane.js)
+
+Key runtime pieces:
+
+- `RunTreeInspector`
+- `IncidentDebugger`
+- `TraceDiffer`
+- `TraceSerializer`
+- `FileRunStore` or another durable `BaseRunStore`
+
+Related docs:
+
+- [`public-control-plane-references.md`](public-control-plane-references.md)
+- [`run-trace-visualization.md`](run-trace-visualization.md)
+
+## 5. Suggested production split
 
 For most serious systems, split the runtime into separate processes:
 
@@ -118,7 +144,7 @@ Maintained split reference:
 
 - [`examples/referenceDeploymentSplit.js`](../examples/referenceDeploymentSplit.js)
 
-## 5. Storage recommendation
+## 6. Storage recommendation
 
 For local development:
 
@@ -139,7 +165,7 @@ For larger systems:
 - implement `BaseLayerStore`
 - register them through `StorageBackendRegistry`
 
-## 6. Trace export recommendation
+## 7. Trace export recommendation
 
 Use trace export in two layers:
 
