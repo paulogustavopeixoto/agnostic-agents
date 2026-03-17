@@ -1211,6 +1211,182 @@ describe('Agent', () => {
     await expect(agent.run('Use tool to send email')).rejects.toBeInstanceOf(ToolPolicyError);
   });
 
+  test('supports composed verifier strategies before risky tool execution', async () => {
+    const { VerifierEnsemble } = require('../src/runtime/VerifierEnsemble');
+    const tool = new Tool({
+      name: 'send_email',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string' },
+        },
+        required: ['query'],
+      },
+      metadata: {
+        sideEffectLevel: 'external_write',
+      },
+      implementation: async ({ query }) => ({ sent: query }),
+    });
+
+    mockAdapter.generateText = jest.fn()
+      .mockResolvedValueOnce({
+        message: '',
+        toolCalls: [{ name: 'send_email', arguments: { query: 'status' }, id: 'tool_use_1' }],
+      })
+      .mockResolvedValueOnce({
+        message: 'Sent',
+      });
+
+    const verifier = new VerifierEnsemble({
+      reviewers: [
+        async () => ({ action: 'allow', reason: 'content is fine' }),
+        async () => ({ action: 'allow', reason: 'safety reviewer agrees' }),
+      ],
+    });
+    const agent = new Agent(mockAdapter, {
+      tools: [tool],
+      retryManager,
+      verifier,
+    });
+
+    const run = await agent.run('Use tool to send email');
+
+    expect(run.status).toBe('completed');
+    expect(run.state.evidenceGraph.nodes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'verifier',
+          reviewers: expect.any(Array),
+          strategy: 'most_restrictive',
+        }),
+      ])
+    );
+  });
+
+  test('requires approval for low-confidence risky tool calls when confidence policy is enabled', async () => {
+    const { ConfidencePolicy } = require('../src/runtime/ConfidencePolicy');
+    const tool = new Tool({
+      name: 'send_email',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string' },
+        },
+        required: ['query'],
+      },
+      metadata: {
+        sideEffectLevel: 'external_write',
+      },
+      implementation: async ({ query }) => ({ sent: query }),
+    });
+
+    mockAdapter.generateText = jest.fn().mockResolvedValue({
+      message: '',
+      toolCalls: [{ name: 'send_email', arguments: {}, id: 'tool_use_1' }],
+    });
+
+    const agent = new Agent(mockAdapter, {
+      tools: [tool],
+      retryManager,
+      confidencePolicy: new ConfidencePolicy({ toolApprovalThreshold: 0.8 }),
+    });
+
+    const run = await agent.run('Use tool to send email');
+
+    expect(run.status).toBe('waiting_for_approval');
+    expect(run.pendingApproval).toEqual(
+      expect.objectContaining({
+        toolName: 'send_email',
+        confidence: expect.objectContaining({
+          score: 0,
+        }),
+      })
+    );
+    expect(run.events.map(event => event.type)).toEqual(
+      expect.arrayContaining(['tool_confidence_scored', 'confidence_policy_decision', 'approval_requested'])
+    );
+  });
+
+  test('pauses low-confidence final outputs when run confidence policy is enabled', async () => {
+    const { ConfidencePolicy } = require('../src/runtime/ConfidencePolicy');
+
+    mockAdapter.generateText = jest.fn().mockResolvedValue({
+      message: 'Here is the answer.',
+      toolCalls: [],
+    });
+
+    const agent = new Agent(mockAdapter, {
+      tools: [],
+      retryManager,
+      confidencePolicy: new ConfidencePolicy({ runPauseThreshold: 0.7 }),
+    });
+
+    const run = await agent.run('Answer the question', { selfVerify: false });
+
+    expect(run.status).toBe('paused');
+    expect(run.pendingPause).toEqual(
+      expect.objectContaining({
+        stage: 'confidence_review',
+        source: 'confidence_policy',
+      })
+    );
+    expect(run.events.map(event => event.type)).toEqual(
+      expect.arrayContaining(['confidence_policy_decision', 'run_paused'])
+    );
+  });
+
+  test('pauses risky tool execution when adaptive retry policy escalates after a failure', async () => {
+    const { AdaptiveRetryPolicy } = require('../src/runtime/AdaptiveRetryPolicy');
+    const { LearningLoop } = require('../src/runtime/LearningLoop');
+    const tool = new Tool({
+      name: 'send_email',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string' },
+        },
+        required: ['query'],
+      },
+      metadata: {
+        sideEffectLevel: 'external_write',
+      },
+      implementation: async () => {
+        throw new Error('smtp timeout');
+      },
+    });
+
+    mockAdapter.generateText = jest.fn().mockResolvedValue({
+      message: '',
+      toolCalls: [{ name: 'send_email', arguments: { query: 'status' }, id: 'tool_use_1' }],
+    });
+
+    const learningLoop = new LearningLoop();
+    learningLoop.recordRun(new Run({ input: 'prior failed run', status: 'failed', errors: [{ message: 'boom' }] }));
+
+    const agent = new Agent(mockAdapter, {
+      tools: [tool],
+      retryManager,
+      verifier: jest.fn().mockResolvedValue({ action: 'allow', reason: 'reviewed' }),
+      adaptiveRetryPolicy: new AdaptiveRetryPolicy({
+        learningLoop,
+        escalateAfterAttempt: 0,
+      }),
+    });
+
+    const run = await agent.run('Use tool to send email');
+
+    expect(run.status).toBe('paused');
+    expect(run.pendingPause).toEqual(
+      expect.objectContaining({
+        stage: 'adaptive_retry_escalation',
+        toolName: 'send_email',
+      })
+    );
+    expect(run.events.map(event => event.type)).toEqual(
+      expect.arrayContaining(['adaptive_retry_escalated', 'run_paused'])
+    );
+  });
+
   test('records self-verification, tool confidence, and run assessment', async () => {
     const tool = new Tool({
       name: 'send_email',

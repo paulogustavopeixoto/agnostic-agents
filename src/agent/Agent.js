@@ -4,6 +4,8 @@ const { MissingInfoResolver } = require('./MissingInfoResolver');
 const { Run } = require('../runtime/Run');
 const { EvidenceGraph } = require('../runtime/EvidenceGraph');
 const { ToolPolicy } = require('../runtime/ToolPolicy');
+const { ConfidencePolicy } = require('../runtime/ConfidencePolicy');
+const { AdaptiveRetryPolicy } = require('../runtime/AdaptiveRetryPolicy');
 const { EventBus } = require('../runtime/EventBus');
 const { ConsoleDebugSink } = require('../runtime/ConsoleDebugSink');
 const { RunInspector } = require('../runtime/RunInspector');
@@ -61,6 +63,8 @@ class Agent {
       authContext = null,
       resolveToolAuth = null,
       executionIdentity = null,
+      confidencePolicy = null,
+      adaptiveRetryPolicy = null,
       onEvent = null,
       eventBus = null,
       debug = false,
@@ -94,6 +98,18 @@ class Agent {
     this.authContext = authContext && typeof authContext === 'object' ? { ...authContext } : null;
     this.resolveToolAuth = typeof resolveToolAuth === 'function' ? resolveToolAuth : null;
     this.executionIdentity = ExecutionIdentity.normalize(executionIdentity);
+    this.confidencePolicy =
+      confidencePolicy instanceof ConfidencePolicy
+        ? confidencePolicy
+        : confidencePolicy
+          ? new ConfidencePolicy(confidencePolicy)
+          : null;
+    this.adaptiveRetryPolicy =
+      adaptiveRetryPolicy instanceof AdaptiveRetryPolicy
+        ? adaptiveRetryPolicy
+        : adaptiveRetryPolicy
+          ? new AdaptiveRetryPolicy(adaptiveRetryPolicy)
+          : null;
     this.onEvent = onEvent;
     this.eventBus = this.extensionHost
       ? this.extensionHost.extendEventBus(eventBus)
@@ -405,6 +421,67 @@ class Agent {
 
     run.state.assessment = assessment;
     return assessment;
+  }
+
+  async _applyToolConfidencePolicy(run, tool, toolCall, toolAssessment, finalConfig = {}) {
+    if (!this.confidencePolicy?.evaluateTool) {
+      return { action: 'allow', reason: null, source: 'disabled' };
+    }
+
+    const decision = this.confidencePolicy.evaluateTool(tool, toolAssessment, {
+      run,
+      config: finalConfig,
+      toolCall,
+    }) || { action: 'allow', reason: null, source: 'confidence_policy' };
+
+    run.state.policyDecisions = run.state.policyDecisions || [];
+    run.state.policyDecisions.push({
+      toolName: tool.name,
+      stage: 'confidence',
+      decision,
+    });
+    await this._emitEvent(run, 'confidence_policy_decision', {
+      toolName: tool.name,
+      stage: 'tool',
+      decision,
+      assessment: toolAssessment,
+    });
+
+    return decision;
+  }
+
+  async _applyRunConfidencePolicy(run, assessment, finalConfig = {}) {
+    if (!this.confidencePolicy?.evaluateRun) {
+      return { action: 'allow', reason: null, source: 'disabled' };
+    }
+
+    const decision = this.confidencePolicy.evaluateRun(run, assessment, {
+      run,
+      config: finalConfig,
+    }) || { action: 'allow', reason: null, source: 'confidence_policy' };
+
+    run.state.policyDecisions = run.state.policyDecisions || [];
+    run.state.policyDecisions.push({
+      toolName: null,
+      stage: 'run_confidence',
+      decision,
+    });
+    await this._emitEvent(run, 'confidence_policy_decision', {
+      toolName: null,
+      stage: 'run',
+      decision,
+      assessment,
+    });
+
+    if (decision.action === 'pause') {
+      return this._pauseRun(run, decision.reason || 'Run paused for confidence review.', {
+        stage: 'confidence_review',
+        source: 'confidence_policy',
+        assessment,
+      });
+    }
+
+    return decision;
   }
 
   _outputProposesNewAction(run) {
@@ -853,6 +930,9 @@ class Agent {
           const toolResult = await this.retryManager.execute(() =>
             this._handleToolCall(toolCall, { run })
           );
+          if (toolResult?.__adaptiveEscalated) {
+            return run;
+          }
 
           this._appendToolMessages(run, toolCall, toolResult);
           await this._persistRun(run);
@@ -869,7 +949,14 @@ class Agent {
 
       run.output = result?.message || result;
       await this._selfVerifyRunOutput(run, finalConfig);
-      this._assessRun(run);
+      const assessment = this._assessRun(run);
+      const confidenceDecision = await this._applyRunConfidencePolicy(run, assessment, finalConfig);
+      if (run.status === 'paused') {
+        return run;
+      }
+      if (confidenceDecision?.action === 'deny') {
+        throw new ToolPolicyError(confidenceDecision.reason || 'Run denied by confidence policy.');
+      }
       run.setStatus('completed');
 
       if (this.memory?.storeConversation) {
@@ -927,7 +1014,35 @@ class Agent {
 
     run.addToolCall(request);
     await this._emitEvent(run, 'tool_requested', request);
-    await this._scoreToolCallConfidence(run, toolInstance, toolCall);
+    const toolAssessment = await this._scoreToolCallConfidence(run, toolInstance, toolCall);
+    const confidenceDecision = await this._applyToolConfidencePolicy(
+      run,
+      toolInstance,
+      toolCall,
+      toolAssessment,
+      finalConfig
+    );
+
+    if (confidenceDecision?.action === 'deny') {
+      throw new ToolPolicyError(
+        confidenceDecision.reason || `Execution denied for tool "${toolCall.name}".`
+      );
+    }
+
+    if (confidenceDecision?.action === 'require_approval') {
+      run.pendingApproval = {
+        ...request,
+        reason: confidenceDecision.reason || null,
+        confidence: toolAssessment,
+      };
+      run.setStatus('waiting_for_approval');
+      if (this.approvalInbox?.add) {
+        await this.approvalInbox.add(run.pendingApproval);
+      }
+      await this._emitEvent(run, 'approval_requested', run.pendingApproval);
+      await this._persistRun(run);
+      return { status: 'waiting_for_approval' };
+    }
 
     const decision = this.toolPolicy.evaluate(toolInstance, toolCall.arguments || {}, {
       run,
@@ -1050,6 +1165,10 @@ class Agent {
       return this.verifier(tool, args, context);
     }
 
+    if (this.verifier?.verify) {
+      return this.verifier.verify(tool, args, context);
+    }
+
     if (this.verifier?.generateText) {
       const isSelfVerification = context.stage === 'self_verification';
       const prompt = [
@@ -1163,6 +1282,8 @@ class Agent {
           type: 'verifier',
           label: tool.name,
           verdict,
+          reviewers: verdict.reviewers || [],
+          strategy: verdict.strategy || null,
         });
         this._completeStep(run, step.id, verdict);
         await this._emitEvent(run, 'verifier_completed', {
@@ -1325,7 +1446,46 @@ class Agent {
 
     try {
       const toolStartedAt = Date.now();
-      const rawResult = await toolInstance.call(resolvedArgs, toolContext);
+      const rawResult = this.adaptiveRetryPolicy?.onFailure && this.retryManager.executeWithPolicy
+        ? await this.retryManager.executeWithPolicy(
+            () => toolInstance.call(resolvedArgs, toolContext),
+            {
+              policy: this.adaptiveRetryPolicy,
+              context: {
+                operation: 'tool_execution',
+                toolName: toolCall.name,
+                sideEffectLevel: toolInstance?.metadata?.sideEffectLevel || 'none',
+              },
+              onEscalate: async (error, details) => {
+                if (!runtime.run) {
+                  throw error;
+                }
+                runtime.run.state.adaptiveEscalation = {
+                  toolName: toolCall.name,
+                  reason: details.decision?.reason || error.message || String(error),
+                  attempt: details.attempt,
+                };
+                await this._emitEvent(runtime.run, 'adaptive_retry_escalated', {
+                  toolName: toolCall.name,
+                  reason: details.decision?.reason || error.message || String(error),
+                  attempt: details.attempt,
+                });
+                await this._pauseRun(
+                  runtime.run,
+                  details.decision?.reason || 'Adaptive retry policy escalated the tool execution.',
+                  {
+                    stage: 'adaptive_retry_escalation',
+                    toolName: toolCall.name,
+                  }
+                );
+                return { __adaptiveEscalated: true };
+              },
+            }
+          )
+        : await toolInstance.call(resolvedArgs, toolContext);
+      if (rawResult?.__adaptiveEscalated) {
+        return rawResult;
+      }
       const result = await this.toolPolicy.onAfterExecute(toolInstance, rawResult, {
         run: runtime.run || null,
         toolCall,

@@ -14,6 +14,24 @@ The format is intentionally simple:
 
 ### Removed
 
+## 1.1.0
+
+### Added
+
+- `v6` distributed-runtime surfaces including `DistributedRunEnvelope`, remote continuation APIs, queue/service handoff references, distributed incident reconstruction, trace correlation, distributed recovery planning/execution, remote control-plane integrations, and execution identity propagation
+- `v7` adaptive-runtime surfaces including `BranchQualityAnalyzer`, `PolicyTuningAdvisor`, `VerifierEnsemble`, `ConfidencePolicy`, `AdaptiveRetryPolicy`, `HistoricalRoutingAdvisor`, `AdaptiveDecisionLedger`, and `AdaptiveGovernanceGate`
+- maintained adaptive benchmark coverage and audit examples including `referenceAdaptiveBenchmarks.js` and `referenceV7Audit.js`
+
+### Changed
+
+- promoted the package from the `1.0.x` maturity line to `1.1.0` now that the distributed execution baseline and adaptive runtime layers are implemented, documented, and tested as maintained surfaces
+- updated the README and roadmap to reflect the current `v7` scope and the completed `v6` and `v7` milestones
+- expanded the maintained examples and docs around distributed execution, remote governance, adaptive runtime behavior, and end-to-end audit verification
+
+### Fixed
+
+- release metadata and scope documentation now align with the shipped distributed-runtime and adaptive-runtime capabilities instead of stopping at older phase labels
+
 ## 1.0.44
 
 ### Added

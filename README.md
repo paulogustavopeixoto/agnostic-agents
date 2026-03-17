@@ -24,9 +24,9 @@ The package ships a maintained `index.d.ts` so TypeScript projects get typed acc
 - `PlanningRuntime`: plan, verify, recover execution flow for higher-order runtime tasks.
 - `Memory`: layered memory for conversation, working, profile, policy, and semantic storage.
 - `RAG`: grounded retrieval helper with provenance, reranking, retrievers, Pinecone support, or the built-in `LocalVectorStore`.
-- `FallbackRouter`: capability-aware provider fallback routing with cost/risk/task-type hints.
+- `FallbackRouter`: capability-aware provider fallback routing with cost/risk/task-type hints and optional history-aware routing advice.
 - `BackgroundJobScheduler`: recurring and delayed job execution with pluggable job stores.
-- `EvidenceGraph` / `EvalHarness` / `LearningLoop`: runtime evidence tracking, eval execution, learning signals from runs and benchmarks, and adaptive recommendation summaries.
+- `EvidenceGraph` / `EvalHarness` / `LearningLoop` / `BranchQualityAnalyzer` / `PolicyTuningAdvisor` / `VerifierEnsemble` / `ConfidencePolicy` / `AdaptiveRetryPolicy` / `HistoricalRoutingAdvisor` / `AdaptiveDecisionLedger` / `AdaptiveGovernanceGate`: runtime evidence tracking, eval execution, learning signals from runs and benchmarks, adaptive recommendation summaries, replay/branch quality comparison, policy-tuning suggestions, composed reviewer strategies, confidence-aware execution thresholds, adaptive retry/escalation control, history-aware provider routing, durable adaptive audit trails, and approval-aware review for material adaptive changes.
 - `EventBus` / `ConsoleDebugSink` / `FileAuditSink` / `WebhookEventSink` / `RuntimeEventRedactor`: structured runtime events, debug sinks, JSONL audit logging, external event forwarding, and PII-safe redaction helpers.
 - `ToolPolicy` / `GovernanceHooks` / `WebhookGovernanceAdapter` / `ApprovalInbox` / `StorageBackendRegistry`: governance policy controls, external review hooks, remote control-plane forwarding, and stable runtime storage contracts.
 - environment adapters for browser, shell, API, queue, and file-backed execution environments.
@@ -315,6 +315,7 @@ The agent validates tool arguments against `parameters`, applies schema defaults
 - `npm run example:reference-operator`
 - `npm run example:reference-evals`
 - `npm run example:reference-replay-benchmarks`
+- `npm run example:reference-v7-audit`
 - `npm run example:reference-openapi`
 - `npm run example:reference-durable-backends`
 - `npm run example:reference-distributed-handoff`
@@ -348,7 +349,7 @@ Distributed identity and auth-scope guidance is documented in [`docs/distributed
 Secret-handling expectations for adapters, tools, logs, traces, and tests are documented in [`docs/secret-handling.md`](docs/secret-handling.md).
 Tool auth propagation for host-controlled credentials is documented in [`docs/tool-auth-propagation.md`](docs/tool-auth-propagation.md).
 
-## Current v4 scope
+## Current v7 scope
 
 This package currently targets:
 
@@ -359,8 +360,12 @@ This package currently targets:
 - grounded retrieval with provenance and evidence tracking
 - workflow orchestration and explicit delegation on top of the runtime
 - planning, recovery, and recurring background execution
+- distributed execution, queue/service handoff, remote control-plane integration, and cross-service recovery
 - provider fallback routing with cost/risk/task-type hints
 - incident debugging, portable trace export, governance hooks, tool allowlist/blocklist controls, PII-safe audit logging, auth propagation for tools, operator recovery/deployment guidance, and reference deployment patterns
+- maintained benchmark references for replay regressions and adaptive routing/governance decisions
+- a single `v7` audit example for end-to-end adaptive-runtime verification logs
+- adaptive routing, verifier composition, confidence-aware execution, adaptive retry/escalation, and approval-aware adaptive governance
 - MCP tool discovery
 - eval and learning-loop primitives for runtime benchmarking
 

@@ -94,4 +94,29 @@ describe('Maintained examples', () => {
     expect(stdout).toContain('recommendedAction');
     expect(stdout).toContain('branch_from_failure_checkpoint');
   });
+
+  test('reference adaptive benchmarks example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceAdaptiveBenchmarks.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Adaptive benchmark report');
+    expect(stdout).toContain('adaptive-routing-benchmark');
+    expect(stdout).toContain('adaptive-policy-suggestion-benchmark');
+    expect(stdout).toContain('adaptive-governance-benchmark');
+  });
+
+  test('reference v7 audit example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceV7Audit.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('v7 Audit');
+    expect(stdout).toContain('Learning summary');
+    expect(stdout).toContain('Branch quality analysis');
+    expect(stdout).toContain('Adaptive governance review');
+    expect(stdout).toContain('Adaptive benchmark report');
+  });
 });

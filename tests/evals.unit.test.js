@@ -5,6 +5,12 @@ const { RAG } = require('../src/rag/RAG');
 const { LocalVectorStore } = require('../src/db/LocalVectorStore');
 const { EvalHarness } = require('../src/runtime/EvalHarness');
 const { InMemoryRunStore } = require('../src/runtime/stores/InMemoryRunStore');
+const { LearningLoop } = require('../src/runtime/LearningLoop');
+const { PolicyTuningAdvisor } = require('../src/runtime/PolicyTuningAdvisor');
+const { HistoricalRoutingAdvisor } = require('../src/runtime/HistoricalRoutingAdvisor');
+const { AdaptiveDecisionLedger } = require('../src/runtime/AdaptiveDecisionLedger');
+const { AdaptiveGovernanceGate } = require('../src/runtime/AdaptiveGovernanceGate');
+const { ApprovalInbox } = require('../src/runtime/ApprovalInbox');
 
 class ToolEvalAdapter {
   async generateText(messages, { tools = [] } = {}) {
@@ -153,5 +159,136 @@ describe('Eval and benchmark discipline', () => {
         passed: true,
       }),
     ]);
+  });
+
+  test('EvalHarness can run adaptive-decision benchmark scenarios', async () => {
+    const learningLoop = new LearningLoop();
+    learningLoop.recordRun({
+      id: 'run-low-confidence',
+      status: 'completed',
+      errors: [],
+      toolCalls: [],
+      toolResults: [],
+      state: {
+        assessment: {
+          confidence: 0.45,
+          evidenceConflicts: 1,
+        },
+        selfVerification: {
+          action: 'require_approval',
+        },
+      },
+      pendingApproval: { toolName: 'send_status_update' },
+    });
+
+    const branchAnalysis = {
+      baselineRunId: 'baseline-run',
+      bestRunId: 'replay-run',
+      comparisons: [
+        {
+          runId: 'replay-run',
+          diff: {
+            firstDivergingStepIndex: 1,
+          },
+        },
+      ],
+    };
+
+    const routingAdvisor = new HistoricalRoutingAdvisor({ learningLoop });
+    routingAdvisor.recordOutcome({
+      providerLabel: 'safe-provider',
+      success: true,
+      methodName: 'generateText',
+      taskType: 'support',
+      confidence: 0.92,
+    });
+    routingAdvisor.recordOutcome({
+      providerLabel: 'safe-provider',
+      success: true,
+      methodName: 'generateText',
+      taskType: 'support',
+      confidence: 0.88,
+    });
+    routingAdvisor.recordOutcome({
+      providerLabel: 'risky-provider',
+      success: false,
+      methodName: 'generateText',
+      taskType: 'support',
+      confidence: 0.31,
+    });
+
+    const providerCandidates = [
+      {
+        provider: { name: 'risky-provider' },
+        profile: { labels: ['risky-provider'], taskTypes: ['support'], riskTier: 'high' },
+      },
+      {
+        provider: { name: 'safe-provider' },
+        profile: { labels: ['safe-provider'], taskTypes: ['support'], riskTier: 'medium' },
+      },
+    ];
+
+    const policyAdvisor = new PolicyTuningAdvisor({ learningLoop });
+    const adaptiveLedger = new AdaptiveDecisionLedger();
+    const adaptiveGate = new AdaptiveGovernanceGate({
+      ledger: adaptiveLedger,
+      approvalInbox: new ApprovalInbox(),
+    });
+
+    const harness = new EvalHarness({
+      scenarios: [
+        {
+          id: 'adaptive-routing-benchmark',
+          run: async () =>
+            routingAdvisor.rankProviders(providerCandidates, {
+              methodName: 'generateText',
+              args: [{}, { route: { taskType: 'support' } }],
+            }),
+          assert: ranked => ranked[0].provider.name === 'safe-provider',
+        },
+        {
+          id: 'adaptive-policy-suggestion-benchmark',
+          run: async () => policyAdvisor.buildSuggestions({ branchAnalysis }),
+          assert: suggestions =>
+            suggestions.some(
+              suggestion =>
+                suggestion.id === 'tighten-side-effect-policy' ||
+                suggestion.id === 'promote-healthier-branch-baseline'
+            ),
+        },
+        {
+          id: 'adaptive-governance-benchmark',
+          run: async () =>
+            adaptiveGate.reviewSuggestion(
+              {
+                id: 'adaptive-routing-review',
+                category: 'routing_policy',
+                priority: 'high',
+                suggestion: 'Promote replay-run as the support routing baseline.',
+                evidence: { bestRunId: 'replay-run' },
+              },
+              {
+                replay: { baselineRunId: 'baseline-run', bestRunId: 'replay-run' },
+                rollback: { action: 'restore_baseline', runId: 'baseline-run' },
+              }
+            ),
+          assert: result =>
+            result.action === 'require_approval' &&
+            result.request?.adaptiveEntryId === 'adaptive-routing-review',
+        },
+      ],
+    });
+
+    const report = await harness.run({ learningLoop });
+
+    expect(report.total).toBe(3);
+    expect(report.failed).toBe(0);
+    expect(report.results).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'adaptive-routing-benchmark', passed: true }),
+        expect.objectContaining({ id: 'adaptive-policy-suggestion-benchmark', passed: true }),
+        expect.objectContaining({ id: 'adaptive-governance-benchmark', passed: true }),
+      ])
+    );
   });
 });

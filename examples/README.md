@@ -51,6 +51,12 @@ These examples are intended as reference deployment patterns rather than feature
 - `referenceReplayBenchmarks.js`
   - no API key required
   - shows replay-based runtime regression checks over stored runs
+- `referenceAdaptiveBenchmarks.js`
+  - no API key required
+  - shows adaptive routing, policy suggestion, and governance-review benchmark checks
+- `referenceV7Audit.js`
+  - no API key required
+  - prints a single end-to-end `v7` audit across learning, branch analysis, verifier composition, confidence policy, adaptive retry, routing, governance review, and adaptive benchmarks
 - `referenceOpenApiImport.js`
   - no API key required
   - shows importing a small OpenAPI spec into runtime tools

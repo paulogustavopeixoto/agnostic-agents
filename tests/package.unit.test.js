@@ -20,6 +20,13 @@ const { Run } = require('../src/runtime/Run');
 const { EvidenceGraph } = require('../src/runtime/EvidenceGraph');
 const { EvalHarness } = require('../src/runtime/EvalHarness');
 const { LearningLoop } = require('../src/runtime/LearningLoop');
+const { PolicyTuningAdvisor } = require('../src/runtime/PolicyTuningAdvisor');
+const { VerifierEnsemble } = require('../src/runtime/VerifierEnsemble');
+const { ConfidencePolicy } = require('../src/runtime/ConfidencePolicy');
+const { AdaptiveRetryPolicy } = require('../src/runtime/AdaptiveRetryPolicy');
+const { HistoricalRoutingAdvisor } = require('../src/runtime/HistoricalRoutingAdvisor');
+const { AdaptiveDecisionLedger } = require('../src/runtime/AdaptiveDecisionLedger');
+const { AdaptiveGovernanceGate } = require('../src/runtime/AdaptiveGovernanceGate');
 const { GovernanceHooks } = require('../src/runtime/GovernanceHooks');
 const { WebhookGovernanceAdapter } = require('../src/runtime/WebhookGovernanceAdapter');
 const { FileAuditSink } = require('../src/runtime/FileAuditSink');
@@ -29,6 +36,7 @@ const { ExtensionHost } = require('../src/runtime/ExtensionHost');
 const { StorageBackendRegistry } = require('../src/runtime/StorageBackendRegistry');
 const { RunTreeInspector } = require('../src/runtime/RunTreeInspector');
 const { IncidentDebugger } = require('../src/runtime/IncidentDebugger');
+const { BranchQualityAnalyzer } = require('../src/runtime/BranchQualityAnalyzer');
 const { DistributedRecoveryPlanner } = require('../src/runtime/DistributedRecoveryPlanner');
 const { DistributedRecoveryRunner } = require('../src/runtime/DistributedRecoveryRunner');
 const { TraceDiffer } = require('../src/runtime/TraceDiffer');
@@ -86,6 +94,7 @@ describe('Package/module unit tests', () => {
     expect(pkg.ExecutionIdentity).toBeDefined();
     expect(pkg.RunTreeInspector).toBeDefined();
     expect(pkg.IncidentDebugger).toBeDefined();
+    expect(pkg.BranchQualityAnalyzer).toBeDefined();
     expect(pkg.DistributedRecoveryPlanner).toBeDefined();
     expect(pkg.DistributedRecoveryRunner).toBeDefined();
     expect(pkg.ToolPolicy).toBeDefined();
@@ -94,6 +103,13 @@ describe('Package/module unit tests', () => {
     expect(pkg.EvidenceGraph).toBeDefined();
     expect(pkg.EvalHarness).toBeDefined();
     expect(pkg.LearningLoop).toBeDefined();
+    expect(pkg.PolicyTuningAdvisor).toBeDefined();
+    expect(pkg.VerifierEnsemble).toBeDefined();
+    expect(pkg.ConfidencePolicy).toBeDefined();
+    expect(pkg.AdaptiveRetryPolicy).toBeDefined();
+    expect(pkg.HistoricalRoutingAdvisor).toBeDefined();
+    expect(pkg.AdaptiveDecisionLedger).toBeDefined();
+    expect(pkg.AdaptiveGovernanceGate).toBeDefined();
     expect(pkg.GovernanceHooks).toBeDefined();
     expect(pkg.WebhookGovernanceAdapter).toBeDefined();
     expect(pkg.FileAuditSink).toBeDefined();
@@ -746,6 +762,108 @@ describe('Package/module unit tests', () => {
     );
   });
 
+  test('BranchQualityAnalyzer ranks replay and branch outcomes by observed quality', async () => {
+    const baseline = new Run({
+      input: 'baseline',
+      output: null,
+      status: 'failed',
+      errors: [{ name: 'Error', message: 'tool failure' }],
+      state: {
+        assessment: {
+          confidence: 0.35,
+          evidenceConflicts: 1,
+          verification: { action: 'require_approval' },
+        },
+      },
+    });
+    baseline.addStep({ id: 'step-1', type: 'tool', status: 'failed' });
+
+    const improved = new Run({
+      input: 'improved',
+      output: 'ok',
+      status: 'completed',
+      state: {
+        assessment: {
+          confidence: 0.92,
+          evidenceConflicts: 0,
+          verification: { action: 'allow' },
+        },
+      },
+      metadata: {
+        lineage: {
+          rootRunId: baseline.id,
+          parentRunId: null,
+          childRunIds: [],
+          branchOriginRunId: baseline.id,
+          branchCheckpointId: 'cp-1',
+        },
+      },
+    });
+    improved.addStep({ id: 'step-1', type: 'tool', status: 'completed', output: 'ok' });
+
+    const analyzer = new BranchQualityAnalyzer();
+    const report = analyzer.compare(baseline, [improved]);
+
+    expect(report.bestRunId).toBe(improved.id);
+    expect(report.rankedRuns[0]).toEqual(
+      expect.objectContaining({
+        runId: improved.id,
+        status: 'completed',
+      })
+    );
+    expect(report.comparisons).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          runId: improved.id,
+          diff: expect.objectContaining({
+            statusChanged: true,
+            firstDivergingStepIndex: 0,
+          }),
+        }),
+      ])
+    );
+    expect(report.recommendations).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining(`Prefer run "${improved.id}" over baseline`),
+      ])
+    );
+  });
+
+  test('BranchQualityAnalyzer can analyze a stored root family', async () => {
+    const runStore = new InMemoryRunStore();
+    const root = new Run({ input: 'root', output: null, status: 'failed' });
+    await runStore.saveRun(root);
+
+    const replay = new Run({
+      input: 'replay',
+      output: 'stable',
+      status: 'completed',
+      state: {
+        assessment: {
+          confidence: 0.88,
+          evidenceConflicts: 0,
+          verification: { action: 'allow' },
+        },
+      },
+      metadata: {
+        lineage: {
+          rootRunId: root.id,
+          parentRunId: null,
+          childRunIds: [],
+          branchOriginRunId: root.id,
+          branchCheckpointId: 'root:checkpoint:1',
+        },
+      },
+    });
+    await runStore.saveRun(replay);
+
+    const analyzer = new BranchQualityAnalyzer({ runStore });
+    const report = await analyzer.analyzeFamily(root.id);
+
+    expect(report.bestRunId).toBe(replay.id);
+    expect(report.baselineRunId).toBe(root.id);
+  });
+
   test('DistributedRecoveryPlanner builds a structured recovery plan from incident state', async () => {
     const store = new InMemoryRunStore();
     const root = new Run({ input: 'root' });
@@ -1252,6 +1370,48 @@ describe('Package/module unit tests', () => {
     expect(safeProvider.generateText).toHaveBeenCalledTimes(1);
   });
 
+  test('FallbackRouter can route using historical provider outcomes', async () => {
+    const cheapProvider = {
+      name: 'cheap-provider',
+      getCapabilities: () => ({ generateText: true, toolCalling: true }),
+      generateText: jest.fn().mockResolvedValue({ message: 'cheap route' }),
+    };
+    const reliableProvider = {
+      name: 'reliable-provider',
+      getCapabilities: () => ({ generateText: true, toolCalling: true }),
+      generateText: jest.fn().mockResolvedValue({ message: 'reliable route' }),
+    };
+
+    const advisor = new HistoricalRoutingAdvisor({
+      outcomes: [
+        { providerLabel: 'cheap', success: false, methodName: 'generateText', taskType: 'support' },
+        { providerLabel: 'reliable', success: true, methodName: 'generateText', taskType: 'support', confidence: 0.9 },
+      ],
+    });
+
+    const router = new FallbackRouter({
+      providers: [
+        {
+          provider: cheapProvider,
+          profile: { labels: ['cheap'], costTier: 'low', riskTier: 'medium', taskTypes: ['support'] },
+        },
+        {
+          provider: reliableProvider,
+          profile: { labels: ['reliable'], costTier: 'medium', riskTier: 'high', taskTypes: ['support'] },
+        },
+      ],
+      routingAdvisor: advisor,
+    });
+
+    const result = await router.generateText([{ role: 'user', content: 'help' }], {
+      route: { taskType: 'support' },
+    });
+
+    expect(result).toEqual(expect.objectContaining({ message: 'reliable route' }));
+    expect(reliableProvider.generateText).toHaveBeenCalledTimes(1);
+    expect(cheapProvider.generateText).not.toHaveBeenCalled();
+  });
+
   test('Workflow validates step definitions and dependencies', () => {
     const step = new WorkflowStep({
       id: 'collect',
@@ -1533,6 +1693,325 @@ describe('Package/module unit tests', () => {
         }),
       ])
     );
+  });
+
+  test('PolicyTuningAdvisor turns replay and eval signals into policy suggestions', () => {
+    const learningLoop = new LearningLoop();
+    learningLoop.recordRun(
+      new Run({
+        input: 'risky run',
+        status: 'failed',
+        pendingApproval: { toolName: 'send_status_update' },
+        state: {
+          selfVerification: { action: 'require_approval' },
+          assessment: {
+            confidence: 0.41,
+            evidenceConflicts: 1,
+          },
+        },
+      })
+    );
+    const evaluationReport = learningLoop.recordEvaluation({
+      total: 1,
+      passed: 0,
+      failed: 1,
+      results: [{ id: 'eval-risky-path', passed: false, category: 'evaluation', error: 'policy mismatch' }],
+    });
+
+    const advisor = new PolicyTuningAdvisor({ learningLoop });
+    const suggestions = advisor.buildSuggestions({
+      evaluationReport,
+      branchAnalysis: {
+        baselineRunId: 'run-baseline',
+        bestRunId: 'run-branch',
+        comparisons: [{ runId: 'run-branch', diff: { firstDivergingStepIndex: 2 } }],
+      },
+    });
+
+    expect(suggestions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'tighten-side-effect-policy',
+          category: 'tool_policy',
+          priority: 'high',
+        }),
+        expect.objectContaining({
+          id: 'strengthen-reviewer-composition',
+          category: 'verifier_policy',
+        }),
+        expect.objectContaining({
+          id: 'promote-healthier-branch-baseline',
+          category: 'routing_policy',
+        }),
+        expect.objectContaining({
+          id: 'convert-failing-evals-into-policy-tests',
+          category: 'evaluation_policy',
+        }),
+      ])
+    );
+  });
+
+  test('VerifierEnsemble uses the most restrictive reviewer outcome by default', async () => {
+    const ensemble = new VerifierEnsemble({
+      reviewers: [
+        async () => ({ action: 'allow', reason: 'looks fine' }),
+        async () => ({ action: 'require_approval', reason: 'side effect needs approval' }),
+      ],
+    });
+
+    await expect(ensemble.verify({ name: 'send_email' }, { query: 'status' })).resolves.toEqual(
+      expect.objectContaining({
+        action: 'require_approval',
+        source: 'verifier_ensemble',
+        strategy: 'most_restrictive',
+      })
+    );
+  });
+
+  test('VerifierEnsemble can escalate reviewer disagreement', async () => {
+    const ensemble = new VerifierEnsemble({
+      strategy: 'escalate_on_disagreement',
+      reviewers: [
+        async () => ({ action: 'allow', reason: 'safe enough' }),
+        async () => ({ action: 'require_approval', reason: 'review manually' }),
+      ],
+    });
+
+    await expect(ensemble.verify({ name: 'send_email' }, { query: 'status' })).resolves.toEqual(
+      expect.objectContaining({
+        action: 'require_approval',
+        source: 'verifier_ensemble',
+        strategy: 'escalate_on_disagreement',
+      })
+    );
+  });
+
+  test('ConfidencePolicy escalates low-confidence risky tools and pauses weak final runs', () => {
+    const policy = new ConfidencePolicy({
+      toolApprovalThreshold: 0.6,
+      runPauseThreshold: 0.7,
+    });
+
+    expect(
+      policy.evaluateTool(
+        { name: 'send_email', metadata: { sideEffectLevel: 'external_write' } },
+        { score: 0.4 }
+      )
+    ).toEqual(
+      expect.objectContaining({
+        action: 'require_approval',
+        source: 'confidence_policy',
+      })
+    );
+
+    expect(
+      policy.evaluateRun(
+        { id: 'run-1' },
+        { confidence: 0.55 }
+      )
+    ).toEqual(
+      expect.objectContaining({
+        action: 'pause',
+        source: 'confidence_policy',
+      })
+    );
+  });
+
+  test('AdaptiveRetryPolicy escalates risky retries when prior failures exist', async () => {
+    const learningLoop = new LearningLoop();
+    learningLoop.recordRun(new Run({ input: 'failed', status: 'failed', errors: [{ message: 'boom' }] }));
+
+    const policy = new AdaptiveRetryPolicy({
+      learningLoop,
+      escalateAfterAttempt: 0,
+    });
+    const retryManager = new RetryManager({ retries: 2, baseDelay: 1, maxDelay: 1 });
+    const fn = jest.fn().mockRejectedValue(new Error('tool failure'));
+    const escalated = [];
+
+    await expect(
+      retryManager.executeWithPolicy(
+        fn,
+        {
+          policy,
+          context: {
+            operation: 'tool_execution',
+            sideEffectLevel: 'external_write',
+          },
+          onEscalate: async (error, details) => {
+            escalated.push({ message: error.message, decision: details.decision });
+            return 'escalated';
+          },
+        }
+      )
+    ).resolves.toBe('escalated');
+
+    expect(escalated).toEqual([
+      expect.objectContaining({
+        message: 'tool failure',
+        decision: expect.objectContaining({
+          action: 'escalate',
+        }),
+      }),
+    ]);
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  test('AdaptiveDecisionLedger records adaptive choices with replay and rollback metadata', async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agnostic-agents-adaptive-'));
+    const filePath = path.join(tempDir, 'adaptive.log');
+    const ledger = new AdaptiveDecisionLedger({ filePath });
+
+    const suggestion = await ledger.recordSuggestion(
+      {
+        id: 'suggest-1',
+        category: 'routing_policy',
+        suggestion: 'Prefer the healthier replay branch as the routing baseline.',
+        evidence: { bestRunId: 'run-2' },
+      },
+      {
+        replay: { baselineRunId: 'run-1', bestRunId: 'run-2' },
+        rollback: { action: 'restore_baseline', runId: 'run-1' },
+      }
+    );
+
+    const decision = await ledger.recordDecision(
+      {
+        id: 'decision-1',
+        category: 'verifier_policy',
+        summary: 'Applied stricter verifier ensemble for low-confidence paths.',
+        evidence: { lowConfidenceRuns: 2 },
+      },
+      {
+        applied: true,
+        approved: true,
+        replay: { policy: 'verifier_ensemble_v2' },
+        rollback: { action: 'restore_policy', policy: 'verifier_ensemble_v1' },
+      }
+    );
+
+    expect(ledger.summarize()).toEqual(
+      expect.objectContaining({
+        total: 2,
+        suggestions: 1,
+        decisions: 1,
+        applied: 1,
+        approved: 1,
+        replayable: 2,
+        rollbackReady: 2,
+      })
+    );
+    expect(ledger.exportReplay(suggestion.id)).toEqual(
+      expect.objectContaining({
+        entryId: 'suggest-1',
+        replay: expect.objectContaining({ bestRunId: 'run-2' }),
+      })
+    );
+    expect(ledger.buildRollbackPlan(decision.id)).toEqual(
+      expect.objectContaining({
+        entryId: 'decision-1',
+        rollback: expect.objectContaining({ action: 'restore_policy' }),
+      })
+    );
+
+    const persisted = fs.readFileSync(filePath, 'utf8').trim().split('\n');
+    expect(persisted).toHaveLength(2);
+  });
+
+  test('AdaptiveGovernanceGate routes material adaptive changes through approval and resolution', async () => {
+    const events = [];
+    const ledger = new AdaptiveDecisionLedger();
+    const approvalInbox = new ApprovalInbox();
+    const gate = new AdaptiveGovernanceGate({
+      ledger,
+      approvalInbox,
+      governanceHooks: new GovernanceHooks({
+        onEvent: async type => {
+          events.push(type);
+        },
+      }),
+    });
+
+    const reviewed = await gate.reviewSuggestion(
+      {
+        id: 'routing-shift-1',
+        category: 'routing_policy',
+        priority: 'high',
+        suggestion: 'Promote the healthier replay branch as the routing baseline.',
+        evidence: { bestRunId: 'run-2' },
+      },
+      {
+        replay: { baselineRunId: 'run-1', bestRunId: 'run-2' },
+        rollback: { action: 'restore_baseline', runId: 'run-1' },
+      }
+    );
+
+    expect(reviewed).toEqual(
+      expect.objectContaining({
+        action: 'require_approval',
+        request: expect.objectContaining({
+          adaptiveEntryId: 'routing-shift-1',
+          type: 'adaptive_change',
+        }),
+      })
+    );
+    expect(await approvalInbox.get('routing-shift-1')).toEqual(
+      expect.objectContaining({
+        adaptiveEntryId: 'routing-shift-1',
+      })
+    );
+
+    const resolved = await gate.resolveReview('routing-shift-1', {
+      approved: true,
+      applied: true,
+      reason: 'Operator approved routing change.',
+    });
+
+    expect(resolved).toEqual(
+      expect.objectContaining({
+        approved: true,
+        applied: true,
+        adaptiveEntryId: 'routing-shift-1',
+      })
+    );
+    expect(ledger.summarize()).toEqual(
+      expect.objectContaining({
+        total: 2,
+        approved: 1,
+        applied: 1,
+      })
+    );
+    expect(events).toEqual(['adaptive_review_requested', 'adaptive_review_resolved']);
+  });
+
+  test('AdaptiveGovernanceGate allows non-material advisory suggestions without approval', async () => {
+    const events = [];
+    const gate = new AdaptiveGovernanceGate({
+      ledger: new AdaptiveDecisionLedger(),
+      approvalInbox: new ApprovalInbox(),
+      governanceHooks: new GovernanceHooks({
+        onEvent: async type => {
+          events.push(type);
+        },
+      }),
+      materialCategories: ['tool_policy'],
+      materialPriorities: ['high'],
+    });
+
+    const reviewed = await gate.reviewSuggestion({
+      id: 'note-1',
+      category: 'policy_hygiene',
+      priority: 'low',
+      suggestion: 'Keep the current policy baseline until more evals land.',
+    });
+
+    expect(reviewed).toEqual(
+      expect.objectContaining({
+        action: 'allow',
+        request: null,
+      })
+    );
+    expect(events).toEqual(['adaptive_review_allowed']);
   });
 
   test('GovernanceHooks dispatches named governance events', async () => {

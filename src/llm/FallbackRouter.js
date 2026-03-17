@@ -13,7 +13,7 @@ const METHOD_CAPABILITY_MAP = {
 };
 
 class FallbackRouter extends BaseProvider {
-  constructor({ providers = [], onFallback = null, onError = null, routingStrategy = null } = {}) {
+  constructor({ providers = [], onFallback = null, onError = null, routingStrategy = null, routingAdvisor = null } = {}) {
     super({
       capabilities: providers.reduce(
         (acc, provider) => {
@@ -57,9 +57,17 @@ class FallbackRouter extends BaseProvider {
     this.onFallback = onFallback;
     this.onError = onError;
     this.routingStrategy = routingStrategy;
+    this.routingAdvisor = routingAdvisor;
   }
 
   _resolveRoute(methodName, args) {
+    if (this.routingAdvisor?.rankProviders) {
+      return this.routingAdvisor.rankProviders(this.providers, {
+        methodName,
+        args,
+      });
+    }
+
     if (typeof this.routingStrategy === 'function') {
       return this.routingStrategy({
         methodName,
@@ -120,6 +128,18 @@ class FallbackRouter extends BaseProvider {
 
       try {
         const result = await provider[methodName](...args);
+        if (this.routingAdvisor?.recordOutcome) {
+          const [, config = {}] = args;
+          const route = config.route || {};
+          const routeHints = route.hints || {};
+          this.routingAdvisor.recordOutcome({
+            providerLabel: profile.labels?.[0] || provider.name || provider.constructor?.name || `provider-${index}`,
+            success: true,
+            methodName,
+            taskType: routeHints.taskType || route.taskType || null,
+            confidence: result?.routing?.confidence || null,
+          });
+        }
         if (methodName === 'generateText' && result && typeof result === 'object') {
           result.routing = {
             selectedProfile: profile,
@@ -129,6 +149,18 @@ class FallbackRouter extends BaseProvider {
         return result;
       } catch (error) {
         lastError = error;
+        if (this.routingAdvisor?.recordOutcome) {
+          const [, config = {}] = args;
+          const route = config.route || {};
+          const routeHints = route.hints || {};
+          this.routingAdvisor.recordOutcome({
+            providerLabel: profile.labels?.[0] || provider.name || provider.constructor?.name || `provider-${index}`,
+            success: false,
+            methodName,
+            taskType: routeHints.taskType || route.taskType || null,
+            error: error.message || String(error),
+          });
+        }
         if (typeof this.onError === 'function') {
           await this.onError({
             methodName,

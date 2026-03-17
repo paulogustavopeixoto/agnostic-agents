@@ -1,6 +1,6 @@
 {
   "name": "agnostic-agents",
-  "version": "1.0.44",
+  "version": "1.1.0",
   "description": "A Node.js package for multi-LLM agent support",
   "main": "index.js",
   "types": "index.d.ts",
@@ -85,6 +85,8 @@
     "example:reference-operator": "node examples/referenceOperatorWorkflow.js",
     "example:reference-evals": "node examples/referenceEvalBenchmarks.js",
     "example:reference-replay-benchmarks": "node examples/referenceReplayBenchmarks.js",
+    "example:reference-adaptive-benchmarks": "node examples/referenceAdaptiveBenchmarks.js",
+    "example:reference-v7-audit": "node examples/referenceV7Audit.js",
     "example:reference-openapi": "node examples/referenceOpenApiImport.js",
     "example:reference-durable-backends": "node examples/referenceDurableBackends.js",
     "example:reference-distributed-handoff": "node examples/referenceDistributedHandoff.js",

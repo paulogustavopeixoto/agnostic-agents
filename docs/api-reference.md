@@ -94,6 +94,19 @@ Key method:
 
 - `createReport(runId, options?)`
 
+### `BranchQualityAnalyzer`
+
+Compares replay and branch outcomes to identify the strongest observed execution path.
+
+Constructor:
+
+- `new BranchQualityAnalyzer({ runStore? })`
+
+Key methods:
+
+- `compare(baselineRun, candidateRuns?)`
+- `analyzeFamily(rootRunId)`
+
 ### `DistributedRecoveryPlanner`
 
 Builds structured recovery plans from distributed incident state.
@@ -441,6 +454,71 @@ Key methods:
 - `summarize()`
 - `buildRecommendations()`
 - `buildAdaptiveRecommendations()`
+
+### `PolicyTuningAdvisor`
+
+Converts replay, eval, and learning-loop signals into operator-facing policy suggestions.
+
+Key method:
+
+- `buildSuggestions(options?)`
+
+### `VerifierEnsemble`
+
+Composes multiple reviewers into a single verifier decision.
+
+Key method:
+
+- `verify(tool, args, context?)`
+
+### `ConfidencePolicy`
+
+Applies explicit confidence thresholds to risky tool calls and weak final outputs.
+
+Key methods:
+
+- `evaluateTool(tool, toolAssessment, context?)`
+- `evaluateRun(run, assessment, context?)`
+
+### `AdaptiveRetryPolicy`
+
+Turns prior failures and eval pressure into retry-versus-escalation decisions.
+
+Key method:
+
+- `onFailure(error, options?)`
+
+### `HistoricalRoutingAdvisor`
+
+Ranks providers using accumulated routing outcomes and optional learning-loop pressure.
+
+Key methods:
+
+- `recordOutcome(outcome?)`
+- `rankProviders(providers, options?)`
+
+### `AdaptiveDecisionLedger`
+
+Records adaptive suggestions and decisions with replay and rollback metadata.
+
+Key methods:
+
+- `recordSuggestion(suggestion, metadata?)`
+- `recordDecision(decision, metadata?)`
+- `summarize()`
+- `exportReplay(entryId)`
+- `buildRollbackPlan(entryId)`
+
+### `AdaptiveGovernanceGate`
+
+Ensures material adaptive changes follow approval and governance review paths before application.
+
+Key methods:
+
+- `evaluate(entry, context?)`
+- `reviewSuggestion(suggestion, metadata?)`
+- `reviewDecision(decision, metadata?)`
+- `resolveReview(reviewId, resolution?)`
 
 ## Environment and provider adapters
 

@@ -2,6 +2,7 @@ const { Run } = require('./Run');
 const { RunInspector } = require('./RunInspector');
 const { RunTreeInspector } = require('./RunTreeInspector');
 const { IncidentDebugger } = require('./IncidentDebugger');
+const { BranchQualityAnalyzer } = require('./BranchQualityAnalyzer');
 const { DistributedRecoveryPlanner } = require('./DistributedRecoveryPlanner');
 const { DistributedRecoveryRunner } = require('./DistributedRecoveryRunner');
 const { TraceDiffer } = require('./TraceDiffer');
@@ -11,6 +12,13 @@ const { ExecutionIdentity } = require('./ExecutionIdentity');
 const { EvidenceGraph } = require('./EvidenceGraph');
 const { EvalHarness } = require('./EvalHarness');
 const { LearningLoop } = require('./LearningLoop');
+const { PolicyTuningAdvisor } = require('./PolicyTuningAdvisor');
+const { VerifierEnsemble } = require('./VerifierEnsemble');
+const { ConfidencePolicy } = require('./ConfidencePolicy');
+const { AdaptiveRetryPolicy } = require('./AdaptiveRetryPolicy');
+const { HistoricalRoutingAdvisor } = require('./HistoricalRoutingAdvisor');
+const { AdaptiveDecisionLedger } = require('./AdaptiveDecisionLedger');
+const { AdaptiveGovernanceGate } = require('./AdaptiveGovernanceGate');
 const { GovernanceHooks } = require('./GovernanceHooks');
 const { WebhookGovernanceAdapter } = require('./WebhookGovernanceAdapter');
 const { ExtensionHost } = require('./ExtensionHost');
@@ -50,6 +58,7 @@ module.exports = {
   RunInspector,
   RunTreeInspector,
   IncidentDebugger,
+  BranchQualityAnalyzer,
   DistributedRecoveryPlanner,
   DistributedRecoveryRunner,
   TraceDiffer,
@@ -59,6 +68,13 @@ module.exports = {
   EvidenceGraph,
   EvalHarness,
   LearningLoop,
+  PolicyTuningAdvisor,
+  VerifierEnsemble,
+  ConfidencePolicy,
+  AdaptiveRetryPolicy,
+  HistoricalRoutingAdvisor,
+  AdaptiveDecisionLedger,
+  AdaptiveGovernanceGate,
   GovernanceHooks,
   WebhookGovernanceAdapter,
   ExtensionHost,

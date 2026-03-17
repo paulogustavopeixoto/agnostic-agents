@@ -13,6 +13,7 @@ The package now maintains baseline coverage for:
 - tool selection accuracy checks
 - RAG grounding checks
 - replay-based regression checks
+- adaptive-decision benchmark checks
 
 These are implemented with `EvalHarness` and are intended to be:
 
@@ -70,6 +71,18 @@ Use it for:
 - regression checks on checkpoint/replay internals
 - validating that inspection/replay surfaces still preserve stable execution records
 
+### Adaptive-decision benchmarks
+
+Question:
+
+- do adaptive routing, policy tuning, and governance-review surfaces still produce the expected control behavior from the same evidence?
+
+Use it for:
+
+- history-aware routing regressions
+- adaptive policy suggestion regressions
+- governance gating regressions for material adaptive changes
+
 ## Maintained benchmark example
 
 See:
@@ -82,6 +95,7 @@ It demonstrates a minimal benchmark report across:
 - tool selection accuracy
 - RAG grounding
 - replay regression
+- adaptive routing and governance benchmarks
 
 ## Maintained test coverage
 
@@ -89,6 +103,7 @@ See:
 
 - [`tests/evals.unit.test.js`](../tests/evals.unit.test.js)
 - [`examples/referenceReplayBenchmarks.js`](../examples/referenceReplayBenchmarks.js)
+- [`examples/referenceAdaptiveBenchmarks.js`](../examples/referenceAdaptiveBenchmarks.js)
 
 This test is the current baseline regression suite for the maintained benchmark categories above.
 

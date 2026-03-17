@@ -239,6 +239,12 @@ export class IncidentDebugger {
   createReport(runId: string, options?: { compareToRunId?: string | null }): Promise<JsonObject>;
 }
 
+export class BranchQualityAnalyzer {
+  constructor(options?: { runStore?: BaseRunStore });
+  compare(baselineRun: Run | JsonObject, candidateRuns?: Array<Run | JsonObject>): JsonObject;
+  analyzeFamily(rootRunId: string): Promise<JsonObject>;
+}
+
 export class DistributedRecoveryPlanner {
   constructor(options: { runStore: BaseRunStore });
   createPlan(runId: string, options?: { compareToRunId?: string | null }): Promise<JsonObject>;
@@ -427,6 +433,72 @@ export class LearningLoop {
   buildAdaptiveRecommendations(): JsonObject[];
 }
 
+export class PolicyTuningAdvisor {
+  constructor(options?: { learningLoop?: LearningLoop | JsonObject | null });
+  buildSuggestions(options?: { branchAnalysis?: JsonObject | null; evaluationReport?: JsonObject | null }): JsonObject[];
+}
+
+export class VerifierEnsemble {
+  constructor(options?: {
+    reviewers?: Array<Function | JsonObject>;
+    strategy?: 'most_restrictive' | 'escalate_on_disagreement';
+  });
+  verify(tool: JsonObject, args: JsonObject, context?: JsonObject): Promise<JsonObject>;
+}
+
+export class ConfidencePolicy {
+  constructor(options?: {
+    toolApprovalThreshold?: number;
+    runPauseThreshold?: number;
+    riskySideEffects?: string[];
+    evaluateTool?: Function | null;
+    evaluateRun?: Function | null;
+  });
+  evaluateTool(tool: JsonObject, toolAssessment: JsonObject, context?: JsonObject): JsonObject;
+  evaluateRun(run: Run | JsonObject, assessment: JsonObject, context?: JsonObject): JsonObject;
+}
+
+export class AdaptiveRetryPolicy {
+  constructor(options?: {
+    learningLoop?: LearningLoop | JsonObject | null;
+    escalateAfterAttempt?: number;
+  });
+  onFailure(error: Error | JsonObject, options?: { attempt?: number; retries?: number; context?: JsonObject }): JsonObject;
+}
+
+export class HistoricalRoutingAdvisor {
+  constructor(options?: { learningLoop?: LearningLoop | JsonObject | null; outcomes?: JsonObject[] });
+  recordOutcome(outcome?: JsonObject): JsonObject;
+  rankProviders(providers?: JsonObject[], options?: { methodName?: string; args?: any[] }): JsonObject[];
+}
+
+export class AdaptiveDecisionLedger {
+  constructor(options?: { entries?: JsonObject[]; filePath?: string | null });
+  record(entry?: JsonObject): Promise<JsonObject>;
+  recordSuggestion(suggestion?: JsonObject, metadata?: JsonObject): Promise<JsonObject>;
+  recordDecision(decision?: JsonObject, metadata?: JsonObject): Promise<JsonObject>;
+  get(entryId: string): JsonObject | null;
+  list(): JsonObject[];
+  summarize(): JsonObject;
+  exportReplay(entryId: string): JsonObject;
+  buildRollbackPlan(entryId: string): JsonObject;
+}
+
+export class AdaptiveGovernanceGate {
+  constructor(options?: {
+    ledger?: AdaptiveDecisionLedger | null;
+    approvalInbox?: ApprovalInbox | null;
+    governanceHooks?: GovernanceHooks | JsonObject | null;
+    materialCategories?: string[];
+    materialPriorities?: string[];
+    requireApproval?: ((entry: JsonObject, context?: JsonObject) => Promise<JsonObject | boolean> | JsonObject | boolean) | null;
+  });
+  evaluate(entry?: JsonObject, context?: JsonObject): Promise<JsonObject>;
+  reviewSuggestion(suggestion?: JsonObject, metadata?: JsonObject): Promise<JsonObject>;
+  reviewDecision(decision?: JsonObject, metadata?: JsonObject): Promise<JsonObject>;
+  resolveReview(reviewId: string, resolution?: JsonObject): Promise<JsonObject>;
+}
+
 export class BaseEnvironmentAdapter {
   constructor(options?: JsonObject);
   kind: string;
@@ -546,7 +618,12 @@ export class PineconeManager {}
 
 export class RetryManager {
   constructor(options?: JsonObject);
-  run<T>(operation: () => Promise<T> | T): Promise<T>;
+  execute<T>(operation: () => Promise<T> | T, ...args: any[]): Promise<T>;
+  executeWithPolicy<T>(
+    operation: () => Promise<T> | T,
+    options?: { policy?: AdaptiveRetryPolicy | JsonObject | null; context?: JsonObject; onEscalate?: Function | null },
+    ...args: any[]
+  ): Promise<T>;
 }
 
 export class OpenAIAdapter {
