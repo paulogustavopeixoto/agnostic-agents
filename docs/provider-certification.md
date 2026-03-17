@@ -2,6 +2,8 @@
 
 This document defines the adapter and provider certification process for `agnostic-agents`.
 
+For the concise provider/feature support table, see [`docs/support-matrix.md`](support-matrix.md).
+
 The goal is simple:
 
 - do not overclaim provider support

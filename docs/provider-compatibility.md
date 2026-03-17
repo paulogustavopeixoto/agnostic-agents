@@ -4,6 +4,7 @@ This document describes the normalized adapter contract and current certificatio
 
 For how certification levels are defined, see [`docs/provider-certification.md`](provider-certification.md).
 For minimal setup snippets, see [`docs/provider-quickstarts.md`](provider-quickstarts.md).
+For the concise provider/feature matrix, see [`docs/support-matrix.md`](support-matrix.md).
 
 ## Shared contract
 

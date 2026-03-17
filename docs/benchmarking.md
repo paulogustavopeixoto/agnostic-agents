@@ -14,6 +14,7 @@ The package now maintains baseline coverage for:
 - RAG grounding checks
 - replay-based regression checks
 - adaptive-decision benchmark checks
+- worker-coordination benchmark checks
 
 These are implemented with `EvalHarness` and are intended to be:
 
@@ -83,6 +84,18 @@ Use it for:
 - adaptive policy suggestion regressions
 - governance gating regressions for material adaptive changes
 
+### Worker-coordination benchmarks
+
+Question:
+
+- do delegated worker flows still preserve lineage, child-run aggregation, and contract gating?
+
+Use it for:
+
+- multi-agent workflow regressions
+- delegation contract enforcement regressions
+- child-run metrics and lineage regressions
+
 ## Maintained benchmark example
 
 See:
@@ -96,6 +109,7 @@ It demonstrates a minimal benchmark report across:
 - RAG grounding
 - replay regression
 - adaptive routing and governance benchmarks
+- worker-coordination benchmarks
 
 ## Maintained test coverage
 
@@ -104,6 +118,7 @@ See:
 - [`tests/evals.unit.test.js`](../tests/evals.unit.test.js)
 - [`examples/referenceReplayBenchmarks.js`](../examples/referenceReplayBenchmarks.js)
 - [`examples/referenceAdaptiveBenchmarks.js`](../examples/referenceAdaptiveBenchmarks.js)
+- [`examples/referenceWorkerCoordinationBenchmarks.js`](../examples/referenceWorkerCoordinationBenchmarks.js)
 
 This test is the current baseline regression suite for the maintained benchmark categories above.
 

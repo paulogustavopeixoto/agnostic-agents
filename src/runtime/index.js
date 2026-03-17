@@ -28,6 +28,7 @@ const { BackgroundJobScheduler } = require('./BackgroundJobScheduler');
 const { DelegationRuntime } = require('./DelegationRuntime');
 const { PlanningRuntime } = require('./PlanningRuntime');
 const { ToolPolicy } = require('./ToolPolicy');
+const { ProductionPolicyPack } = require('./ProductionPolicyPack');
 const { EventBus } = require('./EventBus');
 const { ConsoleDebugSink } = require('./ConsoleDebugSink');
 const { FileAuditSink } = require('./FileAuditSink');
@@ -84,6 +85,7 @@ module.exports = {
   DelegationRuntime,
   PlanningRuntime,
   ToolPolicy,
+  ProductionPolicyPack,
   EventBus,
   ConsoleDebugSink,
   FileAuditSink,

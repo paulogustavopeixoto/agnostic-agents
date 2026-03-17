@@ -143,4 +143,66 @@ describe('Maintained examples', () => {
     expect(stdout).toContain('researcher');
     expect(stdout).toContain('writer');
   });
+
+  test('reference coordination benchmarks example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceCoordinationBenchmarks.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Coordination benchmark report');
+    expect(stdout).toContain('coordination-critique-benchmark');
+    expect(stdout).toContain('coordination-resolution-benchmark');
+    expect(stdout).toContain('coordination-loop-benchmark');
+    expect(stdout).toContain('coordination-decomposition-benchmark');
+  });
+
+  test('reference production policy pack example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceProductionPolicyPack.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Production policy decisions');
+    expect(stdout).toContain('production-deny-tools');
+    expect(stdout).toContain('production-protected-tools');
+    expect(stdout).toContain('Governance events captured by pack');
+  });
+
+  test('reference file-backed stack example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceFileBackedStack.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('File-backed stack summary');
+    expect(stdout).toContain('local-file-backed');
+    expect(stdout).toContain('storedRuns');
+    expect(stdout).toContain('storedJobs');
+    expect(stdout).toContain("runStatus: 'completed'");
+    expect(stdout).toContain('runSummary');
+  });
+
+  test('reference worker coordination benchmarks example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceWorkerCoordinationBenchmarks.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Worker coordination benchmark report');
+    expect(stdout).toContain('worker-coordination-lineage-benchmark');
+    expect(stdout).toContain('worker-coordination-contract-benchmark');
+  });
+
+  test('reference runtime extension example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceRuntimeExtension.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Runtime extension summary');
+    expect(stdout).toContain('reference-runtime-extension');
+    expect(stdout).toContain('reference-require-approval');
+    expect(stdout).toContain('reference-extension-scenario');
+  });
 });

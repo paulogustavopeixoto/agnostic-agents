@@ -63,6 +63,21 @@ These examples are intended as reference deployment patterns rather than feature
 - `referenceDecompositionAdvisor.js`
   - no API key required
   - shows how the coordination layer can recommend direct execution, delegation, or split-and-delegate plans based on task complexity, risk, capabilities, and delegate trust
+- `referenceCoordinationBenchmarks.js`
+  - no API key required
+  - shows maintained coordination benchmark scenarios for critique, resolution, loop execution, and decomposition planning using `EvalHarness`
+- `referenceProductionPolicyPack.js`
+  - no API key required
+  - shows a maintained production-oriented policy/governance pack contributing policy rules and governance hooks through `ExtensionHost`
+- `referenceFileBackedStack.js`
+  - no API key required
+  - shows a local-first persisted deployment stack using file-backed run/job/memory stores plus approval and governance handling
+- `referenceWorkerCoordinationBenchmarks.js`
+  - no API key required
+  - shows maintained worker-coordination evals for delegated workflow lineage, child-run aggregation, and contract enforcement
+- `referenceRuntimeExtension.js`
+  - no API key required
+  - shows a community-facing extension example contributing an event sink, policy rule, and eval scenario through `ExtensionHost`
 - `referenceOpenApiImport.js`
   - no API key required
   - shows importing a small OpenAPI spec into runtime tools

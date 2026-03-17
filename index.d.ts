@@ -135,6 +135,18 @@ export class DecompositionAdvisor {
   rankDelegates(task?: JsonObject, delegates?: JsonObject[]): JsonObject[];
 }
 
+export class CoordinationBenchmarkSuite {
+  constructor(options?: {
+    critiqueProtocol?: CritiqueProtocol | JsonObject | null;
+    disagreementResolver?: DisagreementResolver | JsonObject | null;
+    coordinationLoop?: CoordinationLoop | JsonObject | null;
+    decompositionAdvisor?: DecompositionAdvisor | JsonObject | null;
+    evalHarness?: EvalHarness | JsonObject | null;
+  });
+  buildScenarios(options?: JsonObject): JsonObject[];
+  run(options?: JsonObject): Promise<JsonObject>;
+}
+
 export interface RunMetrics {
   tokenUsage: {
     prompt: number;
@@ -465,6 +477,24 @@ export class ToolPolicy {
   verify(tool: any, context?: JsonObject): JsonObject;
   addRule(rule?: JsonObject): JsonObject;
   addRules(rules?: JsonObject[]): JsonObject[];
+}
+
+export class ProductionPolicyPack {
+  constructor(options?: {
+    name?: string;
+    version?: string | null;
+    environment?: string;
+    denyToolNames?: string[];
+    protectedToolNames?: string[];
+    denySideEffectLevels?: string[];
+    requireApprovalSideEffectLevels?: string[];
+    requireApprovalTags?: string[];
+    onGovernanceEvent?: ((event: JsonObject, context?: JsonObject) => Promise<void> | void) | null;
+  });
+  buildPolicyRules(): JsonObject[];
+  buildGovernanceHooks(): Function[];
+  listGovernanceEvents(): JsonObject[];
+  toExtension(): JsonObject;
 }
 
 export class EvidenceGraph {

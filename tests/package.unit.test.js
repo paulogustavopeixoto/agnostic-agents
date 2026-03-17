@@ -22,6 +22,7 @@ const { TrustRegistry } = require('../src/coordination/TrustRegistry');
 const { DisagreementResolver } = require('../src/coordination/DisagreementResolver');
 const { CoordinationLoop } = require('../src/coordination/CoordinationLoop');
 const { DecompositionAdvisor } = require('../src/coordination/DecompositionAdvisor');
+const { CoordinationBenchmarkSuite } = require('../src/coordination/CoordinationBenchmarkSuite');
 const { Run } = require('../src/runtime/Run');
 const { EvidenceGraph } = require('../src/runtime/EvidenceGraph');
 const { EvalHarness } = require('../src/runtime/EvalHarness');
@@ -55,6 +56,7 @@ const { DelegationRuntime } = require('../src/runtime/DelegationRuntime');
 const { PlanningRuntime } = require('../src/runtime/PlanningRuntime');
 const { TraceSerializer } = require('../src/runtime/TraceSerializer');
 const { ToolPolicy } = require('../src/runtime/ToolPolicy');
+const { ProductionPolicyPack } = require('../src/runtime/ProductionPolicyPack');
 const { EventBus } = require('../src/runtime/EventBus');
 const { BaseRunStore } = require('../src/runtime/stores/BaseRunStore');
 const { BaseJobStore } = require('../src/runtime/stores/BaseJobStore');
@@ -101,6 +103,7 @@ describe('Package/module unit tests', () => {
     expect(pkg.DisagreementResolver).toBeDefined();
     expect(pkg.CoordinationLoop).toBeDefined();
     expect(pkg.DecompositionAdvisor).toBeDefined();
+    expect(pkg.CoordinationBenchmarkSuite).toBeDefined();
     expect(pkg.Run).toBeDefined();
     expect(pkg.DistributedRunEnvelope).toBeDefined();
     expect(pkg.ExecutionIdentity).toBeDefined();
@@ -110,6 +113,7 @@ describe('Package/module unit tests', () => {
     expect(pkg.DistributedRecoveryPlanner).toBeDefined();
     expect(pkg.DistributedRecoveryRunner).toBeDefined();
     expect(pkg.ToolPolicy).toBeDefined();
+    expect(pkg.ProductionPolicyPack).toBeDefined();
     expect(pkg.EventBus).toBeDefined();
     expect(pkg.TraceSerializer).toBeDefined();
     expect(pkg.EvidenceGraph).toBeDefined();
@@ -471,6 +475,107 @@ describe('Package/module unit tests', () => {
     expect(split.suggestedPlan).toHaveLength(2);
     expect(split.suggestedPlan[0].delegate).toEqual(expect.objectContaining({ id: 'researcher' }));
     expect(split.suggestedPlan[1].delegate).toEqual(expect.objectContaining({ id: 'writer' }));
+  });
+
+  test('CoordinationBenchmarkSuite builds and runs maintained coordination scenarios', async () => {
+    const schemaRegistry = new CritiqueSchemaRegistry({
+      schemas: {
+        release_review: {
+          taxonomy: {
+            policy: {
+              severity: 'critical',
+              verdict: 'escalate',
+              recommendedAction: 'escalate',
+            },
+          },
+        },
+      },
+    });
+    const trustRegistry = new TrustRegistry();
+    const critiqueProtocol = new CritiqueProtocol({
+      schemaRegistry,
+      reviewers: [
+        {
+          id: 'policy-reviewer',
+          review: async () => ({
+            criticId: 'policy-reviewer',
+            failureType: 'policy',
+            confidence: 0.94,
+            rationale: 'Approval is required.',
+          }),
+        },
+      ],
+    });
+    const disagreementResolver = new DisagreementResolver({ trustRegistry });
+    const coordinationLoop = new CoordinationLoop({
+      critiqueProtocol,
+      trustRegistry,
+      disagreementResolver,
+      handlers: {
+        escalate: async ({ candidate }) => ({ ok: true, escalated: true, candidateId: candidate.id }),
+      },
+    });
+    const decompositionAdvisor = new DecompositionAdvisor();
+    const suite = new CoordinationBenchmarkSuite({
+      critiqueProtocol,
+      disagreementResolver,
+      coordinationLoop,
+      decompositionAdvisor,
+    });
+
+    const report = await suite.run({
+      candidate: { id: 'candidate-4', taskFamily: 'release_review' },
+      reviewContext: { taskFamily: 'release_review' },
+      expectedResolutionAction: 'escalate',
+      decompositionTask: {
+        id: 'task-3',
+        task: 'Investigate release health and prepare executive summary',
+        taskType: 'analysis',
+        complexity: 0.91,
+        risk: 0.41,
+        requiredCapabilities: ['generateText', 'retrieval'],
+        suggestedSubtasks: [
+          {
+            task: 'Investigate release health',
+            taskType: 'analysis',
+            requiredCapabilities: ['retrieval'],
+          },
+          {
+            task: 'Prepare executive summary',
+            taskType: 'writing',
+            requiredCapabilities: ['generateText'],
+          },
+        ],
+      },
+      decompositionOptions: {
+        availableDelegates: [
+          {
+            id: 'researcher',
+            capabilities: ['retrieval'],
+            specializations: ['analysis'],
+            trustScore: 0.88,
+          },
+          {
+            id: 'writer',
+            capabilities: ['generateText'],
+            specializations: ['writing'],
+            trustScore: 0.91,
+          },
+        ],
+      },
+      expectedDecompositionAction: 'split_and_delegate',
+    });
+
+    expect(report.total).toBe(4);
+    expect(report.failed).toBe(0);
+    expect(report.results).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'coordination-critique-benchmark', passed: true }),
+        expect.objectContaining({ id: 'coordination-resolution-benchmark', passed: true }),
+        expect.objectContaining({ id: 'coordination-loop-benchmark', passed: true }),
+        expect.objectContaining({ id: 'coordination-decomposition-benchmark', passed: true }),
+      ])
+    );
   });
 
   test('Run tracks state and serializes cleanly', () => {
@@ -1454,6 +1559,76 @@ describe('Package/module unit tests', () => {
       reason: null,
       source: 'default',
     });
+  });
+
+  test('ProductionPolicyPack contributes policy rules and governance hooks through ExtensionHost', async () => {
+    const pack = new ProductionPolicyPack({
+      environment: 'production',
+      denyToolNames: ['delete_records'],
+      protectedToolNames: ['send_status_update'],
+      requireApprovalTags: ['pii'],
+    });
+    const host = new ExtensionHost({
+      extensions: [pack.toExtension()],
+    });
+    const policy = host.extendToolPolicy();
+    const hooks = host.extendGovernanceHooks();
+
+    const destructiveTool = new Tool({
+      name: 'delete_records',
+      parameters: { type: 'object', properties: {} },
+      implementation: async () => ({ ok: true }),
+    });
+    const protectedTool = new Tool({
+      name: 'send_status_update',
+      parameters: { type: 'object', properties: {} },
+      implementation: async () => ({ ok: true }),
+    });
+    const piiTool = new Tool({
+      name: 'sync_profile',
+      parameters: { type: 'object', properties: {} },
+      metadata: { tags: ['pii'] },
+      implementation: async () => ({ ok: true }),
+    });
+
+    expect(policy.evaluate(destructiveTool, {}, {})).toEqual(
+      expect.objectContaining({
+        action: 'deny',
+        ruleId: 'production-deny-tools',
+      })
+    );
+    expect(policy.evaluate(protectedTool, {}, {})).toEqual(
+      expect.objectContaining({
+        action: 'require_approval',
+        ruleId: 'production-protected-tools',
+      })
+    );
+    expect(policy.evaluate(piiTool, {}, {})).toEqual(
+      expect.objectContaining({
+        action: 'require_approval',
+        ruleId: 'production-approval-tags',
+      })
+    );
+
+    await hooks.dispatch(
+      'approval_requested',
+      {
+        runId: 'run-9',
+        toolName: 'send_status_update',
+      },
+      {
+        run: { id: 'run-9' },
+      }
+    );
+
+    expect(pack.listGovernanceEvents()).toEqual([
+      expect.objectContaining({
+        type: 'approval_requested',
+        runId: 'run-9',
+        toolName: 'send_status_update',
+        environment: 'production',
+      }),
+    ]);
   });
 
   test('FileAuditSink logs risky side-effecting runtime events', async () => {

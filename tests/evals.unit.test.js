@@ -11,6 +11,11 @@ const { HistoricalRoutingAdvisor } = require('../src/runtime/HistoricalRoutingAd
 const { AdaptiveDecisionLedger } = require('../src/runtime/AdaptiveDecisionLedger');
 const { AdaptiveGovernanceGate } = require('../src/runtime/AdaptiveGovernanceGate');
 const { ApprovalInbox } = require('../src/runtime/ApprovalInbox');
+const { Workflow } = require('../src/runtime/workflow/Workflow');
+const { AgentWorkflowStep } = require('../src/runtime/workflow/AgentWorkflowStep');
+const { WorkflowRunner } = require('../src/runtime/workflow/WorkflowRunner');
+const { DelegationRuntime } = require('../src/runtime/DelegationRuntime');
+const { DelegationContract } = require('../src/runtime/workflow/DelegationContract');
 
 class ToolEvalAdapter {
   async generateText(messages, { tools = [] } = {}) {
@@ -50,6 +55,34 @@ class RagEvalAdapter {
     return chunks.map(chunk => ({
       embedding: [chunk.length, chunk.split(' ').length, 1],
     }));
+  }
+}
+
+class WorkerEvalAdapter {
+  constructor(label, { toolCalling = false } = {}) {
+    this.label = label;
+    this.toolCalling = toolCalling;
+  }
+
+  getCapabilities() {
+    return {
+      generateText: true,
+      toolCalling: this.toolCalling,
+    };
+  }
+
+  async generateText(messages) {
+    const text = messages.map(message => String(message.content || '')).join('\n').toLowerCase();
+
+    if (text.includes('turn this research into a short update')) {
+      return { message: `${this.label} draft: replay, approvals, and traces` };
+    }
+
+    if (text.includes('list three runtime capabilities')) {
+      return { message: `${this.label} research: replay, approvals, and traces` };
+    }
+
+    return { message: `${this.label} response` };
   }
 }
 
@@ -288,6 +321,109 @@ describe('Eval and benchmark discipline', () => {
         expect.objectContaining({ id: 'adaptive-routing-benchmark', passed: true }),
         expect.objectContaining({ id: 'adaptive-policy-suggestion-benchmark', passed: true }),
         expect.objectContaining({ id: 'adaptive-governance-benchmark', passed: true }),
+      ])
+    );
+  });
+
+  test('EvalHarness can run worker-coordination benchmark scenarios', async () => {
+    const childRunStore = new InMemoryRunStore();
+    const workflowRunStore = new InMemoryRunStore();
+    const delegationRuntime = new DelegationRuntime();
+    const researcher = new Agent(new WorkerEvalAdapter('researcher'), {
+      runStore: childRunStore,
+    });
+    const writer = new Agent(new WorkerEvalAdapter('writer'), {
+      runStore: childRunStore,
+    });
+
+    const workflow = new Workflow({
+      id: 'worker-coordination-benchmark',
+      steps: [
+        new AgentWorkflowStep({
+          id: 'research',
+          agent: researcher,
+          delegationRuntime,
+          delegationContract: new DelegationContract({
+            id: 'research-contract',
+            assignee: 'researcher',
+            requiredInputs: ['prompt'],
+            requiredCapabilities: ['generateText'],
+          }),
+          prompt: 'List three runtime capabilities in bullet form.',
+        }),
+        new AgentWorkflowStep({
+          id: 'draft',
+          agent: writer,
+          dependsOn: ['research'],
+          delegationRuntime,
+          delegationContract: new DelegationContract({
+            id: 'writer-contract',
+            assignee: 'writer',
+            requiredInputs: ['prompt'],
+            requiredCapabilities: ['generateText'],
+          }),
+          prompt: ({ results }) => `Turn this research into a short update:\n${results.research.output}`,
+        }),
+      ],
+    });
+
+    const contractFailureWorkflow = new Workflow({
+      id: 'worker-contract-failure-benchmark',
+      steps: [
+        new AgentWorkflowStep({
+          id: 'gated_worker',
+          agent: new Agent(new WorkerEvalAdapter('gated-worker', { toolCalling: false }), {
+            runStore: childRunStore,
+          }),
+          delegationContract: new DelegationContract({
+            id: 'gated-contract',
+            assignee: 'gated-worker',
+            requiredInputs: ['prompt'],
+            requiredCapabilities: ['toolCalling'],
+          }),
+          prompt: 'Handle a tool-dependent worker task.',
+        }),
+      ],
+    });
+
+    const harness = new EvalHarness({
+      scenarios: [
+        {
+          id: 'worker-coordination-lineage-benchmark',
+          run: async () => new WorkflowRunner({ workflow, runStore: workflowRunStore }).run('Prepare a worker report'),
+          assert: run =>
+            run.status === 'completed' &&
+            run.metrics.childRuns.count === 2 &&
+            run.metrics.childRuns.items.length === 2 &&
+            run.events.some(event => event.type === 'delegation_completed') &&
+            String(run.output?.draft?.output || '').includes('replay, approvals, and traces'),
+        },
+        {
+          id: 'worker-coordination-contract-benchmark',
+          run: async () => {
+            try {
+              await new WorkflowRunner({
+                workflow: contractFailureWorkflow,
+                runStore: workflowRunStore,
+              }).run('Prepare a gated worker task');
+              return null;
+            } catch (error) {
+              return error.message || String(error);
+            }
+          },
+          assert: message => String(message).includes('requires capability "toolCalling"'),
+        },
+      ],
+    });
+
+    const report = await harness.run();
+
+    expect(report.total).toBe(2);
+    expect(report.failed).toBe(0);
+    expect(report.results).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'worker-coordination-lineage-benchmark', passed: true }),
+        expect.objectContaining({ id: 'worker-coordination-contract-benchmark', passed: true }),
       ])
     );
   });

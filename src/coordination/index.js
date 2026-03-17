@@ -4,6 +4,7 @@ const { TrustRegistry } = require('./TrustRegistry');
 const { DisagreementResolver } = require('./DisagreementResolver');
 const { CoordinationLoop } = require('./CoordinationLoop');
 const { DecompositionAdvisor } = require('./DecompositionAdvisor');
+const { CoordinationBenchmarkSuite } = require('./CoordinationBenchmarkSuite');
 
 module.exports = {
   CritiqueProtocol,
@@ -12,4 +13,5 @@ module.exports = {
   DisagreementResolver,
   CoordinationLoop,
   DecompositionAdvisor,
+  CoordinationBenchmarkSuite,
 };

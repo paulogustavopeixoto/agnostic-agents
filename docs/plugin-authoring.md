@@ -182,3 +182,5 @@ const extension = {
 - [`docs/api-reference.md`](api-reference.md)
 - [`docs/operator-workflows.md`](operator-workflows.md)
 - [`docs/api-stability-policy.md`](api-stability-policy.md)
+- [`docs/extension-certification.md`](extension-certification.md)
+- [`docs/runtime-extension-contributors.md`](runtime-extension-contributors.md)

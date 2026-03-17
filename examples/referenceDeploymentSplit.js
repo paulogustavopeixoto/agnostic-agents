@@ -14,7 +14,7 @@ function createAdapter(label) {
   return {
     getCapabilities: () => ({ generateText: true, toolCalling: true }),
     generateText: async (messages, options = {}) => {
-      const alreadyHasToolResult = messages.some(message => message?.role === 'tool');
+      const alreadyHasToolResult = messages.some(message => message?.role === 'function');
       if (options.tools?.length && !alreadyHasToolResult) {
         return {
           message: '',

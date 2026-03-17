@@ -2,7 +2,24 @@
 
 # agnostic-agents
 
-A Node.js runtime OS for building provider-agnostic agent systems with inspectable runs, replay, branching, approvals, workflows, layered memory, grounded retrieval, and multi-agent orchestration.
+`agnostic-agents` is a Node.js runtime OS for building provider-agnostic agent systems.
+
+It is designed for projects that need more than a chat wrapper:
+
+- inspectable runs
+- checkpoints and replay
+- approvals and policy-gated tools
+- workflows and delegation
+- grounded retrieval and layered memory
+- distributed handoff across processes or services
+- evals, benchmarks, and incident analysis
+
+The package also now includes a separate coordination layer above the runtime for:
+
+- structured critique
+- disagreement resolution
+- task decomposition
+- coordination benchmarks
 
 ## Install
 
@@ -10,31 +27,23 @@ A Node.js runtime OS for building provider-agnostic agent systems with inspectab
 npm install agnostic-agents
 ```
 
-The package ships a maintained `index.d.ts` so TypeScript projects get typed access to the public runtime surface without extra setup.
+The package ships a maintained `index.d.ts`, so TypeScript projects get typed access to the public surface without extra setup.
 
-## What it includes
+## What This Package Is Good For
 
-- `Agent`: runtime-backed agent execution with tool calling, approvals, pause/resume, cancellation, replay, run assessment, self-verification, memory context, retrieval augmentation, and multimodal helper methods.
-- `Tool`: JSON Schema based tool definition that adapters can export to provider-specific formats.
-- `Run` / `RunInspector`: inspectable run model with events, checkpoints, timings, usage, lineage, assessments, and errors.
-- `DistributedRunEnvelope` / `TraceCorrelation` / `RunTreeInspector` / `IncidentDebugger` / `DistributedRecoveryPlanner` / `DistributedRecoveryRunner` / `TraceSerializer` / `TraceDiffer`: distributed handoff envelopes, correlation metadata, run trees, incident workflows, policy-aware recovery planning and execution, portable traces, and replay diffing for runtime control.
-- `ExecutionIdentity`: normalized execution identity metadata for delegated and remote runtime paths.
-- `Workflow` / `WorkflowStep` / `AgentWorkflowStep` / `WorkflowRunner`: dependency-aware orchestration built on the runtime.
-- `DelegationRuntime` / `DelegationContract`: explicit multi-agent delegation with governed contracts and child-run tracking.
-- `PlanningRuntime`: plan, verify, recover execution flow for higher-order runtime tasks.
-- `Memory`: layered memory for conversation, working, profile, policy, and semantic storage.
-- `RAG`: grounded retrieval helper with provenance, reranking, retrievers, Pinecone support, or the built-in `LocalVectorStore`.
-- `FallbackRouter`: capability-aware provider fallback routing with cost/risk/task-type hints and optional history-aware routing advice.
-- `BackgroundJobScheduler`: recurring and delayed job execution with pluggable job stores.
-- `EvidenceGraph` / `EvalHarness` / `LearningLoop` / `BranchQualityAnalyzer` / `PolicyTuningAdvisor` / `VerifierEnsemble` / `ConfidencePolicy` / `AdaptiveRetryPolicy` / `HistoricalRoutingAdvisor` / `AdaptiveDecisionLedger` / `AdaptiveGovernanceGate`: runtime evidence tracking, eval execution, learning signals from runs and benchmarks, adaptive recommendation summaries, replay/branch quality comparison, policy-tuning suggestions, composed reviewer strategies, confidence-aware execution thresholds, adaptive retry/escalation control, history-aware provider routing, durable adaptive audit trails, and approval-aware review for material adaptive changes.
-- `CritiqueProtocol` / `CritiqueSchemaRegistry` / `TrustRegistry` / `DisagreementResolver` / `CoordinationLoop` / `DecompositionAdvisor`: a separate coordination layer for structured critique, task-family failure taxonomies, trust-weighted coordination, explicit disagreement resolution, a simple propose -> critique -> resolve -> act loop, and task decomposition/delegation recommendations above the runtime.
-- `EventBus` / `ConsoleDebugSink` / `FileAuditSink` / `WebhookEventSink` / `RuntimeEventRedactor`: structured runtime events, debug sinks, JSONL audit logging, external event forwarding, and PII-safe redaction helpers.
-- `ToolPolicy` / `GovernanceHooks` / `WebhookGovernanceAdapter` / `ApprovalInbox` / `StorageBackendRegistry`: governance policy controls, external review hooks, remote control-plane forwarding, and stable runtime storage contracts.
-- environment adapters for browser, shell, API, queue, and file-backed execution environments.
-- `MCPClient` / `MCPTool` / `MCPDiscoveryLoader`: connect to Model Context Protocol tool sources.
-- `RetryManager`: retry wrapper for adapters and workflows.
+Use `agnostic-agents` when you want:
 
-## Quick start
+- a single-agent runtime with tools, approvals, memory, and replay
+- a workflow runner with explicit steps and child-run lineage
+- a provider-agnostic execution layer behind one adapter contract
+- a runtime substrate for higher-level worker or organization systems
+- a package that keeps control, observability, and governance in the open
+
+Do not think of it as only a prompt helper or a chat abstraction. The maintained direction is a runtime control layer for serious agent systems.
+
+## Fastest Start
+
+If you just want a working tool-using agent, start here:
 
 ```js
 const { Agent, Tool, OpenAIAdapter } = require('agnostic-agents');
@@ -49,7 +58,7 @@ const calculator = new Tool({
   parameters: {
     type: 'object',
     properties: {
-      expression: { type: 'string', description: 'Expression like 12 * 7' },
+      expression: { type: 'string' },
     },
     required: ['expression'],
   },
@@ -60,25 +69,18 @@ const calculator = new Tool({
 
 const agent = new Agent(adapter, {
   tools: [calculator],
-  description: 'You are a concise assistant. Use tools when they help.',
+  description: 'Use tools when they help.',
   defaultConfig: { temperature: 0.2, maxTokens: 300 },
 });
 
-const response = await agent.sendMessage('What is 12 * 7?');
-console.log(response);
+const answer = await agent.sendMessage('What is 12 * 7?');
+console.log(answer);
 ```
 
-## Runtime example
-
-`Agent.run()` returns an inspectable `Run` object. This is the maintained path for runtime features like approvals, checkpoints, branching, replay, self-verification, and inspection.
+If you want the maintained runtime path instead of the shortest chat path, use `Agent.run()`:
 
 ```js
-const {
-  Agent,
-  Tool,
-  OpenAIAdapter,
-  RunInspector
-} = require('agnostic-agents');
+const { Agent, Tool, OpenAIAdapter, RunInspector } = require('agnostic-agents');
 
 const adapter = new OpenAIAdapter(process.env.OPENAI_API_KEY, {
   model: 'gpt-4o-mini',
@@ -86,7 +88,6 @@ const adapter = new OpenAIAdapter(process.env.OPENAI_API_KEY, {
 
 const sendUpdate = new Tool({
   name: 'send_status_update',
-  description: 'Send a short status update to a recipient.',
   parameters: {
     type: 'object',
     properties: {
@@ -108,72 +109,57 @@ const sendUpdate = new Tool({
 
 const agent = new Agent(adapter, {
   tools: [sendUpdate],
-  description: 'Use tools when required and ask for approval before side effects.',
-  verifier: new OpenAIAdapter(process.env.OPENAI_API_KEY, {
-    model: 'gpt-4o-mini',
-  }),
+  verifier: adapter,
   defaultConfig: { selfVerify: true },
 });
 
 let run = await agent.run('Send Paulo a short update saying the runtime is ready.');
 
 if (run.status === 'waiting_for_approval') {
-  run = await agent.resumeRun(run.id, { approved: true, reason: 'approved in demo' });
+  run = await agent.resumeRun(run.id, {
+    approved: true,
+    reason: 'approved in demo',
+  });
 }
 
-console.log(run.output);
 console.dir(RunInspector.summarize(run), { depth: null });
 ```
 
-## Memory example
+## Core Surfaces
 
-```js
-const { Agent, Memory, OpenAIAdapter } = require('agnostic-agents');
+### Runtime
 
-const memory = new Memory();
-const agent = new Agent(new OpenAIAdapter(process.env.OPENAI_API_KEY), {
-  memory,
-  description: 'You remember earlier turns and task context.',
-});
+The maintained runtime surface centers on:
 
-memory.setWorkingMemory('current_project', 'Validate the v4 runtime-control release.');
-memory.setPolicy('external_updates', 'Ask for approval before sending external updates.');
+- `Agent`
+- `Run`
+- `RunInspector`
+- `ToolPolicy`
+- `ApprovalInbox`
+- `GovernanceHooks`
 
-await agent.sendMessage('My favorite city is Lisbon.');
-const answer = await agent.sendMessage('What city did I mention?');
-console.log(answer);
-```
+That gives you:
 
-## Retrieval example
+- pause/resume/cancel
+- tool approval gating
+- replay and branching
+- structured events
+- run inspection and trace export
 
-`Agent` uses retrieval as prompt augmentation when a `rag` instance is provided. Retrieval results are available with provenance and can be inspected on runs. To use the built-in local store, the adapter must support embeddings.
+### Workflow and Delegation
 
-```js
-const {
-  Agent,
-  RAG,
-  LocalVectorStore,
-  OpenAIAdapter,
-} = require('agnostic-agents');
+For explicit multi-step work, use:
 
-const adapter = new OpenAIAdapter(process.env.OPENAI_API_KEY);
-const rag = new RAG({
-  adapter,
-  vectorStore: new LocalVectorStore(),
-});
+- `Workflow`
+- `WorkflowStep`
+- `AgentWorkflowStep`
+- `WorkflowRunner`
+- `DelegationRuntime`
+- `DelegationContract`
 
-await rag.index(['AI ethics involves fairness, transparency, and accountability.']);
+This is the maintained orchestration layer. Legacy `Task` and `Orchestrator` remain only for compatibility.
 
-const agent = new Agent(adapter, {
-  rag,
-  description: 'Use retrieved context when it is relevant.',
-});
-
-const answer = await agent.sendMessage('What does AI ethics involve?');
-console.log(answer);
-```
-
-## Workflow example
+Example:
 
 ```js
 const {
@@ -181,12 +167,13 @@ const {
   Workflow,
   AgentWorkflowStep,
   WorkflowRunner,
-  DelegationContract,
   DelegationRuntime,
+  DelegationContract,
   OpenAIAdapter,
 } = require('agnostic-agents');
 
 const adapter = new OpenAIAdapter(process.env.OPENAI_API_KEY);
+const delegationRuntime = new DelegationRuntime();
 
 const researcher = new Agent(adapter, {
   description: 'Produce concise factual bullet points.',
@@ -195,8 +182,6 @@ const researcher = new Agent(adapter, {
 const writer = new Agent(adapter, {
   description: 'Turn findings into short status updates.',
 });
-
-const delegationRuntime = new DelegationRuntime();
 
 const workflow = new Workflow({
   id: 'daily-sync',
@@ -227,14 +212,42 @@ const workflow = new Workflow({
   ],
 });
 
-const runner = new WorkflowRunner({ workflow });
-const run = await runner.run('Prepare a daily sync update');
+const run = await new WorkflowRunner({ workflow }).run('Prepare a daily sync update');
 console.log(run.output);
 ```
 
-## Distributed handoff example
+### Memory and Retrieval
 
-Use a shared run store when one process creates a run and another process continues it.
+Use:
+
+- `Memory` for conversation, working, profile, policy, and semantic layers
+- `RAG` for grounded retrieval with provenance
+
+```js
+const { Agent, Memory, RAG, LocalVectorStore, OpenAIAdapter } = require('agnostic-agents');
+
+const adapter = new OpenAIAdapter(process.env.OPENAI_API_KEY);
+const memory = new Memory();
+const rag = new RAG({
+  adapter,
+  vectorStore: new LocalVectorStore(),
+});
+
+await rag.index(['Runtime control requires replay, branching, and inspection.']);
+await memory.setWorkingMemory('current_project', 'Validate the runtime release');
+
+const agent = new Agent(adapter, {
+  memory,
+  rag,
+  description: 'Use retrieved context when relevant.',
+});
+
+console.log(await agent.sendMessage('What does runtime control require?'));
+```
+
+### Distributed Execution
+
+Use shared stores plus distributed envelopes when one process creates a run and another continues it.
 
 ```js
 const { Agent, FileRunStore } = require('agnostic-agents');
@@ -254,71 +267,77 @@ const remoteRun = await processB.continueDistributedRun(envelope);
 console.log(remoteRun.status);
 ```
 
-## Planning and scheduling example
+### Coordination Layer
 
-```js
-const {
-  PlanningRuntime,
-  BackgroundJobScheduler,
-  InMemoryJobStore,
-} = require('agnostic-agents');
+Above the runtime core, the package now includes:
 
-const planning = new PlanningRuntime({
-  planner: async ({ input }) => [{ id: 'plan-1', task: input }],
-  executor: async ({ plan }) => ({ completed: true, planLength: plan.length }),
-  verifier: async ({ result }) => ({ status: result.completed ? 'passed' : 'recover' }),
-});
+- `CritiqueProtocol`
+- `CritiqueSchemaRegistry`
+- `TrustRegistry`
+- `DisagreementResolver`
+- `CoordinationLoop`
+- `DecompositionAdvisor`
+- `CoordinationBenchmarkSuite`
 
-const planningRun = await planning.run('Summarize the runtime state');
-console.log(planningRun.output);
+This layer is for:
 
-const scheduler = new BackgroundJobScheduler({
-  store: new InMemoryJobStore(),
-  handlers: {
-    sync: async payload => ({ ok: true, topic: payload.topic }),
-  },
-});
+- structured critique records
+- trust-weighted disagreement handling
+- decomposition recommendations
+- coordination evals and benchmarks
 
-await scheduler.schedule({
-  id: 'nightly-sync',
-  handler: 'sync',
-  payload: { topic: 'runtime' },
-  runAt: new Date().toISOString(),
-});
+It is intentionally separate from the runtime kernel.
 
-const dueJobs = await scheduler.runDueJobs();
-console.log(dueJobs);
-```
+### Policy and Governance
 
-## Tool contract
+Use:
 
-Each tool uses one canonical shape:
+- `ToolPolicy` for raw policy logic
+- `ExtensionHost` for contributed policy and governance behavior
+- `ProductionPolicyPack` for a maintained production-oriented preset
+- `ApprovalInbox` and `GovernanceHooks` for operator-facing control
 
-- `name`
-- `description`
-- `parameters` as JSON Schema
-- `implementation(args, context)`
+This means users can add or mutate policy dynamically without patching core runtime code.
 
-The agent validates tool arguments against `parameters`, applies schema defaults, and executes the tool before asking the model for a final response.
+## Provider Surface
 
-## Examples
+The package supports multiple providers behind one adapter contract.
+
+Shared maintained contract:
+
+- `generateText()`
+- `getCapabilities()`
+- `supports(capability)`
+
+Capability support and certification vary by provider. Use these docs instead of assuming parity:
+
+- [Provider compatibility](docs/provider-compatibility.md)
+- [Provider certification](docs/provider-certification.md)
+- [Support matrix](docs/support-matrix.md)
+- [Provider quickstarts](docs/provider-quickstarts.md)
+
+If you want the strongest maintained end-to-end path today, start with OpenAI.
+
+## Maintained Examples
+
+Local/no-key examples:
 
 - `npm run example:local-tool`
 - `npm run example:local-rag`
 - `npm run example:local-rag-tool`
-- `npm run example:openai`
-- `npm run example:gemini`
-- `npm run example:openai-runtime`
-- `npm run example:openai-v3-runtime`
-- `npm run example:openai-v4-runtime`
 - `npm run example:reference-worker`
 - `npm run example:reference-incident`
 - `npm run example:reference-operator`
 - `npm run example:reference-evals`
 - `npm run example:reference-replay-benchmarks`
+- `npm run example:reference-adaptive-benchmarks`
 - `npm run example:reference-v7-audit`
 - `npm run example:reference-coordination-review`
 - `npm run example:reference-decomposition-advisor`
+- `npm run example:reference-coordination-benchmarks`
+- `npm run example:reference-production-policy-pack`
+- `npm run example:reference-file-backed-stack`
+- `npm run example:reference-worker-coordination-benchmarks`
 - `npm run example:reference-openapi`
 - `npm run example:reference-durable-backends`
 - `npm run example:reference-distributed-handoff`
@@ -327,107 +346,110 @@ The agent validates tool arguments against `parameters`, applies schema defaults
 - `npm run example:reference-deployment-split`
 - `npm run example:reference-distributed-recovery`
 
-Additional examples live in [`examples/`](examples).
+Provider-backed examples:
 
-Maintained `v1` examples are documented in [`examples/README.md`](examples/README.md).
+- `npm run example:openai`
+- `npm run example:gemini`
+- `npm run example:openai-runtime`
+- `npm run example:openai-v3-runtime`
+- `npm run example:openai-v4-runtime`
 
-Reference deployment patterns are documented in [`docs/reference-integrations.md`](docs/reference-integrations.md).
-The maintained package reference is documented in [`docs/api-reference.md`](docs/api-reference.md).
-Version-to-version upgrade paths are documented in [`docs/migration-guides.md`](docs/migration-guides.md).
-The public API stability, deprecation, and versioning rules are documented in [`docs/api-stability-policy.md`](docs/api-stability-policy.md).
-Copy-paste provider quickstarts are documented in [`docs/provider-quickstarts.md`](docs/provider-quickstarts.md).
-Benchmarking and regression-eval guidance is documented in [`docs/benchmarking.md`](docs/benchmarking.md).
-Comparison benchmark fixtures are documented in [`docs/benchmark-fixtures.md`](docs/benchmark-fixtures.md).
-Plugin authoring guidance is documented in [`docs/plugin-authoring.md`](docs/plugin-authoring.md).
-MCP interoperability guidance is documented in [`docs/mcp-interoperability.md`](docs/mcp-interoperability.md).
-OpenAPI integration examples are documented in [`docs/openapi-examples.md`](docs/openapi-examples.md).
-Real product-pattern recipes are documented in [`docs/cookbook.md`](docs/cookbook.md).
-Operator triage, replay, branching, and recovery workflows are documented in [`docs/operator-workflows.md`](docs/operator-workflows.md).
-Operator-facing deployment guidance is documented in [`docs/operator-architecture.md`](docs/operator-architecture.md).
-Production-oriented storage backend guidance is documented in [`docs/storage-backends.md`](docs/storage-backends.md).
-Distributed execution and handoff guidance is documented in [`docs/distributed-execution.md`](docs/distributed-execution.md).
-Remote control-plane guidance is documented in [`docs/remote-control-planes.md`](docs/remote-control-planes.md).
-Distributed identity and auth-scope guidance is documented in [`docs/distributed-identities.md`](docs/distributed-identities.md).
+See [examples/README.md](examples/README.md) for labels and intent.
 
-Secret-handling expectations for adapters, tools, logs, traces, and tests are documented in [`docs/secret-handling.md`](docs/secret-handling.md).
-Tool auth propagation for host-controlled credentials is documented in [`docs/tool-auth-propagation.md`](docs/tool-auth-propagation.md).
+## Recommended Starting Paths
 
-## Current v7 scope
+If you are new to the package:
 
-This package currently targets:
+1. start with `local-tool` or `openai`
+2. move to `Agent.run()` and `RunInspector`
+3. add `ToolPolicy` and `ApprovalInbox` if side effects matter
+4. add `WorkflowRunner` and delegation if you need explicit orchestration
+5. move to file-backed or split deployment references when persistence and operations matter
 
-- provider-agnostic tool calling
-- inspectable runs with checkpoints, replay, branching, run trees, traces, events, and assessments
-- approval-gated, pausable, resumable, and cancellable execution
-- layered memory
-- grounded retrieval with provenance and evidence tracking
-- workflow orchestration and explicit delegation on top of the runtime
-- planning, recovery, and recurring background execution
-- distributed execution, queue/service handoff, remote control-plane integration, and cross-service recovery
-- provider fallback routing with cost/risk/task-type hints
-- incident debugging, portable trace export, governance hooks, tool allowlist/blocklist controls, PII-safe audit logging, auth propagation for tools, operator recovery/deployment guidance, and reference deployment patterns
-- maintained benchmark references for replay regressions and adaptive routing/governance decisions
-- a single `v7` audit example for end-to-end adaptive-runtime verification logs
-- adaptive routing, verifier composition, confidence-aware execution, adaptive retry/escalation, and approval-aware adaptive governance
-- a separate in-repo coordination layer for structured critique and disagreement resolution above the runtime core
-- a maintained coordination loop example that turns critiques into an executed next action
-- MCP tool discovery
-- eval and learning-loop primitives for runtime benchmarking
+If you are evaluating the package for serious runtime usage:
 
-Legacy `Task` and `Orchestrator` remain for compatibility, but the maintained orchestration layer is `Workflow` / `WorkflowRunner`.
+1. read [docs/reference-integrations.md](docs/reference-integrations.md)
+2. read [docs/common-stack-integrations.md](docs/common-stack-integrations.md)
+3. run `reference-file-backed-stack`
+4. run `reference-deployment-split`
+5. review [docs/operator-workflows.md](docs/operator-workflows.md)
 
-Some adapters expose extra audio, image, or video methods, but support varies by provider.
+## Documentation Map
 
-## Adapter capabilities
+API and package surface:
 
-Each adapter exposes `getCapabilities()` with the normalized capability map:
+- [API reference](docs/api-reference.md)
+- [API stability policy](docs/api-stability-policy.md)
+- [Migration guides](docs/migration-guides.md)
 
-- `generateText`
-- `toolCalling`
-- `embeddings`
-- `imageAnalysis`
-- `imageGeneration`
-- `audioTranscription`
-- `audioGeneration`
-- `videoAnalysis`
-- `videoGeneration`
+Runtime operations:
 
-Use this to decide whether to expose optional features in your app.
+- [Reference integrations](docs/reference-integrations.md)
+- [Common stack integrations](docs/common-stack-integrations.md)
+- [Operator workflows](docs/operator-workflows.md)
+- [Operator architecture](docs/operator-architecture.md)
+- [Distributed execution](docs/distributed-execution.md)
+- [Remote control planes](docs/remote-control-planes.md)
+- [Distributed identities](docs/distributed-identities.md)
+- [Storage backends](docs/storage-backends.md)
 
-See [`docs/provider-compatibility.md`](docs/provider-compatibility.md) for provider-specific notes.
-Certification levels and support-claim rules are defined in [`docs/provider-certification.md`](docs/provider-certification.md).
-Secret handling and redaction guidance is documented in [`docs/secret-handling.md`](docs/secret-handling.md).
+Policy, governance, and security:
+
+- [Policy and governance packs](docs/policy-governance-packs.md)
+- [Secret handling](docs/secret-handling.md)
+- [Tool auth propagation](docs/tool-auth-propagation.md)
+
+Evals and ecosystem:
+
+- [Benchmarking](docs/benchmarking.md)
+- [Benchmark fixtures](docs/benchmark-fixtures.md)
+- [Plugin authoring](docs/plugin-authoring.md)
+- [Extension certification and compatibility](docs/extension-certification.md)
+- [Runtime extension contributor guidance](docs/runtime-extension-contributors.md)
+- [MCP interoperability](docs/mcp-interoperability.md)
+- [OpenAPI examples](docs/openapi-examples.md)
+- [Cookbook](docs/cookbook.md)
+
+Provider guidance:
+
+- [Provider quickstarts](docs/provider-quickstarts.md)
+- [Provider compatibility](docs/provider-compatibility.md)
+- [Provider certification](docs/provider-certification.md)
+- [Support matrix](docs/support-matrix.md)
 
 ## Development
+
+Run the maintained test suites with:
 
 ```bash
 npm test
 ```
 
-Available test commands:
+Other useful commands:
 
 ```bash
 npm run test:unit
 npm run test:integration
 npm run test:live
 npm run test:all
+npm run test:coverage
 ```
 
-Live tests use `.env` keys and only run when `RUN_LIVE_API_TESTS=1` is set by the script. Provider-account limitations such as quota, billing, or model availability are treated as skippable smoke-test conditions rather than framework failures.
+## Current Scope
 
-Detailed command and environment documentation is available in [`docs/testing.md`](docs/testing.md).
+This package currently targets:
 
-Package publish contents are documented in [`docs/package-audit.md`](docs/package-audit.md).
+- provider-agnostic runtime execution
+- inspectable runs with replay and lineage
+- approval-gated tool execution
+- layered memory and grounded retrieval
+- explicit workflows and delegation
+- distributed handoff and recovery
+- adaptive runtime tuning and operator-facing evals
+- a separate coordination layer above the runtime
 
-Maintained runtime demos are:
+It does not try to be:
 
-```bash
-npm run example:openai-runtime
-npm run example:openai-v3-runtime
-npm run example:openai-v4-runtime
-npm run example:reference-distributed-handoff
-npm run example:reference-distributed-incident
-npm run example:reference-remote-control-plane
-npm run example:reference-deployment-split
-npm run example:reference-distributed-recovery
-```
+- a hosted control plane
+- a closed worker-management product
+- a provider-specific framework disguised as a generic runtime

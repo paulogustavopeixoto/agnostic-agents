@@ -34,6 +34,7 @@ const {
   DisagreementResolver,
   CoordinationLoop,
   DecompositionAdvisor,
+  CoordinationBenchmarkSuite,
 } = require('./src/coordination');
 const {
   Run,
@@ -66,6 +67,7 @@ const {
   DelegationRuntime,
   PlanningRuntime,
   ToolPolicy,
+  ProductionPolicyPack,
   EventBus,
   ConsoleDebugSink,
   FileAuditSink,
@@ -139,6 +141,7 @@ module.exports = {
   DisagreementResolver,
   CoordinationLoop,
   DecompositionAdvisor,
+  CoordinationBenchmarkSuite,
   Run,
   RunInspector,
   RunTreeInspector,
@@ -169,6 +172,7 @@ module.exports = {
   DelegationRuntime,
   PlanningRuntime,
   ToolPolicy,
+  ProductionPolicyPack,
   EventBus,
   ConsoleDebugSink,
   FileAuditSink,

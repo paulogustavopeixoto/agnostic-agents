@@ -4,6 +4,8 @@ These reference integrations show how to use `agnostic-agents` as a runtime OS i
 
 They are not full products. They are thin patterns you can adapt into your own service, worker, or control plane.
 
+For named common-stack mappings, see [`docs/common-stack-integrations.md`](common-stack-integrations.md).
+
 ## 1. API-facing runtime service
 
 Use this pattern when you want an HTTP service that:
