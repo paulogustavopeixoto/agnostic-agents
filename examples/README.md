@@ -66,9 +66,24 @@ These examples are intended as reference deployment patterns rather than feature
 - `referenceCoordinationBenchmarks.js`
   - no API key required
   - shows maintained coordination benchmark scenarios for critique, resolution, loop execution, and decomposition planning using `EvalHarness`
+- `referenceCoordinationPolicyGate.js`
+  - no API key required
+  - shows policy gating of coordination outcomes so runtime policy can require escalation or deny automatic retry paths
 - `referenceProductionPolicyPack.js`
   - no API key required
   - shows a maintained production-oriented policy/governance pack contributing policy rules and governance hooks through `ExtensionHost`
+- `referencePolicySimulation.js`
+  - no API key required
+  - shows portable policy artifacts, simulation, evaluation artifacts, and eval-harness policy scenarios
+- `referencePolicyInheritance.js`
+  - no API key required
+  - shows scoped policy inheritance across runtime, workflow, agent, and distributed handoff layers
+- `referencePolicyLifecycle.js`
+  - no API key required
+  - shows draft promotion and rollback between active policy versions
+- `referenceApprovalEscalationPolicySuite.js`
+  - no API key required
+  - shows maintained pre-rollout approval and escalation policy scenarios in one eval-style report
 - `referenceFileBackedStack.js`
   - no API key required
   - shows a local-first persisted deployment stack using file-backed run/job/memory stores plus approval and governance handling

@@ -11,6 +11,11 @@ const { HistoricalRoutingAdvisor } = require('../src/runtime/HistoricalRoutingAd
 const { AdaptiveDecisionLedger } = require('../src/runtime/AdaptiveDecisionLedger');
 const { AdaptiveGovernanceGate } = require('../src/runtime/AdaptiveGovernanceGate');
 const { ApprovalInbox } = require('../src/runtime/ApprovalInbox');
+const { PolicyPack } = require('../src/runtime/PolicyPack');
+const { PolicySimulator } = require('../src/runtime/PolicySimulator');
+const { ProductionPolicyPack } = require('../src/runtime/ProductionPolicyPack');
+const { CoordinationPolicyGate } = require('../src/runtime/CoordinationPolicyGate');
+const { ApprovalEscalationPolicySuite } = require('../src/runtime/ApprovalEscalationPolicySuite');
 const { Workflow } = require('../src/runtime/workflow/Workflow');
 const { AgentWorkflowStep } = require('../src/runtime/workflow/AgentWorkflowStep');
 const { WorkflowRunner } = require('../src/runtime/workflow/WorkflowRunner');
@@ -323,6 +328,127 @@ describe('Eval and benchmark discipline', () => {
         expect.objectContaining({ id: 'adaptive-governance-benchmark', passed: true }),
       ])
     );
+  });
+
+  test('EvalHarness can run policy simulation scenarios', async () => {
+    const pack = new PolicyPack({
+      id: 'policy-pack',
+      name: 'policy-benchmark',
+      version: '1.0.0',
+      rules: [
+        {
+          id: 'deny-destructive',
+          sideEffectLevels: ['destructive'],
+          action: 'deny',
+        },
+      ],
+    });
+    const simulator = new PolicySimulator({ policyPack: pack });
+    const harness = new EvalHarness({
+      scenarios: [
+        {
+          id: 'policy-simulation-benchmark',
+          run: async () =>
+            simulator.simulateRequests([
+              {
+                name: 'delete_records',
+                metadata: {
+                  sideEffectLevel: 'destructive',
+                },
+              },
+            ]),
+          assert: report =>
+            report.summarize().denied === 1 &&
+            report.summarize().ruleCounts['deny-destructive'] === 1,
+        },
+      ],
+    });
+
+    const report = await harness.run();
+
+    expect(report.total).toBe(1);
+    expect(report.failed).toBe(0);
+    expect(report.results).toEqual([
+      expect.objectContaining({
+        id: 'policy-simulation-benchmark',
+        passed: true,
+      }),
+    ]);
+  });
+
+  test('ApprovalEscalationPolicySuite can simulate approval and escalation policy scenarios before rollout', async () => {
+    const simulator = new PolicySimulator({
+      policyPack: new ProductionPolicyPack({
+        environment: 'staging',
+        protectedToolNames: ['send_status_update'],
+        denySideEffectLevels: ['destructive'],
+      }).toPolicyPack(),
+    });
+    const coordinationGate = new CoordinationPolicyGate({
+      scopes: {
+        runtime: new PolicyPack({
+          id: 'runtime-policy-pack',
+          name: 'runtime-policy-pack',
+          rules: [
+            {
+              id: 'require-review-for-branch-retry',
+              toolNames: ['coordination:branch_and_retry'],
+              action: 'require_approval',
+            },
+          ],
+        }),
+        agent: new PolicyPack({
+          id: 'coordination-policy-pack',
+          name: 'coordination-policy-pack',
+          rules: [
+            {
+              id: 'deny-policy-retries',
+              toolNames: ['coordination:branch_and_retry'],
+              tags: ['policy'],
+              action: 'deny',
+            },
+          ],
+        }),
+      },
+    });
+
+    const suite = new ApprovalEscalationPolicySuite({
+      policySimulator: simulator,
+      coordinationPolicyGate: coordinationGate,
+      approvalScenarios: [
+        {
+          id: 'approval-protected-tool',
+          toolName: 'send_status_update',
+          metadata: { sideEffectLevel: 'external_write' },
+          expectedAction: 'require_approval',
+          expectedRuleId: 'staging-protected-tools',
+        },
+      ],
+      escalationScenarios: [
+        {
+          id: 'escalate-policy-branch-retry',
+          resolution: {
+            action: 'branch_and_retry',
+            rankedCritiques: [{ failureType: 'policy', severity: 'high' }],
+          },
+          context: { taskFamily: 'release_review' },
+          expectedPolicyAction: 'deny',
+          expectedGatedAction: 'escalate',
+        },
+      ],
+    });
+
+    const report = await suite.run();
+
+    expect(report).toMatchObject({
+      total: 2,
+      passed: 2,
+      failed: 0,
+      results: expect.arrayContaining([
+        expect.objectContaining({ id: 'approval-protected-tool', passed: true }),
+        expect.objectContaining({ id: 'escalate-policy-branch-retry', passed: true }),
+      ]),
+    });
   });
 
   test('EvalHarness can run worker-coordination benchmark scenarios', async () => {

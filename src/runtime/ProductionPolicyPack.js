@@ -114,6 +114,22 @@ class ProductionPolicyPack {
     return [...this.governanceEvents];
   }
 
+  toPolicyPack() {
+    const { PolicyPack } = require('./PolicyPack');
+
+    return new PolicyPack({
+      name: this.name,
+      version: this.version,
+      description: `Portable policy artifact for ${this.environment}.`,
+      defaultAction: 'allow',
+      rules: this.buildPolicyRules(),
+      metadata: {
+        environment: this.environment,
+        source: 'ProductionPolicyPack',
+      },
+    });
+  }
+
   toExtension() {
     return {
       name: this.name,

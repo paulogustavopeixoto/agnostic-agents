@@ -170,6 +170,18 @@ describe('Maintained examples', () => {
     expect(stdout).toContain('coordination-decomposition-benchmark');
   });
 
+  test('reference coordination policy gate example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceCoordinationPolicyGate.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Coordination policy gate summary');
+    expect(stdout).toContain("policyAction: 'deny'");
+    expect(stdout).toContain("gatedAction: 'escalate'");
+    expect(stdout).toContain('Coordination policy evaluation artifact');
+  });
+
   test('reference production policy pack example runs', async () => {
     const examplePath = path.join(__dirname, '..', 'examples', 'referenceProductionPolicyPack.js');
     const { stdout } = await execFileAsync(process.execPath, [examplePath], {
@@ -180,6 +192,58 @@ describe('Maintained examples', () => {
     expect(stdout).toContain('production-deny-tools');
     expect(stdout).toContain('production-protected-tools');
     expect(stdout).toContain('Governance events captured by pack');
+  });
+
+  test('reference policy simulation example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referencePolicySimulation.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Policy pack artifact');
+    expect(stdout).toContain('Policy diff summary');
+    expect(stdout).toContain('agnostic-agents-policy-pack');
+    expect(stdout).toContain('Policy simulation report');
+    expect(stdout).toContain('Policy explanation summary');
+    expect(stdout).toContain('Policy evaluation artifact');
+    expect(stdout).toContain('Trace-bundle simulation summary');
+    expect(stdout).toContain('Policy eval harness report');
+  });
+
+  test('reference policy inheritance example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referencePolicyInheritance.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Resolved policy inheritance summary');
+    expect(stdout).toContain('handoff:handoff-deny-send-status');
+    expect(stdout).toContain('Scoped policy decision');
+    expect(stdout).toContain("action: 'deny'");
+  });
+
+  test('reference policy lifecycle example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referencePolicyLifecycle.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Policy lifecycle summary');
+    expect(stdout).toContain("activeVersion: '1.1.0'");
+    expect(stdout).toContain("rolledBackFrom: '1.1.0'");
+    expect(stdout).toContain('Policy rollback result');
+  });
+
+  test('reference approval and escalation policy suite example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceApprovalEscalationPolicySuite.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Approval and escalation policy suite report');
+    expect(stdout).toContain('approval-protected-tool');
+    expect(stdout).toContain('escalate-policy-branch-retry');
+    expect(stdout).toContain('passed: true');
   });
 
   test('reference file-backed stack example runs', async () => {

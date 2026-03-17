@@ -29,6 +29,14 @@ const { DelegationRuntime } = require('./DelegationRuntime');
 const { PlanningRuntime } = require('./PlanningRuntime');
 const { ToolPolicy } = require('./ToolPolicy');
 const { ProductionPolicyPack } = require('./ProductionPolicyPack');
+const { PolicyPack } = require('./PolicyPack');
+const { PolicyDecisionReport } = require('./PolicyDecisionReport');
+const { PolicyEvaluationRecord } = require('./PolicyEvaluationRecord');
+const { PolicySimulator } = require('./PolicySimulator');
+const { PolicyScopeResolver } = require('./PolicyScopeResolver');
+const { CoordinationPolicyGate } = require('./CoordinationPolicyGate');
+const { PolicyLifecycleManager } = require('./PolicyLifecycleManager');
+const { ApprovalEscalationPolicySuite } = require('./ApprovalEscalationPolicySuite');
 const { EventBus } = require('./EventBus');
 const { ConsoleDebugSink } = require('./ConsoleDebugSink');
 const { FileAuditSink } = require('./FileAuditSink');
@@ -86,6 +94,14 @@ module.exports = {
   PlanningRuntime,
   ToolPolicy,
   ProductionPolicyPack,
+  PolicyPack,
+  PolicyDecisionReport,
+  PolicyEvaluationRecord,
+  PolicySimulator,
+  PolicyScopeResolver,
+  CoordinationPolicyGate,
+  PolicyLifecycleManager,
+  ApprovalEscalationPolicySuite,
   EventBus,
   ConsoleDebugSink,
   FileAuditSink,

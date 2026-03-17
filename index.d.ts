@@ -147,6 +147,148 @@ export class CoordinationBenchmarkSuite {
   run(options?: JsonObject): Promise<JsonObject>;
 }
 
+export class PolicyPack {
+  constructor(options?: {
+    id?: string | null;
+    name?: string;
+    version?: string | null;
+    description?: string;
+    defaultAction?: 'allow' | 'deny' | 'require_approval';
+    rules?: JsonObject[];
+    allowTools?: string[] | string | null;
+    denyTools?: string[] | string | null;
+    metadata?: JsonObject;
+  });
+  id: string | null;
+  name: string;
+  version: string | null;
+  description: string;
+  defaultAction: string;
+  rules: JsonObject[];
+  allowTools: string[] | null;
+  denyTools: string[] | null;
+  metadata: JsonObject;
+  toJSON(): JsonObject;
+  toToolPolicy(options?: JsonObject): ToolPolicy;
+  diff(otherPolicyPack?: PolicyPack | JsonObject): JsonObject;
+  static fromJSON(payload?: JsonObject): PolicyPack;
+  static fromToolPolicy(toolPolicy?: ToolPolicy | JsonObject, metadata?: JsonObject): PolicyPack;
+}
+
+export class PolicyDecisionReport {
+  constructor(options?: {
+    mode?: string;
+    policyPack?: JsonObject | null;
+    decisions?: JsonObject[];
+    metadata?: JsonObject;
+  });
+  summarize(): JsonObject;
+  explain(): JsonObject;
+  toJSON(): JsonObject;
+}
+
+export class PolicyEvaluationRecord {
+  constructor(options?: {
+    subject?: JsonObject;
+    report?: JsonObject | null;
+    metadata?: JsonObject;
+  });
+  summarize(): JsonObject;
+  toJSON(): JsonObject;
+  static fromJSON(payload?: JsonObject): PolicyEvaluationRecord;
+}
+
+export class PolicySimulator {
+  constructor(options?: {
+    policyPack?: PolicyPack | JsonObject | null;
+    toolPolicy?: ToolPolicy | JsonObject | null;
+  });
+  simulateRequest(tool?: JsonObject, args?: JsonObject, context?: JsonObject): JsonObject;
+  simulateRequests(requests?: JsonObject[], context?: JsonObject): PolicyDecisionReport;
+  simulateRun(run?: Run | JsonObject, options?: { toolsByName?: Record<string, any> }): PolicyDecisionReport;
+  simulateTraceBundle(bundle?: JsonObject, options?: { toolsByName?: Record<string, any> }): JsonObject;
+  createEvaluationRecord(subject?: JsonObject, report?: PolicyDecisionReport | JsonObject): PolicyEvaluationRecord;
+}
+
+export class PolicyScopeResolver {
+  static DEFAULT_PRECEDENCE: string[];
+  constructor(options?: {
+    precedence?: string[];
+    metadata?: JsonObject;
+  });
+  precedence: string[];
+  metadata: JsonObject;
+  resolve(scopes?: Record<string, PolicyPack | JsonObject | null>): PolicyPack;
+  resolveToolPolicy(
+    scopes?: Record<string, PolicyPack | JsonObject | null>,
+    options?: JsonObject
+  ): ToolPolicy;
+}
+
+export class CoordinationPolicyGate {
+  constructor(options?: {
+    policyPack?: PolicyPack | JsonObject | null;
+    toolPolicy?: ToolPolicy | JsonObject | null;
+    policyScopeResolver?: PolicyScopeResolver | JsonObject | null;
+    scopes?: Record<string, PolicyPack | JsonObject | null> | null;
+    escalationAction?: string;
+    actionMetadata?: Record<string, JsonObject>;
+  });
+  policyPack: PolicyPack;
+  simulator: PolicySimulator;
+  escalationAction: string;
+  actionMetadata: Record<string, JsonObject>;
+  evaluate(
+    resolution?: JsonObject,
+    options?: {
+      candidate?: JsonObject;
+      review?: JsonObject | null;
+      context?: JsonObject;
+    }
+  ): JsonObject;
+  createEvaluationRecord(
+    resolution?: JsonObject,
+    options?: {
+      candidate?: JsonObject;
+      review?: JsonObject | null;
+      context?: JsonObject;
+    }
+  ): PolicyEvaluationRecord;
+}
+
+export class PolicyLifecycleManager {
+  constructor(options?: {
+    draft?: PolicyPack | JsonObject | null;
+    active?: PolicyPack | JsonObject | null;
+    history?: JsonObject[];
+  });
+  draft: PolicyPack | null;
+  active: PolicyPack | null;
+  history: JsonObject[];
+  setDraft(policyPack?: PolicyPack | JsonObject): PolicyPack;
+  activate(policyPack?: PolicyPack | JsonObject, metadata?: JsonObject): JsonObject;
+  promote(policyPack?: PolicyPack | JsonObject | null, metadata?: JsonObject): JsonObject;
+  rollback(options?: {
+    version?: string | null;
+    policyPackId?: string | null;
+    reason?: string;
+  }): JsonObject;
+  summarize(): JsonObject;
+}
+
+export class ApprovalEscalationPolicySuite {
+  constructor(options?: {
+    policySimulator?: PolicySimulator | JsonObject | null;
+    coordinationPolicyGate?: CoordinationPolicyGate | JsonObject | null;
+    approvalScenarios?: JsonObject[];
+    escalationScenarios?: JsonObject[];
+  });
+  approvalScenarios: JsonObject[];
+  escalationScenarios: JsonObject[];
+  buildScenarios(): JsonObject[];
+  run(): Promise<JsonObject>;
+}
+
 export interface RunMetrics {
   tokenUsage: {
     prompt: number;
@@ -494,6 +636,7 @@ export class ProductionPolicyPack {
   buildPolicyRules(): JsonObject[];
   buildGovernanceHooks(): Function[];
   listGovernanceEvents(): JsonObject[];
+  toPolicyPack(): PolicyPack;
   toExtension(): JsonObject;
 }
 

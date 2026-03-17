@@ -57,6 +57,14 @@ const { PlanningRuntime } = require('../src/runtime/PlanningRuntime');
 const { TraceSerializer } = require('../src/runtime/TraceSerializer');
 const { ToolPolicy } = require('../src/runtime/ToolPolicy');
 const { ProductionPolicyPack } = require('../src/runtime/ProductionPolicyPack');
+const { PolicyPack } = require('../src/runtime/PolicyPack');
+const { PolicyDecisionReport } = require('../src/runtime/PolicyDecisionReport');
+const { PolicyEvaluationRecord } = require('../src/runtime/PolicyEvaluationRecord');
+const { PolicySimulator } = require('../src/runtime/PolicySimulator');
+const { PolicyScopeResolver } = require('../src/runtime/PolicyScopeResolver');
+const { CoordinationPolicyGate } = require('../src/runtime/CoordinationPolicyGate');
+const { PolicyLifecycleManager } = require('../src/runtime/PolicyLifecycleManager');
+const { ApprovalEscalationPolicySuite } = require('../src/runtime/ApprovalEscalationPolicySuite');
 const { EventBus } = require('../src/runtime/EventBus');
 const { BaseRunStore } = require('../src/runtime/stores/BaseRunStore');
 const { BaseJobStore } = require('../src/runtime/stores/BaseJobStore');
@@ -114,6 +122,14 @@ describe('Package/module unit tests', () => {
     expect(pkg.DistributedRecoveryRunner).toBeDefined();
     expect(pkg.ToolPolicy).toBeDefined();
     expect(pkg.ProductionPolicyPack).toBeDefined();
+    expect(pkg.PolicyPack).toBeDefined();
+    expect(pkg.PolicyDecisionReport).toBeDefined();
+    expect(pkg.PolicyEvaluationRecord).toBeDefined();
+    expect(pkg.PolicySimulator).toBeDefined();
+    expect(pkg.PolicyScopeResolver).toBeDefined();
+    expect(pkg.CoordinationPolicyGate).toBeDefined();
+    expect(pkg.PolicyLifecycleManager).toBeDefined();
+    expect(pkg.ApprovalEscalationPolicySuite).toBeDefined();
     expect(pkg.EventBus).toBeDefined();
     expect(pkg.TraceSerializer).toBeDefined();
     expect(pkg.EvidenceGraph).toBeDefined();
@@ -212,6 +228,357 @@ describe('Package/module unit tests', () => {
       input_schema: tool.parameters,
     });
     await expect(tool.call({ expression: '1+1' })).resolves.toEqual({ result: '1+1' });
+  });
+
+  test('PolicyPack and PolicySimulator export and simulate portable policy artifacts', () => {
+    const pack = new PolicyPack({
+      id: 'demo-policy-pack',
+      name: 'demo-policy',
+      version: '1.0.0',
+      rules: [
+        {
+          id: 'require-approval-writes',
+          sideEffectLevels: ['external_write'],
+          action: 'require_approval',
+        },
+      ],
+    });
+    const simulator = new PolicySimulator({ policyPack: pack });
+    const run = new Run({
+      toolCalls: [
+        {
+          name: 'send_status_update',
+          arguments: { recipient: 'Paulo' },
+          metadata: { sideEffectLevel: 'external_write' },
+        },
+      ],
+      status: 'completed',
+    });
+
+    const report = simulator.simulateRun(run);
+
+    expect(PolicyPack.fromJSON(pack.toJSON()).name).toBe('demo-policy');
+    expect(report).toBeInstanceOf(PolicyDecisionReport);
+    expect(report.summarize()).toMatchObject({
+      total: 1,
+      approvalsRequired: 1,
+      ruleCounts: {
+        'require-approval-writes': 1,
+      },
+    });
+    expect(report.toJSON().decisions).toEqual([
+      expect.objectContaining({
+        toolName: 'send_status_update',
+        action: 'require_approval',
+        matchedRule: expect.objectContaining({
+          id: 'require-approval-writes',
+        }),
+        policyPackId: 'demo-policy-pack',
+        policyPackVersion: '1.0.0',
+      }),
+    ]);
+
+    const evaluationRecord = simulator.createEvaluationRecord(
+      {
+        type: 'run',
+        runId: run.id,
+      },
+      report
+    );
+
+    expect(evaluationRecord).toBeInstanceOf(PolicyEvaluationRecord);
+    expect(PolicyEvaluationRecord.fromJSON(evaluationRecord.toJSON()).summarize()).toMatchObject({
+      subject: {
+        type: 'run',
+        runId: run.id,
+      },
+      summary: expect.objectContaining({
+        approvalsRequired: 1,
+      }),
+      explanations: [
+        expect.objectContaining({
+          ruleId: 'require-approval-writes',
+          explanation: expect.stringContaining('require_approval because rule "require-approval-writes"'),
+        }),
+      ],
+    });
+    expect(report.explain()).toMatchObject({
+      decisions: [
+        expect.objectContaining({
+          ruleId: 'require-approval-writes',
+          explanation: expect.stringContaining('require_approval because rule "require-approval-writes"'),
+        }),
+      ],
+    });
+  });
+
+  test('PolicyPack can diff versions of a policy artifact', () => {
+    const baseline = new PolicyPack({
+      id: 'policy-pack',
+      name: 'ops-policy',
+      version: '1.0.0',
+      defaultAction: 'allow',
+      rules: [
+        { id: 'approval-write', sideEffectLevels: ['external_write'], action: 'require_approval' },
+      ],
+    });
+    const updated = new PolicyPack({
+      id: 'policy-pack',
+      name: 'ops-policy',
+      version: '1.1.0',
+      defaultAction: 'allow',
+      rules: [
+        { id: 'approval-write', sideEffectLevels: ['external_write'], action: 'require_approval' },
+        { id: 'deny-destructive', sideEffectLevels: ['destructive'], action: 'deny' },
+      ],
+      denyTools: ['drop_production_db'],
+    });
+
+    expect(baseline.diff(updated)).toMatchObject({
+      left: { version: '1.0.0' },
+      right: { version: '1.1.0' },
+      denyToolsChanged: true,
+      addedRules: [
+        expect.objectContaining({
+          id: 'deny-destructive',
+        }),
+      ],
+    });
+  });
+
+  test('PolicyScopeResolver merges runtime, workflow, agent, and handoff scopes by precedence', () => {
+    const resolver = new PolicyScopeResolver();
+    const runtimePack = new PolicyPack({
+      id: 'runtime-pack',
+      name: 'runtime-pack',
+      rules: [
+        {
+          id: 'runtime-require-approval',
+          sideEffectLevels: ['external_write'],
+          action: 'require_approval',
+        },
+      ],
+      allowTools: ['send_status_update', 'generate_report'],
+      denyTools: ['delete_records'],
+      metadata: {
+        scope: 'runtime',
+      },
+    });
+    const workflowPack = new PolicyPack({
+      id: 'workflow-pack',
+      name: 'workflow-pack',
+      rules: [
+        {
+          id: 'workflow-sensitive-tag',
+          tags: ['sensitive'],
+          action: 'require_approval',
+        },
+      ],
+      allowTools: ['send_status_update'],
+      metadata: {
+        scope: 'workflow',
+      },
+    });
+    const agentPack = new PolicyPack({
+      id: 'agent-pack',
+      name: 'agent-pack',
+      rules: [
+        {
+          id: 'agent-deny-bulk-export',
+          toolNames: ['bulk_export'],
+          action: 'deny',
+        },
+      ],
+      metadata: {
+        scope: 'agent',
+      },
+    });
+    const handoffPack = new PolicyPack({
+      id: 'handoff-pack',
+      name: 'handoff-pack',
+      version: '2.0.0',
+      rules: [
+        {
+          id: 'handoff-deny-send-status',
+          toolNames: ['send_status_update'],
+          action: 'deny',
+        },
+      ],
+      metadata: {
+        scope: 'handoff',
+      },
+    });
+
+    const resolved = resolver.resolve({
+      runtime: runtimePack,
+      workflow: workflowPack,
+      agent: agentPack,
+      distributedHandoff: handoffPack,
+    });
+
+    expect(resolved.id).toBe('handoff-pack');
+    expect(resolved.version).toBe('2.0.0');
+    expect(resolved.metadata.appliedScopes).toEqual(['runtime', 'workflow', 'agent', 'handoff']);
+    expect(resolved.allowTools).toEqual(['send_status_update']);
+    expect(resolved.denyTools).toEqual(['delete_records']);
+    expect(resolved.rules.map(rule => rule.id)).toEqual([
+      'handoff-deny-send-status',
+      'agent-deny-bulk-export',
+      'workflow-sensitive-tag',
+      'runtime-require-approval',
+    ]);
+
+    const decision = resolved.toToolPolicy().evaluate(
+      {
+        name: 'send_status_update',
+        metadata: {
+          sideEffectLevel: 'external_write',
+        },
+      },
+      {}
+    );
+
+    expect(decision).toMatchObject({
+      action: 'deny',
+      ruleId: 'handoff-deny-send-status',
+      source: 'rule',
+    });
+  });
+
+  test('CoordinationPolicyGate composes runtime and coordination policy into a gating decision', () => {
+    const gate = new CoordinationPolicyGate({
+      scopes: {
+        runtime: new PolicyPack({
+          id: 'runtime-pack',
+          name: 'runtime-pack',
+          rules: [
+            {
+              id: 'require-review-for-branch-retry',
+              toolNames: ['coordination:branch_and_retry'],
+              action: 'require_approval',
+            },
+          ],
+        }),
+        agent: new PolicyPack({
+          id: 'coordination-pack',
+          name: 'coordination-pack',
+          rules: [
+            {
+              id: 'deny-policy-retries',
+              toolNames: ['coordination:branch_and_retry'],
+              tags: ['policy'],
+              action: 'deny',
+            },
+          ],
+        }),
+      },
+    });
+
+    const resolution = {
+      action: 'branch_and_retry',
+      disagreement: false,
+      rankedCritiques: [
+        {
+          failureType: 'policy',
+          severity: 'high',
+        },
+      ],
+    };
+
+    const evaluation = gate.evaluate(resolution, {
+      candidate: {
+        id: 'coordination-candidate-1',
+      },
+      review: {
+        summary: {
+          total: 1,
+          highestSeverity: 'high',
+        },
+      },
+      context: {
+        taskFamily: 'release_review',
+      },
+    });
+
+    expect(evaluation).toMatchObject({
+      action: 'branch_and_retry',
+      allowed: false,
+      gatedAction: 'escalate',
+      policyDecision: expect.objectContaining({
+        action: 'deny',
+        ruleId: 'deny-policy-retries',
+      }),
+    });
+
+    expect(gate.createEvaluationRecord(resolution).summarize()).toMatchObject({
+      summary: expect.objectContaining({
+        denied: 1,
+      }),
+      explanations: [
+        expect.objectContaining({
+          ruleId: 'deny-policy-retries',
+        }),
+      ],
+    });
+  });
+
+  test('PolicyLifecycleManager promotes drafts and rolls back to previous active versions', () => {
+    const lifecycle = new PolicyLifecycleManager({
+      active: new PolicyPack({
+        id: 'ops-policy',
+        name: 'ops-policy',
+        version: '1.0.0',
+        rules: [{ id: 'approval-write', sideEffectLevels: ['external_write'], action: 'require_approval' }],
+      }),
+    });
+
+    lifecycle.setDraft(
+      new PolicyPack({
+        id: 'ops-policy',
+        name: 'ops-policy',
+        version: '1.1.0',
+        rules: [
+          { id: 'approval-write', sideEffectLevels: ['external_write'], action: 'require_approval' },
+          { id: 'deny-destructive', sideEffectLevels: ['destructive'], action: 'deny' },
+        ],
+      })
+    );
+
+    const promotion = lifecycle.promote(undefined, {
+      reason: 'Promote tested destructive-action guardrails.',
+    });
+
+    expect(promotion).toMatchObject({
+      action: 'promote',
+      active: expect.objectContaining({
+        version: '1.1.0',
+      }),
+      previousActive: expect.objectContaining({
+        version: '1.0.0',
+      }),
+    });
+
+    const rollback = lifecycle.rollback({
+      version: '1.0.0',
+      reason: 'Restore the baseline after rollout review.',
+    });
+
+    expect(rollback).toMatchObject({
+      action: 'rollback',
+      active: expect.objectContaining({
+        version: '1.0.0',
+      }),
+      rolledBackFrom: expect.objectContaining({
+        version: '1.1.0',
+      }),
+    });
+
+    expect(lifecycle.summarize()).toMatchObject({
+      active: expect.objectContaining({
+        version: '1.0.0',
+      }),
+      historyCount: 2,
+    });
   });
 
   test('CritiqueProtocol and DisagreementResolver produce structured coordination outcomes', async () => {

@@ -21,6 +21,12 @@ The package also now includes a separate coordination layer above the runtime fo
 - task decomposition
 - coordination benchmarks
 
+The longer-term direction is:
+
+- runtime OS first
+- coordination intelligence above the runtime
+- governed learning loops above coordination
+
 ## Install
 
 ```bash
@@ -40,6 +46,12 @@ Use `agnostic-agents` when you want:
 - a package that keeps control, observability, and governance in the open
 
 Do not think of it as only a prompt helper or a chat abstraction. The maintained direction is a runtime control layer for serious agent systems.
+
+The repo is intentionally split so that:
+
+- runtime primitives stay general-purpose and portable
+- coordination logic stays inspectable and separate from the runtime kernel
+- future learning/adaptation remains governed instead of hidden in opaque agent glue
 
 ## Fastest Start
 
@@ -288,11 +300,37 @@ This layer is for:
 
 It is intentionally separate from the runtime kernel.
 
+## Forward Direction
+
+The current public direction after the completed runtime and coordination work is:
+
+- `v9` Policy OS
+  - policy as portable, testable, replayable runtime artifacts
+- `v10` State OS
+  - stronger deterministic state, restoration, and portable runtime bundles
+- `v11` Interop OS
+  - stable public schemas, manifests, and conformance for ecosystem packages
+- `v12` Coordination OS
+  - stronger critique, trust, disagreement, decomposition, and role-aware multi-agent coordination
+- `v13` Learning OS
+  - governed improvement loops that turn evals, incidents, and prior-run evidence into reviewable behavioral change
+
+That sequence is intentional.
+The package should become smarter without collapsing policy, state, interop, coordination, and learning into one opaque layer.
+
 ### Policy and Governance
 
 Use:
 
 - `ToolPolicy` for raw policy logic
+- `PolicyPack` for portable policy artifacts
+- `PolicySimulator` for policy simulation over requests, runs, and trace bundles
+- `PolicyEvaluationRecord` for portable policy evaluation artifacts
+- `PolicyDecisionReport.explain()` for operator-facing policy explanations
+- `PolicyScopeResolver` for scoped policy inheritance across runtime, workflow, agent, and distributed handoff layers
+- `PolicyLifecycleManager` for draft promotion and rollback of policy packs
+- `ApprovalEscalationPolicySuite` for simulating approval and escalation policy scenarios before rollout
+- `CoordinationPolicyGate` for applying policy to coordination outcomes like retry, reject, or escalate
 - `ExtensionHost` for contributed policy and governance behavior
 - `ProductionPolicyPack` for a maintained production-oriented preset
 - `ApprovalInbox` and `GovernanceHooks` for operator-facing control
@@ -335,7 +373,12 @@ Local/no-key examples:
 - `npm run example:reference-coordination-review`
 - `npm run example:reference-decomposition-advisor`
 - `npm run example:reference-coordination-benchmarks`
+- `npm run example:reference-coordination-policy-gate`
 - `npm run example:reference-production-policy-pack`
+- `npm run example:reference-policy-simulation`
+- `npm run example:reference-policy-inheritance`
+- `npm run example:reference-policy-lifecycle`
+- `npm run example:reference-approval-escalation-policy-suite`
 - `npm run example:reference-file-backed-stack`
 - `npm run example:reference-worker-coordination-benchmarks`
 - `npm run example:reference-openapi`
@@ -459,3 +502,8 @@ It does not try to be:
 - a hosted control plane
 - a closed worker-management product
 - a provider-specific framework disguised as a generic runtime
+
+And it should not become:
+
+- a runtime that hides coordination and learning decisions behind unreadable internal heuristics
+- a self-modifying agent loop that bypasses policy, replay, or operator review

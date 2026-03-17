@@ -44,7 +44,50 @@ Still open:
   core shipped references
 - clearer external milestone reporting as adoption grows
 
-## Highest-signal open items outside `v8+`
+## Forward path after the current release line
+
+The next longer-range sequence is now:
+
+- `v9` Policy OS
+  - make policy portable, testable, replayable, and easier to roll back
+- `v10` State OS
+  - make runtime state more deterministic, portable, and restorable
+- `v11` Interop OS
+  - make the runtime contracts easier for third-party tools and control planes to implement
+- `v12` Coordination OS
+  - make critique, trust, disagreement, and decomposition stronger as first-class coordination systems
+- `v13` Learning OS
+  - turn evidence, evals, and incidents into governed behavioral improvement
+
+The important architectural rule is:
+
+- runtime remains the execution/control substrate
+- coordination remains a separate intelligence layer above it
+- learning remains governed and reversible rather than hidden self-modification
+
+## Recommended execution order
+
+The intended sequence across the forward path is:
+
+1. strengthen governance and policy first
+2. strengthen state portability and restoration next
+3. publish those contracts through stronger interoperability
+4. deepen coordination quality on top of that substrate
+5. only then close the loop with governed learning
+
+In shorter form:
+
+- `v9`: govern behavior better
+- `v10`: make runtime state more portable and deterministic
+- `v11`: make those contracts public and interoperable
+- `v12`: strengthen coordination intelligence above the runtime
+- `v13`: turn evidence into governed learning loops
+
+That order is intentional.
+It keeps the package from becoming smarter in ways that are harder to govern,
+restore, inspect, or validate.
+
+## Highest-signal near-term open items outside `v8+`
 
 - harden long-running background execution for production stores
 - verify the Gemini example against a key with available quota
@@ -60,6 +103,7 @@ The remaining work is now mostly:
 - ecosystem clarity
 - operational hardening
 - public certification depth
+- longer-range policy/state/interop/coordination/learning evolution
 
 That is a healthier pre-release state than having major unresolved core
 architecture work.
