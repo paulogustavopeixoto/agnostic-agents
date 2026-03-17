@@ -406,8 +406,11 @@ Evals and ecosystem:
 
 - [Benchmarking](docs/benchmarking.md)
 - [Benchmark fixtures](docs/benchmark-fixtures.md)
+- [Community summaries](docs/community-summaries.md)
+- [Community roadmap status](docs/community-roadmap-status.md)
 - [Plugin authoring](docs/plugin-authoring.md)
 - [Extension certification and compatibility](docs/extension-certification.md)
+- [Ecosystem certification guidance](docs/ecosystem-certification.md)
 - [Runtime extension contributor guidance](docs/runtime-extension-contributors.md)
 - [MCP interoperability](docs/mcp-interoperability.md)
 - [OpenAPI examples](docs/openapi-examples.md)

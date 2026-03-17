@@ -14,6 +14,28 @@ The format is intentionally simple:
 
 ### Removed
 
+## 1.2.0
+
+### Added
+
+- a maintained coordination layer above the runtime including `CritiqueProtocol`, `CritiqueSchemaRegistry`, `TrustRegistry`, `DisagreementResolver`, `CoordinationLoop`, `DecompositionAdvisor`, and `CoordinationBenchmarkSuite`
+- maintained coordination, worker-coordination, production-policy-pack, runtime-extension, file-backed-stack, and public-control-plane reference examples
+- dynamic policy mutation helpers on `ToolPolicy` plus a maintained `ProductionPolicyPack` for extension-hosted policy and governance presets
+- public ecosystem guidance including the support matrix, ecosystem certification guidance, community summaries, community roadmap status, public control-plane references, and run/trace visualization references
+
+### Changed
+
+- promoted the package from `1.1.x` to `1.2.0` now that the coordination layer, public ecosystem references, and release-facing package/docs surface are all maintained
+- rewrote the README so the package entry point explains the runtime OS, the coordination layer above it, maintained starting paths, provider guidance, and deployment/control-plane references more clearly
+- expanded the published package surface to include the new ecosystem, control-plane, visualization, and community-status documentation
+- completed the remaining `v8+` public ecosystem documentation items in the roadmap
+
+### Fixed
+
+- maintained deployment and control-plane examples now align with the real runtime message format for tool results, preventing duplicate approval loops after resume
+- the file-backed stack reference no longer implies unsupported `Agent` options and now reflects the actual integration boundary more accurately
+- package docs, examples, and roadmap status are more internally consistent about current capabilities and maintained reference paths
+
 ## 1.1.0
 
 ### Added
