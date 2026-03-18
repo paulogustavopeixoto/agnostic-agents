@@ -108,6 +108,9 @@ These examples are intended as reference deployment patterns rather than feature
 - `referenceRuntimeExtension.js`
   - no API key required
   - shows a community-facing extension example contributing an event sink, policy rule, and eval scenario through `ExtensionHost`
+- `referenceInteropManifest.js`
+  - no API key required
+  - shows a public extension manifest plus conformance validation for extension and store integrations
 - `referenceOpenApiImport.js`
   - no API key required
   - shows importing a small OpenAPI spec into runtime tools

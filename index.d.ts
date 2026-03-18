@@ -422,6 +422,55 @@ export class StateIncidentReconstructor {
   reconstruct(bundle?: StateBundle | JsonObject): JsonObject;
 }
 
+export class ExtensionManifest {
+  constructor(options?: {
+    kind?: string;
+    name?: string;
+    version?: string | null;
+    description?: string;
+    contracts?: string[];
+    capabilities?: string[];
+    compatibility?: JsonObject;
+    contributions?: JsonObject;
+    metadata?: JsonObject;
+  });
+  kind: string;
+  name: string;
+  version: string | null;
+  description: string;
+  contracts: string[];
+  capabilities: string[];
+  compatibility: JsonObject;
+  contributions: JsonObject;
+  metadata: JsonObject;
+  toJSON(): JsonObject;
+  static fromJSON(payload?: JsonObject): ExtensionManifest;
+  static validate(payload?: JsonObject): { valid: boolean; errors: string[] };
+  static fromExtension(extension?: JsonObject): ExtensionManifest;
+}
+
+export class ConformanceKit {
+  validateManifest(manifest?: ExtensionManifest | JsonObject): { valid: boolean; errors: string[] };
+  validateExtension(
+    extension?: JsonObject,
+    options?: {
+      manifest?: ExtensionManifest | JsonObject | null;
+    }
+  ): { valid: boolean; errors: string[]; summary: JsonObject };
+  validateStore(
+    store: any,
+    options?: {
+      type?: string;
+    }
+  ): { valid: boolean; errors: string[]; summary: JsonObject };
+  validateArtifact(
+    artifact: any,
+    options?: {
+      type?: string;
+    }
+  ): { valid: boolean; errors: string[] };
+}
+
 export interface RunMetrics {
   tokenUsage: {
     prompt: number;

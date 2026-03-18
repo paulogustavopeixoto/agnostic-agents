@@ -29,6 +29,8 @@ const { DelegationRuntime } = require('./DelegationRuntime');
 const { PlanningRuntime } = require('./PlanningRuntime');
 const { ToolPolicy } = require('./ToolPolicy');
 const { ProductionPolicyPack } = require('./ProductionPolicyPack');
+const { ExtensionManifest } = require('./ExtensionManifest');
+const { ConformanceKit } = require('./ConformanceKit');
 const { PolicyPack } = require('./PolicyPack');
 const { PolicyDecisionReport } = require('./PolicyDecisionReport');
 const { PolicyEvaluationRecord } = require('./PolicyEvaluationRecord');
@@ -105,6 +107,8 @@ module.exports = {
   PlanningRuntime,
   ToolPolicy,
   ProductionPolicyPack,
+  ExtensionManifest,
+  ConformanceKit,
   PolicyPack,
   PolicyDecisionReport,
   PolicyEvaluationRecord,

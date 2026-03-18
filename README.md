@@ -487,6 +487,7 @@ Evals and ecosystem:
 - [Extension certification and compatibility](docs/extension-certification.md)
 - [Ecosystem certification guidance](docs/ecosystem-certification.md)
 - [Runtime extension contributor guidance](docs/runtime-extension-contributors.md)
+- [Interop OS](docs/interop-os.md)
 - [MCP interoperability](docs/mcp-interoperability.md)
 - [OpenAPI examples](docs/openapi-examples.md)
 - [Cookbook](docs/cookbook.md)

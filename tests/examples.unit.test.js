@@ -271,6 +271,19 @@ describe('Maintained examples', () => {
     expect(stdout).toContain('Use the restored pause metadata to choose resume versus replay.');
   });
 
+  test('reference interop manifest example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceInteropManifest.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Interop manifest summary');
+    expect(stdout).toContain('Interop conformance report');
+    expect(stdout).toContain('agnostic-agents-extension-manifest');
+    expect(stdout).toContain("manifestName: 'reference-interop-extension'");
+    expect(stdout).toContain("type: 'job'");
+  });
+
   test('reference state bundle example runs', async () => {
     const examplePath = path.join(__dirname, '..', 'examples', 'referenceStateBundle.js');
     const { stdout } = await execFileAsync(process.execPath, [examplePath], {

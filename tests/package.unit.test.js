@@ -57,6 +57,8 @@ const { PlanningRuntime } = require('../src/runtime/PlanningRuntime');
 const { TraceSerializer } = require('../src/runtime/TraceSerializer');
 const { ToolPolicy } = require('../src/runtime/ToolPolicy');
 const { ProductionPolicyPack } = require('../src/runtime/ProductionPolicyPack');
+const { ExtensionManifest } = require('../src/runtime/ExtensionManifest');
+const { ConformanceKit } = require('../src/runtime/ConformanceKit');
 const { PolicyPack } = require('../src/runtime/PolicyPack');
 const { PolicyDecisionReport } = require('../src/runtime/PolicyDecisionReport');
 const { PolicyEvaluationRecord } = require('../src/runtime/PolicyEvaluationRecord');
@@ -133,6 +135,8 @@ describe('Package/module unit tests', () => {
     expect(pkg.DistributedRecoveryRunner).toBeDefined();
     expect(pkg.ToolPolicy).toBeDefined();
     expect(pkg.ProductionPolicyPack).toBeDefined();
+    expect(pkg.ExtensionManifest).toBeDefined();
+    expect(pkg.ConformanceKit).toBeDefined();
     expect(pkg.PolicyPack).toBeDefined();
     expect(pkg.PolicyDecisionReport).toBeDefined();
     expect(pkg.PolicyEvaluationRecord).toBeDefined();
@@ -331,6 +335,43 @@ describe('Package/module unit tests', () => {
           explanation: expect.stringContaining('require_approval because rule "require-approval-writes"'),
         }),
       ],
+    });
+  });
+
+  test('ExtensionManifest and ConformanceKit publish and validate interop declarations', () => {
+    const extension = {
+      name: 'interop-extension',
+      version: '1.0.0',
+      contributes: {
+        eventSinks: [{ name: 'sink', async handleEvent() {} }],
+        policyRules: [{ id: 'rule-1', toolNames: ['send_status_update'], action: 'require_approval' }],
+      },
+    };
+
+    const manifest = ExtensionManifest.fromExtension(extension);
+    const kit = new ConformanceKit();
+    const extensionReport = kit.validateExtension(extension, { manifest });
+    const storeReport = kit.validateStore(new InMemoryJobStore(), { type: 'job' });
+
+    expect(ExtensionManifest.validate(manifest.toJSON())).toEqual({
+      valid: true,
+      errors: [],
+    });
+    expect(extensionReport).toMatchObject({
+      valid: true,
+      errors: [],
+      summary: {
+        manifestName: 'interop-extension',
+        manifestKind: 'extension',
+        registered: true,
+      },
+    });
+    expect(storeReport).toEqual({
+      valid: true,
+      errors: [],
+      summary: {
+        type: 'job',
+      },
     });
   });
 
