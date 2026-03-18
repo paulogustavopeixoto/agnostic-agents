@@ -14,6 +14,27 @@ The format is intentionally simple:
 
 ### Removed
 
+## 1.3.0
+
+### Added
+
+- `v9` Policy OS core surfaces including portable `PolicyPack` artifacts, `PolicySimulator`, `PolicyEvaluationRecord`, `PolicyScopeResolver`, `PolicyLifecycleManager`, `ApprovalEscalationPolicySuite`, `RecoveryPolicyGate`, `CompensationPolicyPlanner`, and coordination-policy gating
+- `v10` State OS core surfaces including `StateBundle`, `StateDiff`, `StateBundleSerializer`, `StateContractRegistry`, `StateIntegrityChecker`, `StateConsistencyChecker`, `StateRestorePlanner`, `StateDurableRestoreSuite`, and `StateIncidentReconstructor`
+- maintained policy and state reference examples covering policy simulation, policy inheritance, policy lifecycle, approval/escalation policy rehearsal, recovery policy gating, compensation policy planning, portable state bundles, restore planning, durable restore scenarios, and offline incident reconstruction
+- state-oriented documentation including policy OS, state OS, state restore, durable restore, and state incident reconstruction guidance
+
+### Changed
+
+- promoted the package from `1.2.x` to `1.3.0` now that the maintained `v9 Policy OS` core and `v10 State OS` core are part of the public package surface
+- updated the README and roadmap-facing public docs so they reflect the current package more accurately: runtime OS foundation, coordination layer above it, completed policy/state cores, and `v11+` as the forward path
+- expanded the published package surface to include the maintained policy and state documentation needed to use the current release line correctly
+
+### Fixed
+
+- maintained state examples now preserve portable job metadata and align working-memory context with restored run intent, avoiding misleading consistency warnings
+- public docs no longer describe `v10` as only an initial slice now that the concrete `v10` checklist is effectively complete
+- release-facing package metadata is aligned with the current policy/state public surface
+
 ## 1.2.0
 
 ### Added

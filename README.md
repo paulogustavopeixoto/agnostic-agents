@@ -302,10 +302,13 @@ It is intentionally separate from the runtime kernel.
 
 ## Forward Direction
 
-The current public direction after the completed runtime and coordination work is:
+The current package already includes:
 
-- `v10` State OS
-  - stronger deterministic state, restoration, and portable runtime bundles
+- `v9` Policy OS core
+- `v10` State OS core
+
+The next public direction is:
+
 - `v11` Interop OS
   - stable public schemas, manifests, and conformance for ecosystem packages
 - `v12` Coordination OS
@@ -315,14 +318,6 @@ The current public direction after the completed runtime and coordination work i
 
 That sequence is intentional.
 The package should become smarter without collapsing policy, state, interop, coordination, and learning into one opaque layer.
-
-The `v9` Policy OS core is now in place in the current package surface.
-
-The first `v10 State OS` slice is also now in place:
-
-- `StateBundle`
-- `StateDiff`
-- `StateBundleSerializer`
 
 ### Policy and Governance
 
@@ -360,6 +355,14 @@ Use:
 - `StateIncidentReconstructor` for offline incident reconstruction directly from portable state bundles
 
 This means users can add or mutate policy dynamically without patching core runtime code.
+
+Useful docs for these surfaces:
+
+- [Policy OS](docs/policy-os.md)
+- [State OS](docs/state-os.md)
+- [State restore](docs/state-restore.md)
+- [State durable restore](docs/state-durable-restore.md)
+- [State incident reconstruction](docs/state-incident-reconstruction.md)
 
 ## Provider Surface
 

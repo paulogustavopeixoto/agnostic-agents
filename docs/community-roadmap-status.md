@@ -17,6 +17,7 @@ reading the entire long-form planning document.
 - `v6` distributed runtime
 - `v7` adaptive runtime
 - `v9` Policy OS core
+- `v10` State OS core
 
 ### Completed higher-level coordination track
 
@@ -49,8 +50,6 @@ Still open:
 
 The next longer-range sequence is now:
 
-- `v10` State OS
-  - make runtime state more deterministic, portable, and restorable
 - `v11` Interop OS
   - make the runtime contracts easier for third-party tools and control planes to implement
 - `v12` Coordination OS
@@ -76,7 +75,6 @@ The intended sequence across the forward path is:
 
 In shorter form:
 
-- `v10`: make runtime state more portable and deterministic
 - `v11`: make those contracts public and interoperable
 - `v12`: strengthen coordination intelligence above the runtime
 - `v13`: turn evidence into governed learning loops
@@ -101,7 +99,7 @@ The remaining work is now mostly:
 - ecosystem clarity
 - operational hardening
 - public certification depth
-- `v10+` state, interop, coordination, and learning evolution
+- `v11+` interop, coordination, and learning evolution
 
 That is a healthier pre-release state than having major unresolved core
 architecture work.
