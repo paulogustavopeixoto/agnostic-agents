@@ -65,6 +65,17 @@ const { PolicyScopeResolver } = require('../src/runtime/PolicyScopeResolver');
 const { CoordinationPolicyGate } = require('../src/runtime/CoordinationPolicyGate');
 const { PolicyLifecycleManager } = require('../src/runtime/PolicyLifecycleManager');
 const { ApprovalEscalationPolicySuite } = require('../src/runtime/ApprovalEscalationPolicySuite');
+const { RecoveryPolicyGate } = require('../src/runtime/RecoveryPolicyGate');
+const { CompensationPolicyPlanner } = require('../src/runtime/CompensationPolicyPlanner');
+const { StateBundle } = require('../src/runtime/StateBundle');
+const { StateDiff } = require('../src/runtime/StateDiff');
+const { StateBundleSerializer } = require('../src/runtime/StateBundleSerializer');
+const { StateContractRegistry } = require('../src/runtime/StateContractRegistry');
+const { StateIntegrityChecker } = require('../src/runtime/StateIntegrityChecker');
+const { StateConsistencyChecker } = require('../src/runtime/StateConsistencyChecker');
+const { StateRestorePlanner } = require('../src/runtime/StateRestorePlanner');
+const { StateDurableRestoreSuite } = require('../src/runtime/StateDurableRestoreSuite');
+const { StateIncidentReconstructor } = require('../src/runtime/StateIncidentReconstructor');
 const { EventBus } = require('../src/runtime/EventBus');
 const { BaseRunStore } = require('../src/runtime/stores/BaseRunStore');
 const { BaseJobStore } = require('../src/runtime/stores/BaseJobStore');
@@ -130,6 +141,17 @@ describe('Package/module unit tests', () => {
     expect(pkg.CoordinationPolicyGate).toBeDefined();
     expect(pkg.PolicyLifecycleManager).toBeDefined();
     expect(pkg.ApprovalEscalationPolicySuite).toBeDefined();
+    expect(pkg.RecoveryPolicyGate).toBeDefined();
+    expect(pkg.CompensationPolicyPlanner).toBeDefined();
+    expect(pkg.StateBundle).toBeDefined();
+    expect(pkg.StateDiff).toBeDefined();
+    expect(pkg.StateBundleSerializer).toBeDefined();
+    expect(pkg.StateContractRegistry).toBeDefined();
+    expect(pkg.StateIntegrityChecker).toBeDefined();
+    expect(pkg.StateConsistencyChecker).toBeDefined();
+    expect(pkg.StateRestorePlanner).toBeDefined();
+    expect(pkg.StateDurableRestoreSuite).toBeDefined();
+    expect(pkg.StateIncidentReconstructor).toBeDefined();
     expect(pkg.EventBus).toBeDefined();
     expect(pkg.TraceSerializer).toBeDefined();
     expect(pkg.EvidenceGraph).toBeDefined();
@@ -579,6 +601,584 @@ describe('Package/module unit tests', () => {
       }),
       historyCount: 2,
     });
+  });
+
+  test('RecoveryPolicyGate applies policy-aware constraints to replay and branch recovery steps', () => {
+    const gate = new RecoveryPolicyGate({
+      policyPack: new PolicyPack({
+        id: 'recovery-policy-pack',
+        name: 'recovery-policy-pack',
+        rules: [
+          {
+            id: 'require-review-for-branch-recovery',
+            toolNames: ['recovery:branch_from_failure_checkpoint'],
+            action: 'require_approval',
+          },
+          {
+            id: 'allow-partial-replay',
+            toolNames: ['recovery:partial_replay'],
+            action: 'allow',
+          },
+        ],
+      }),
+    });
+
+    const plan = {
+      runId: 'recovery-run-1',
+      incidentType: 'tool_failure',
+      recommendedAction: 'branch_from_failure_checkpoint',
+      steps: [
+        {
+          action: 'branch_from_failure_checkpoint',
+          priority: 'high',
+          requiresApproval: true,
+        },
+        {
+          action: 'partial_replay',
+          priority: 'medium',
+          requiresApproval: false,
+        },
+      ],
+    };
+
+    const evaluation = gate.evaluatePlan(plan);
+
+    expect(evaluation).toMatchObject({
+      runId: 'recovery-run-1',
+      summary: {
+        total: 2,
+        blocked: 1,
+        allowed: 1,
+      },
+      recommendedAction: 'require_recovery_approval',
+    });
+    expect(evaluation.evaluations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          step: expect.objectContaining({ action: 'branch_from_failure_checkpoint' }),
+          allowed: false,
+          gatedAction: 'require_recovery_approval',
+          policyDecision: expect.objectContaining({
+            action: 'require_approval',
+            ruleId: 'require-review-for-branch-recovery',
+          }),
+        }),
+        expect.objectContaining({
+          step: expect.objectContaining({ action: 'partial_replay' }),
+          allowed: true,
+          gatedAction: 'partial_replay',
+          policyDecision: expect.objectContaining({
+            action: 'allow',
+            ruleId: 'allow-partial-replay',
+          }),
+        }),
+      ])
+    );
+
+    expect(gate.createEvaluationRecord(plan).summarize()).toMatchObject({
+      summary: expect.objectContaining({
+        approvalsRequired: 1,
+        allowed: 1,
+      }),
+    });
+  });
+
+  test('CompensationPolicyPlanner turns side-effecting entries into policy-aware compensation recommendations', () => {
+    const planner = new CompensationPolicyPlanner({
+      policyPack: new PolicyPack({
+        id: 'compensation-policy-pack',
+        name: 'compensation-policy-pack',
+        rules: [
+          {
+            id: 'require-approval-for-external-write-compensation',
+            sideEffectLevels: ['external_write'],
+            action: 'require_approval',
+          },
+          {
+            id: 'allow-internal-cleanup-compensation',
+            sideEffectLevels: ['internal_write'],
+            action: 'allow',
+          },
+        ],
+      }),
+    });
+
+    const entries = [
+      {
+        toolName: 'send_status_update',
+        stepId: 'notify-user',
+        sideEffectLevel: 'external_write',
+        compensationHandler: true,
+      },
+      {
+        toolName: 'cache_temp_record',
+        stepId: 'cache-temp',
+        sideEffectLevel: 'internal_write',
+        compensationHandler: true,
+      },
+    ];
+
+    const plan = planner.plan(entries, {
+      runId: 'compensation-run-1',
+    });
+
+    expect(plan).toMatchObject({
+      summary: {
+        total: 2,
+        approvalsRequired: 1,
+        autoCompensate: 1,
+      },
+      recommendedAction: 'approval_required',
+    });
+    expect(plan.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          entry: expect.objectContaining({ stepId: 'notify-user' }),
+          recommendedAction: 'approval_required',
+          policyDecision: expect.objectContaining({
+            action: 'require_approval',
+            ruleId: 'require-approval-for-external-write-compensation',
+          }),
+        }),
+        expect.objectContaining({
+          entry: expect.objectContaining({ stepId: 'cache-temp' }),
+          recommendedAction: 'auto_compensate',
+          policyDecision: expect.objectContaining({
+            action: 'allow',
+            ruleId: 'allow-internal-cleanup-compensation',
+          }),
+        }),
+      ])
+    );
+
+    expect(planner.createEvaluationRecord(entries, { runId: 'compensation-run-1' }).summarize()).toMatchObject({
+      summary: expect.objectContaining({
+        approvalsRequired: 1,
+        allowed: 1,
+      }),
+    });
+  });
+
+  test('StateBundle and StateDiff export and compare portable state bundles', () => {
+    const run = new Run({
+      input: 'bundle state',
+      status: 'completed',
+      state: {
+        assessment: { confidence: 0.91 },
+      },
+      messages: [
+        { role: 'user', content: 'bundle state' },
+      ],
+      toolCalls: [
+        { name: 'search_docs', arguments: { query: 'state' } },
+      ],
+    });
+    run.addCheckpoint({
+      id: `${run.id}:checkpoint:1`,
+      label: 'run_completed',
+      status: 'completed',
+      snapshot: run.createCheckpointSnapshot(),
+    });
+
+    const bundle = new StateBundle({
+      run,
+      memory: {
+        working: {
+          active_task: 'bundle-state',
+        },
+      },
+      metadata: {
+        purpose: 'state-bundle-test',
+      },
+    });
+
+    const exported = bundle.toJSON();
+    const restored = StateBundleSerializer.import(exported);
+    const evolved = new StateBundle({
+      run: new Run({
+        ...run.toJSON(),
+        status: 'failed',
+        state: {
+          ...run.state,
+          recovery: { required: true },
+        },
+      }),
+      memory: {
+        working: {
+          active_task: 'bundle-state',
+        },
+        semantic: {
+          last_incident: 'state-drift',
+        },
+      },
+    });
+
+    expect(StateBundleSerializer.validate(exported)).toEqual({
+      valid: true,
+      errors: [],
+    });
+    expect(restored.summarize()).toMatchObject({
+      runId: run.id,
+      status: 'completed',
+      checkpointCount: 1,
+      memoryLayers: ['working'],
+    });
+    expect(StateDiff.diff(restored, evolved)).toMatchObject({
+      statusChanged: true,
+      stateKeysAdded: ['recovery'],
+      memoryLayersAdded: ['semantic'],
+    });
+  });
+
+  test('StateContractRegistry and StateIntegrityChecker define and validate portable state contracts', () => {
+    const registry = new StateContractRegistry();
+    const checker = new StateIntegrityChecker({
+      contractRegistry: registry,
+    });
+    const run = new Run({
+      input: 'integrity-check',
+      status: 'completed',
+      state: {
+        assessment: { confidence: 0.88 },
+      },
+      metrics: {
+        childRuns: {
+          count: 1,
+          items: [],
+        },
+      },
+      metadata: {
+        lineage: {
+          rootRunId: 'run-root',
+          parentRunId: null,
+          childRunIds: [],
+          branchOriginRunId: null,
+          branchCheckpointId: null,
+        },
+      },
+    });
+
+    const bundle = new StateBundle({
+      run,
+      memory: {
+        working: {
+          active_task: 'integrity-check',
+        },
+      },
+    });
+
+    const report = checker.check(bundle.toJSON());
+
+    expect(registry.describe('state_bundle')).toMatchObject({
+      authoritative: expect.arrayContaining(['run.id', 'run.state', 'memory']),
+      derived: expect.arrayContaining(['summary.runId', 'summary.memoryLayers']),
+    });
+    expect(report).toMatchObject({
+      valid: false,
+      errors: ['run.metrics.childRuns.count does not match childRuns.items length.'],
+      contract: expect.objectContaining({
+        restorationCritical: expect.arrayContaining(['run.id', 'run.checkpoints']),
+      }),
+    });
+  });
+
+  test('StateConsistencyChecker validates coherence across run, memory, and job metadata', () => {
+    const run = new Run({
+      input: 'resume state reconciliation',
+      status: 'paused',
+      state: {
+        recovery: { required: true },
+        scheduler: { jobId: 'job-1' },
+      },
+      pendingPause: {
+        stage: 'replay',
+        jobId: 'job-1',
+      },
+      metadata: {
+        jobId: 'job-1',
+        lineage: {
+          rootRunId: 'state-root',
+          parentRunId: null,
+          childRunIds: [],
+          branchOriginRunId: null,
+          branchCheckpointId: null,
+        },
+      },
+    });
+
+    const bundle = new StateBundle({
+      run,
+      memory: {
+        working: {
+          active_task: 'resume state reconciliation',
+        },
+      },
+      metadata: {
+        jobs: [
+          {
+            id: 'job-1',
+            runId: run.id,
+            status: 'scheduled',
+            handler: 'resume_run',
+          },
+        ],
+      },
+    });
+
+    const checker = new StateConsistencyChecker();
+    const report = checker.check(bundle);
+
+    expect(report).toMatchObject({
+      valid: true,
+      errors: [],
+      summary: {
+        runId: run.id,
+        runStatus: 'paused',
+        memoryLayers: ['working'],
+        referencedJobIds: ['job-1'],
+        resolvedJobIds: ['job-1'],
+      },
+    });
+    expect(report.warnings).toEqual([
+      'Run requires recovery but semantic memory does not record the last incident context.',
+    ]);
+  });
+
+  test('StateRestorePlanner builds a cross-environment restore plan from a portable state bundle', () => {
+    const run = new Run({
+      input: 'restore me remotely',
+      status: 'paused',
+      pendingPause: {
+        stage: 'replay',
+        reason: 'Prepared for remote replay.',
+      },
+      metadata: {
+        lineage: {
+          rootRunId: 'restore-root',
+          parentRunId: null,
+          childRunIds: [],
+          branchOriginRunId: null,
+          branchCheckpointId: null,
+        },
+      },
+    });
+    run.addCheckpoint({
+      id: `${run.id}:checkpoint:1`,
+      label: 'paused_replay',
+      status: 'paused',
+      snapshot: run.createCheckpointSnapshot(),
+    });
+
+    const bundle = new StateBundle({
+      run,
+      memory: {
+        working: {
+          active_task: 'restore-me-remotely',
+        },
+      },
+    });
+
+    const planner = new StateRestorePlanner();
+    const plan = planner.buildPlan(bundle, {
+      sourceEnvironment: 'api-service',
+      targetEnvironment: 'worker-service',
+    });
+
+    expect(plan).toMatchObject({
+      readyToRestore: true,
+      sourceEnvironment: 'api-service',
+      targetEnvironment: 'worker-service',
+    });
+    expect(plan.steps).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ action: 'validate_state_bundle', status: 'ready' }),
+        expect.objectContaining({ action: 'restore_run_state', status: 'ready' }),
+        expect.objectContaining({ action: 'restore_memory_layers', status: 'ready' }),
+        expect.objectContaining({ action: 'resume_or_replay_from_restored_state', status: 'ready' }),
+      ])
+    );
+  });
+
+  test('StateDurableRestoreSuite builds process, queue, and service restore scenarios for long-running workflow state', () => {
+    const run = new Run({
+      input: 'restore long-running workflow',
+      status: 'paused',
+      state: {
+        scheduler: { jobId: 'restore-job-1' },
+      },
+      steps: [
+        {
+          id: 'workflow-step-1',
+          type: 'workflow_step',
+          status: 'paused',
+        },
+      ],
+      pendingPause: {
+        stage: 'workflow_replay',
+        reason: 'Prepared for durable workflow restore.',
+        jobId: 'restore-job-1',
+      },
+      metadata: {
+        jobId: 'restore-job-1',
+        workflowId: 'workflow-restore-1',
+        lineage: {
+          rootRunId: 'restore-root',
+          parentRunId: null,
+          childRunIds: [],
+          branchOriginRunId: null,
+          branchCheckpointId: null,
+        },
+      },
+    });
+    run.addCheckpoint({
+      id: `${run.id}:checkpoint:1`,
+      label: 'workflow_paused',
+      status: 'paused',
+      snapshot: run.createCheckpointSnapshot(),
+    });
+
+    const bundle = new StateBundle({
+      run,
+      memory: {
+        working: {
+          active_task: 'restore long-running workflow',
+        },
+        semantic: {
+          last_incident: 'worker-restart-during-workflow',
+        },
+      },
+      metadata: {
+        jobs: [
+          {
+            id: 'restore-job-1',
+            runId: run.id,
+            status: 'scheduled',
+            handler: 'resume_workflow',
+          },
+        ],
+      },
+    });
+
+    const suite = new StateDurableRestoreSuite();
+    const report = suite.build(bundle, {
+      sourceEnvironment: 'api-service',
+    });
+
+    expect(report).toMatchObject({
+      sourceEnvironment: 'api-service',
+      consistency: expect.objectContaining({
+        valid: true,
+      }),
+    });
+    expect(report.scenarios.map(scenario => scenario.targetEnvironment)).toEqual([
+      'process-worker',
+      'queue-worker',
+      'service-runtime',
+    ]);
+    for (const scenario of report.scenarios) {
+      expect(scenario.readyToRestore).toBe(true);
+      expect(scenario.steps).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ action: 'restore_run_state', status: 'ready' }),
+          expect.objectContaining({ action: 'restore_memory_layers', status: 'ready' }),
+          expect.objectContaining({ action: 'restore_workflow_progress', status: 'ready' }),
+          expect.objectContaining({ action: 'restore_scheduler_jobs', status: 'ready' }),
+          expect.objectContaining({ action: 'verify_scheduler_job_alignment', status: 'ready' }),
+        ])
+      );
+    }
+  });
+
+  test('StateIncidentReconstructor rebuilds an offline incident report from a portable state bundle', () => {
+    const run = new Run({
+      input: 'reconstruct me offline',
+      status: 'failed',
+      steps: [
+        {
+          id: 'run-step-1',
+          type: 'tool',
+          status: 'failed',
+        },
+      ],
+      errors: [
+        {
+          name: 'ToolExecutionError',
+          message: 'send_status_update timed out',
+        },
+      ],
+      pendingPause: {
+        stage: 'replay',
+        reason: 'Prepared for offline replay investigation.',
+      },
+      metrics: {
+        childRuns: {
+          count: 1,
+          items: [],
+        },
+      },
+      metadata: {
+        lineage: {
+          rootRunId: 'incident-root',
+          parentRunId: null,
+          childRunIds: [],
+          branchOriginRunId: null,
+          branchCheckpointId: null,
+        },
+      },
+    });
+    run.addCheckpoint({
+      id: `${run.id}:checkpoint:1`,
+      label: 'run_failed',
+      status: 'failed',
+      snapshot: run.createCheckpointSnapshot(),
+    });
+
+    const bundle = new StateBundle({
+      run,
+      memory: {
+        working: {
+          active_task: 'incident-reconstruction',
+        },
+        semantic: {
+          last_incident: 'send-status-timeout',
+        },
+      },
+    });
+
+    const reconstructor = new StateIncidentReconstructor();
+    const report = reconstructor.reconstruct(bundle);
+
+    expect(report).toMatchObject({
+      runId: run.id,
+      status: 'failed',
+      failure: expect.objectContaining({
+        message: 'send_status_update timed out',
+      }),
+      lastCheckpoint: expect.objectContaining({
+        label: 'run_failed',
+      }),
+      pendingPause: expect.objectContaining({
+        stage: 'replay',
+      }),
+      memoryLayers: ['working', 'semantic'],
+    });
+    expect(report.failedSteps).toEqual([
+      expect.objectContaining({
+        id: 'run-step-1',
+      }),
+    ]);
+    expect(report.integrity).toMatchObject({
+      valid: false,
+      errors: ['run.metrics.childRuns.count does not match childRuns.items length.'],
+    });
+    expect(report.recommendations).toEqual(
+      expect.arrayContaining([
+        'Resolve state-bundle integrity issues before attempting restore or replay.',
+        expect.stringContaining('send_status_update timed out'),
+        expect.stringContaining('run-step-1'),
+        expect.stringContaining('working, semantic'),
+      ])
+    );
   });
 
   test('CritiqueProtocol and DisagreementResolver produce structured coordination outcomes', async () => {

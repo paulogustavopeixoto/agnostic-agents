@@ -84,6 +84,21 @@ These examples are intended as reference deployment patterns rather than feature
 - `referenceApprovalEscalationPolicySuite.js`
   - no API key required
   - shows maintained pre-rollout approval and escalation policy scenarios in one eval-style report
+- `referenceRecoveryPolicyGate.js`
+  - no API key required
+  - shows policy-aware constraints over branch and replay recovery actions
+- `referenceCompensationPolicyPlanner.js`
+  - no API key required
+  - shows policy-aware compensation recommendations for side-effecting steps
+- `referenceStateBundle.js`
+  - no API key required
+  - shows portable state-bundle export, restore, and high-level drift diffing
+- `referenceStateRestorePlanner.js`
+  - no API key required
+  - shows cross-environment restore planning from a portable state bundle plus durable restore scenarios for process, queue, and service boundaries
+- `referenceStateIncidentReconstructor.js`
+  - no API key required
+  - shows offline incident reconstruction directly from a portable state bundle
 - `referenceFileBackedStack.js`
   - no API key required
   - shows a local-first persisted deployment stack using file-backed run/job/memory stores plus approval and governance handling

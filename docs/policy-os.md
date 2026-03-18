@@ -17,6 +17,8 @@ The first `Policy OS` slice includes:
 - `PolicyScopeResolver`
 - `PolicyLifecycleManager`
 - `ApprovalEscalationPolicySuite`
+- `RecoveryPolicyGate`
+- `CompensationPolicyPlanner`
 - `ProductionPolicyPack.toPolicyPack()`
 - basic policy diff/version support through `PolicyPack.diff(...)`
 - operator-facing explanation output through `PolicyDecisionReport.explain()`
@@ -85,6 +87,22 @@ Use `ApprovalEscalationPolicySuite` when you want to:
 - simulate escalation-gated coordination policy scenarios before rollout
 - run both through one maintained eval-style report
 
+### `RecoveryPolicyGate`
+
+Use `RecoveryPolicyGate` when you want to:
+
+- apply policy constraints to replay, branch, and resume recovery steps
+- require approval for high-impact recovery actions through policy
+- export a policy evaluation artifact for a recovery plan
+
+### `CompensationPolicyPlanner`
+
+Use `CompensationPolicyPlanner` when you want to:
+
+- evaluate side-effecting completed work for compensation risk
+- distinguish auto-compensate from approval-required compensation paths
+- export a policy evaluation artifact for a compensation plan
+
 ## Maintained example
 
 - [`examples/referencePolicySimulation.js`](../examples/referencePolicySimulation.js)
@@ -136,6 +154,24 @@ Use [`docs/policy-approval-escalation.md`](./policy-approval-escalation.md) and
 [`examples/referenceApprovalEscalationPolicySuite.js`](../examples/referenceApprovalEscalationPolicySuite.js)
 for the maintained contract.
 
+## Recovery composition
+
+Recovery policy composition is now part of the maintained `v9` surface through
+`RecoveryPolicyGate`.
+
+Use [`docs/policy-recovery.md`](./policy-recovery.md) and
+[`examples/referenceRecoveryPolicyGate.js`](../examples/referenceRecoveryPolicyGate.js)
+for the maintained contract.
+
+## Compensation composition
+
+Compensation policy composition is now part of the maintained `v9` surface
+through `CompensationPolicyPlanner`.
+
+Use [`docs/policy-compensation.md`](./policy-compensation.md) and
+[`examples/referenceCompensationPolicyPlanner.js`](../examples/referenceCompensationPolicyPlanner.js)
+for the maintained contract.
+
 ## Scope note
 
 This is the first maintained slice of `v9`, not the full `Policy OS` vision.
@@ -143,5 +179,4 @@ This is the first maintained slice of `v9`, not the full `Policy OS` vision.
 Still ahead:
 
 - policy promotion workflow from richer rollout states beyond draft/active
-- compensation and recovery policy
 - stronger end-to-end policy audit trails

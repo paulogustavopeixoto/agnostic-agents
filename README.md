@@ -304,8 +304,6 @@ It is intentionally separate from the runtime kernel.
 
 The current public direction after the completed runtime and coordination work is:
 
-- `v9` Policy OS
-  - policy as portable, testable, replayable runtime artifacts
 - `v10` State OS
   - stronger deterministic state, restoration, and portable runtime bundles
 - `v11` Interop OS
@@ -317,6 +315,14 @@ The current public direction after the completed runtime and coordination work i
 
 That sequence is intentional.
 The package should become smarter without collapsing policy, state, interop, coordination, and learning into one opaque layer.
+
+The `v9` Policy OS core is now in place in the current package surface.
+
+The first `v10 State OS` slice is also now in place:
+
+- `StateBundle`
+- `StateDiff`
+- `StateBundleSerializer`
 
 ### Policy and Governance
 
@@ -330,10 +336,28 @@ Use:
 - `PolicyScopeResolver` for scoped policy inheritance across runtime, workflow, agent, and distributed handoff layers
 - `PolicyLifecycleManager` for draft promotion and rollback of policy packs
 - `ApprovalEscalationPolicySuite` for simulating approval and escalation policy scenarios before rollout
+- `RecoveryPolicyGate` for applying policy constraints to replay, branch, and resume recovery paths
+- `CompensationPolicyPlanner` for applying policy to compensation recommendations on side-effecting work
 - `CoordinationPolicyGate` for applying policy to coordination outcomes like retry, reject, or escalate
 - `ExtensionHost` for contributed policy and governance behavior
 - `ProductionPolicyPack` for a maintained production-oriented preset
 - `ApprovalInbox` and `GovernanceHooks` for operator-facing control
+
+### State and Replay
+
+Use:
+
+- `Run` for inspectable runtime state
+- `TraceSerializer` for portable run/trace export
+- `StateBundle` for portable run-plus-memory state snapshots
+- `StateDiff` for high-level state comparison
+- `StateBundleSerializer` for import/export and validation of state bundles
+- `StateContractRegistry` for authoritative-versus-derived state contracts
+- `StateIntegrityChecker` for pre-restore integrity checks
+- `StateConsistencyChecker` for coherence checks across run state, memory, and portable job metadata
+- `StateRestorePlanner` for cross-environment restore planning from portable state bundles
+- `StateDurableRestoreSuite` for process, queue, and service restore scenarios plus workflow/scheduler durability steps
+- `StateIncidentReconstructor` for offline incident reconstruction directly from portable state bundles
 
 This means users can add or mutate policy dynamically without patching core runtime code.
 
@@ -379,6 +403,11 @@ Local/no-key examples:
 - `npm run example:reference-policy-inheritance`
 - `npm run example:reference-policy-lifecycle`
 - `npm run example:reference-approval-escalation-policy-suite`
+- `npm run example:reference-recovery-policy-gate`
+- `npm run example:reference-compensation-policy-planner`
+- `npm run example:reference-state-bundle`
+- `npm run example:reference-state-restore-planner`
+- `npm run example:reference-state-incident-reconstructor`
 - `npm run example:reference-file-backed-stack`
 - `npm run example:reference-worker-coordination-benchmarks`
 - `npm run example:reference-openapi`

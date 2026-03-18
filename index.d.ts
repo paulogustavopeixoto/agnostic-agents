@@ -289,6 +289,139 @@ export class ApprovalEscalationPolicySuite {
   run(): Promise<JsonObject>;
 }
 
+export class RecoveryPolicyGate {
+  constructor(options?: {
+    policyPack?: PolicyPack | JsonObject | null;
+    toolPolicy?: ToolPolicy | JsonObject | null;
+    policyScopeResolver?: PolicyScopeResolver | JsonObject | null;
+    scopes?: Record<string, PolicyPack | JsonObject | null> | null;
+    defaultBlockedAction?: string;
+    actionMetadata?: Record<string, JsonObject>;
+  });
+  policyPack: PolicyPack;
+  simulator: PolicySimulator;
+  defaultBlockedAction: string;
+  actionMetadata: Record<string, JsonObject>;
+  evaluateStep(step?: JsonObject, plan?: JsonObject, context?: JsonObject): JsonObject;
+  evaluatePlan(plan?: JsonObject, context?: JsonObject): JsonObject;
+  createEvaluationRecord(plan?: JsonObject, context?: JsonObject): PolicyEvaluationRecord;
+}
+
+export class CompensationPolicyPlanner {
+  constructor(options?: {
+    policyPack?: PolicyPack | JsonObject | null;
+    toolPolicy?: ToolPolicy | JsonObject | null;
+    policyScopeResolver?: PolicyScopeResolver | JsonObject | null;
+    scopes?: Record<string, PolicyPack | JsonObject | null> | null;
+    fallbackAction?: string;
+    actionMetadata?: Record<string, JsonObject>;
+  });
+  policyPack: PolicyPack;
+  simulator: PolicySimulator;
+  fallbackAction: string;
+  actionMetadata: Record<string, JsonObject>;
+  plan(entries?: JsonObject[], context?: JsonObject): JsonObject;
+  createEvaluationRecord(entries?: JsonObject[], context?: JsonObject): PolicyEvaluationRecord;
+}
+
+export class StateBundle {
+  constructor(options?: {
+    run?: Run | JsonObject | null;
+    memory?: JsonObject | null;
+    metadata?: JsonObject;
+  });
+  run: Run | null;
+  memory: JsonObject | null;
+  metadata: JsonObject;
+  summarize(): JsonObject;
+  toJSON(): JsonObject;
+  static fromJSON(payload?: JsonObject): StateBundle;
+  static SCHEMA_VERSION: string;
+  static FORMAT: string;
+}
+
+export class StateDiff {
+  static diff(left?: StateBundle | JsonObject, right?: StateBundle | JsonObject): JsonObject;
+}
+
+export class StateBundleSerializer {
+  static export(options?: {
+    run?: Run | JsonObject | null;
+    memory?: JsonObject | null;
+    metadata?: JsonObject;
+  }): JsonObject;
+  static import(payload?: JsonObject): StateBundle;
+  static validate(payload?: JsonObject): { valid: boolean; errors: string[] };
+}
+
+export class StateContractRegistry {
+  constructor(options?: {
+    contracts?: Record<string, JsonObject>;
+  });
+  contracts: Record<string, JsonObject>;
+  describe(name?: string): JsonObject | null;
+}
+
+export class StateIntegrityChecker {
+  constructor(options?: {
+    contractRegistry?: StateContractRegistry | JsonObject | null;
+  });
+  contractRegistry: StateContractRegistry;
+  check(bundle?: StateBundle | JsonObject): {
+    valid: boolean;
+    errors: string[];
+    warnings: string[];
+    contract: JsonObject | null;
+    summary?: JsonObject;
+  };
+}
+
+export class StateConsistencyChecker {
+  check(bundle?: StateBundle | JsonObject): {
+    valid: boolean;
+    errors: string[];
+    warnings: string[];
+    summary: JsonObject;
+  };
+}
+
+export class StateRestorePlanner {
+  constructor(options?: {
+    integrityChecker?: StateIntegrityChecker | JsonObject | null;
+  });
+  integrityChecker: StateIntegrityChecker;
+  buildPlan(
+    bundle?: StateBundle | JsonObject,
+    options?: {
+      sourceEnvironment?: string;
+      targetEnvironment?: string;
+    }
+  ): JsonObject;
+}
+
+export class StateDurableRestoreSuite {
+  constructor(options?: {
+    restorePlanner?: StateRestorePlanner | JsonObject | null;
+    consistencyChecker?: StateConsistencyChecker | JsonObject | null;
+  });
+  restorePlanner: StateRestorePlanner;
+  consistencyChecker: StateConsistencyChecker;
+  build(
+    bundle?: StateBundle | JsonObject,
+    options?: {
+      sourceEnvironment?: string;
+    }
+  ): JsonObject;
+}
+
+export class StateIncidentReconstructor {
+  constructor(options?: {
+    integrityChecker?: StateIntegrityChecker | JsonObject | null;
+  });
+  integrityChecker: StateIntegrityChecker;
+  reconstruct(bundle?: StateBundle | JsonObject): JsonObject;
+}
+
 export interface RunMetrics {
   tokenUsage: {
     prompt: number;

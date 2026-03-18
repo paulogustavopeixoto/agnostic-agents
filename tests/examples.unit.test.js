@@ -246,6 +246,88 @@ describe('Maintained examples', () => {
     expect(stdout).toContain('passed: true');
   });
 
+  test('reference recovery policy gate example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceRecoveryPolicyGate.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Recovery policy gate summary');
+    expect(stdout).toContain("recommendedAction: 'require_recovery_approval'");
+    expect(stdout).toContain('branch_from_failure_checkpoint');
+    expect(stdout).toContain('Recovery policy evaluation artifact');
+  });
+
+  test('reference state incident reconstructor example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceStateIncidentReconstructor.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('State incident reconstruction summary');
+    expect(stdout).toContain('State incident reconstruction report');
+    expect(stdout).toContain('send_status_update timed out');
+    expect(stdout).toContain('Run has pendingPause but status is not paused.');
+    expect(stdout).toContain('Use the restored pause metadata to choose resume versus replay.');
+  });
+
+  test('reference state bundle example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceStateBundle.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('State bundle summary');
+    expect(stdout).toContain('State contract summary');
+    expect(stdout).toContain('State integrity report');
+    expect(stdout).toContain('State consistency report');
+    expect(stdout).toContain("resolvedJobIds: [ 'state-demo-job' ]");
+  });
+
+  test('reference compensation policy planner example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceCompensationPolicyPlanner.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Compensation policy plan summary');
+    expect(stdout).toContain("recommendedAction: 'approval_required'");
+    expect(stdout).toContain('notify-user');
+    expect(stdout).toContain('Compensation policy evaluation artifact');
+  });
+
+  test('reference state bundle example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceStateBundle.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('State bundle summary');
+    expect(stdout).toContain('State contract summary');
+    expect(stdout).toContain('State integrity report');
+    expect(stdout).toContain('State diff summary');
+    expect(stdout).toContain('memoryLayers');
+    expect(stdout).toContain('stateKeysAdded');
+  });
+
+  test('reference state restore planner example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceStateRestorePlanner.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('State restore plan summary');
+    expect(stdout).toContain("sourceEnvironment: 'api-service'");
+    expect(stdout).toContain("targetEnvironment: 'worker-service'");
+    expect(stdout).toContain('State restore plan details');
+    expect(stdout).toContain('Durable restore scenarios');
+    expect(stdout).toContain('process-worker');
+    expect(stdout).toContain('queue-worker');
+    expect(stdout).toContain('service-runtime');
+    expect(stdout).toContain('restore_workflow_progress');
+    expect(stdout).toContain('restore_scheduler_jobs');
+  });
+
   test('reference file-backed stack example runs', async () => {
     const examplePath = path.join(__dirname, '..', 'examples', 'referenceFileBackedStack.js');
     const { stdout } = await execFileAsync(process.execPath, [examplePath], {

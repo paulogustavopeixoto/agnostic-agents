@@ -37,6 +37,17 @@ const { PolicyScopeResolver } = require('./PolicyScopeResolver');
 const { CoordinationPolicyGate } = require('./CoordinationPolicyGate');
 const { PolicyLifecycleManager } = require('./PolicyLifecycleManager');
 const { ApprovalEscalationPolicySuite } = require('./ApprovalEscalationPolicySuite');
+const { RecoveryPolicyGate } = require('./RecoveryPolicyGate');
+const { CompensationPolicyPlanner } = require('./CompensationPolicyPlanner');
+const { StateBundle } = require('./StateBundle');
+const { StateDiff } = require('./StateDiff');
+const { StateBundleSerializer } = require('./StateBundleSerializer');
+const { StateContractRegistry } = require('./StateContractRegistry');
+const { StateIntegrityChecker } = require('./StateIntegrityChecker');
+const { StateConsistencyChecker } = require('./StateConsistencyChecker');
+const { StateRestorePlanner } = require('./StateRestorePlanner');
+const { StateDurableRestoreSuite } = require('./StateDurableRestoreSuite');
+const { StateIncidentReconstructor } = require('./StateIncidentReconstructor');
 const { EventBus } = require('./EventBus');
 const { ConsoleDebugSink } = require('./ConsoleDebugSink');
 const { FileAuditSink } = require('./FileAuditSink');
@@ -102,6 +113,17 @@ module.exports = {
   CoordinationPolicyGate,
   PolicyLifecycleManager,
   ApprovalEscalationPolicySuite,
+  RecoveryPolicyGate,
+  CompensationPolicyPlanner,
+  StateBundle,
+  StateDiff,
+  StateBundleSerializer,
+  StateContractRegistry,
+  StateIntegrityChecker,
+  StateConsistencyChecker,
+  StateRestorePlanner,
+  StateDurableRestoreSuite,
+  StateIncidentReconstructor,
   EventBus,
   ConsoleDebugSink,
   FileAuditSink,
