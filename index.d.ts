@@ -1026,6 +1026,40 @@ export class EvalHarness {
   run(options?: JsonObject): Promise<JsonObject>;
 }
 
+export class InvariantRegistry {
+  constructor(options?: { invariants?: JsonObject[] });
+  register(invariant?: JsonObject): JsonObject;
+  list(): JsonObject[];
+  evaluate(context?: JsonObject): Promise<JsonObject[]>;
+}
+
+export class AssuranceReport {
+  constructor(options?: { invariants?: JsonObject[]; scenarios?: JsonObject[] });
+  invariants: JsonObject[];
+  scenarios: JsonObject[];
+  summarize(): JsonObject;
+  explain(): JsonObject;
+  toJSON(): JsonObject;
+}
+
+export class AssuranceSuite {
+  constructor(options?: {
+    invariants?: InvariantRegistry | JsonObject | null;
+    scenarios?: JsonObject[];
+  });
+  invariants: InvariantRegistry;
+  scenarios: JsonObject[];
+  run(context?: JsonObject): Promise<AssuranceReport>;
+}
+
+export class AssuranceGuardrail {
+  evaluate(report?: AssuranceReport | JsonObject): JsonObject;
+}
+
+export class AssuranceRecoveryPlanner {
+  plan(report?: AssuranceReport | JsonObject): JsonObject;
+}
+
 export class LearningLoop {
   recordRun(run: Run | JsonObject): void;
   recordEvaluation(report: JsonObject): void;
@@ -1086,6 +1120,72 @@ export class AdaptiveDecisionLedger {
   buildRollbackPlan(entryId: string): JsonObject;
 }
 
+export class FleetRolloutPlan {
+  constructor(options?: {
+    id?: string | null;
+    target?: JsonObject;
+    stages?: JsonObject[];
+    rollbackTriggers?: JsonObject[];
+    metadata?: JsonObject;
+  });
+  id: string;
+  target: JsonObject;
+  stages: JsonObject[];
+  rollbackTriggers: JsonObject[];
+  metadata: JsonObject;
+  summarize(): JsonObject;
+  toJSON(): JsonObject;
+  static fromJSON(payload?: JsonObject): FleetRolloutPlan;
+}
+
+export class FleetHealthMonitor {
+  constructor(options?: { snapshots?: JsonObject[] });
+  record(snapshot?: JsonObject): JsonObject;
+  summarize(): JsonObject;
+}
+
+export class FleetCanaryEvaluator {
+  constructor(options?: { monitor?: FleetHealthMonitor | JsonObject | null });
+  monitor: FleetHealthMonitor;
+  evaluate(plan?: FleetRolloutPlan | JsonObject, summary?: JsonObject | null): JsonObject;
+}
+
+export class FleetSafetyController {
+  constructor(options?: {
+    monitor?: FleetHealthMonitor | JsonObject | null;
+    maxConcurrentRuns?: number | null;
+    maxSchedulerBacklog?: number | null;
+    maxAdaptiveRegressions?: number;
+    maxSaturation?: number;
+    allowedEnvironmentIds?: string[];
+    allowedTenantIds?: string[];
+  });
+  monitor: FleetHealthMonitor;
+  evaluate(summary?: JsonObject | null, scope?: JsonObject): JsonObject;
+}
+
+export class FleetImpactComparator {
+  constructor(options?: {
+    before?: FleetHealthMonitor | JsonObject | null;
+    after?: FleetHealthMonitor | JsonObject | null;
+  });
+  before: FleetHealthMonitor;
+  after: FleetHealthMonitor;
+  compare(beforeSummary?: JsonObject | null, afterSummary?: JsonObject | null): JsonObject;
+}
+
+export class FleetRollbackAdvisor {
+  constructor(options?: {
+    comparator?: FleetImpactComparator | JsonObject | null;
+  });
+  comparator: FleetImpactComparator;
+  advise(options?: {
+    plan?: FleetRolloutPlan | JsonObject | null;
+    comparison?: JsonObject | null;
+    safetyDecision?: JsonObject | null;
+  }): JsonObject;
+}
+
 export class LearnedAdaptationArtifact {
   constructor(options?: {
     proposal?: JsonObject;
@@ -1116,15 +1216,28 @@ export class ImprovementProposalEngine {
   }): JsonObject[];
 }
 
+export class ImprovementActionPlanner {
+  buildPlans(proposals?: Array<JsonObject | LearnedAdaptationArtifact>): JsonObject[];
+  buildPlan(proposal?: JsonObject | LearnedAdaptationArtifact): JsonObject;
+  compareArtifacts(left?: JsonObject | LearnedAdaptationArtifact, right?: JsonObject | LearnedAdaptationArtifact): JsonObject;
+  buildRollbackPlan(proposal?: JsonObject | LearnedAdaptationArtifact): JsonObject;
+}
+
 export class GovernedImprovementLoop {
   constructor(options?: {
     proposalEngine?: ImprovementProposalEngine | JsonObject | null;
     governanceGate?: AdaptiveGovernanceGate | JsonObject | null;
     ledger?: AdaptiveDecisionLedger | JsonObject | null;
+    adaptationEnvelope?: AdaptationPolicyEnvelope | JsonObject | null;
+    effectTracker?: ImprovementEffectTracker | JsonObject | null;
+    actionPlanner?: ImprovementActionPlanner | JsonObject | null;
   });
   ledger: AdaptiveDecisionLedger;
   proposalEngine: ImprovementProposalEngine;
   governanceGate: AdaptiveGovernanceGate;
+  adaptationEnvelope: AdaptationPolicyEnvelope;
+  effectTracker: ImprovementEffectTracker;
+  actionPlanner: ImprovementActionPlanner;
   propose(options?: {
     branchComparison?: JsonObject | null;
     incident?: JsonObject | null;
@@ -1133,6 +1246,62 @@ export class GovernedImprovementLoop {
     branchComparison?: JsonObject | null;
     incident?: JsonObject | null;
   }): Promise<JsonObject>;
+  recordOutcome(options?: {
+    proposalId?: string;
+    baseline?: JsonObject;
+    outcome?: JsonObject;
+    summary?: string | null;
+    metadata?: JsonObject;
+  }): JsonObject;
+  summarizeEffects(): JsonObject;
+  summarizeReview(review?: JsonObject): JsonObject;
+  buildActionPlans(options?: {
+    branchComparison?: JsonObject | null;
+    incident?: JsonObject | null;
+  }): JsonObject[];
+}
+
+export class AdaptationPolicyEnvelope {
+  constructor(options?: {
+    allowedTargetSurfaces?: string[];
+    deniedTargetSurfaces?: string[];
+    allowedChangeTypes?: string[];
+    deniedChangeTypes?: string[];
+    maxPriority?: 'low' | 'medium' | 'high' | 'critical';
+    requireApprovalCategories?: string[];
+    materialChangeTypes?: string[];
+    constraints?: JsonObject;
+  });
+  evaluate(proposal?: JsonObject): JsonObject;
+  explain(proposal?: JsonObject): string;
+}
+
+export class ImprovementEffectTracker {
+  constructor(options?: { records?: JsonObject[] });
+  record(record?: JsonObject): JsonObject;
+  summarize(): JsonObject;
+  explain(record?: JsonObject): JsonObject;
+}
+
+export class LearningBenchmarkSuite {
+  constructor(options?: {
+    effectTracker?: ImprovementEffectTracker | JsonObject | null;
+    scenarios?: JsonObject[];
+  });
+  effectTracker: ImprovementEffectTracker;
+  buildDefaultScenarios(): JsonObject[];
+  run(options?: JsonObject): Promise<JsonObject>;
+}
+
+export class AdaptationRegressionGuard {
+  constructor(options?: {
+    effectTracker?: ImprovementEffectTracker | JsonObject | null;
+    maxRegressions?: number;
+    minConfidenceDelta?: number;
+    maxFailureDelta?: number;
+  });
+  effectTracker: ImprovementEffectTracker;
+  evaluate(records?: JsonObject[] | null): JsonObject;
 }
 
 export class AdaptiveGovernanceGate {

@@ -516,5 +516,51 @@ describe('Maintained examples', () => {
     expect(stdout).toContain('agnostic-agents-learned-adaptation');
     expect(stdout).toContain('adaptive_change');
     expect(stdout).toContain('rollback');
+    expect(stdout).toContain('reviewSummary');
+    expect(stdout).toContain('effectSummary');
+    expect(stdout).toContain('improved: 1');
+    expect(stdout).toContain('actionPlans');
+    expect(stdout).toContain('comparison');
+    expect(stdout).toContain('incident_driven_adjustment');
+    expect(stdout).toContain('branch_quality_adjustment');
+    expect(stdout).toContain('benchmarkReport');
+    expect(stdout).toContain('guardDecision');
+    expect(stdout).toContain('halt_adaptation');
+  });
+
+  test('reference fleet rollout example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceFleetRollout.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Fleet rollout summary');
+    expect(stdout).toContain('halt_and_rollback');
+    expect(stdout).toContain('adaptiveRegressions');
+    expect(stdout).toContain("scope: 'environment'");
+    expect(stdout).toContain('safety');
+    expect(stdout).toContain("action: 'halt'");
+    expect(stdout).toContain('comparison');
+    expect(stdout).toContain('improved: true');
+    expect(stdout).toContain('rollbackAdvice');
+    expect(stdout).toContain('rollback_recommended');
+  });
+
+  test('reference assurance suite example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceAssuranceSuite.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Assurance summary');
+    expect(stdout).toContain('block');
+    expect(stdout).toContain('policy-scope-stable');
+    expect(stdout).toContain('learning-bounded');
+    expect(stdout).toContain('guardrailDecision');
+    expect(stdout).toContain('block_rollout');
+    expect(stdout).toContain('recoveryPlan');
+    expect(stdout).toContain('rollback_or_quarantine');
+    expect(stdout).toContain('branch-replay-integrity');
+    expect(stdout).toContain('coordination-failure-check');
   });
 });

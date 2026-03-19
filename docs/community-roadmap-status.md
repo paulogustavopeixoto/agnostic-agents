@@ -18,6 +18,9 @@ reading the entire long-form planning document.
 - `v7` adaptive runtime
 - `v9` Policy OS core
 - `v10` State OS core
+- `v11` Interop OS core
+- `v12` Coordination OS core
+- `v13` Learning OS core
 
 ### Completed higher-level coordination track
 
@@ -46,16 +49,34 @@ Still open:
   core shipped references
 - clearer external milestone reporting as adoption grows
 
-## Forward path after the current release line
+## Direction after the current release line
 
-The next longer-range sequence is now:
+The current package already covers the `v11` through `v13` core program:
 
 - `v11` Interop OS
-  - make the runtime contracts easier for third-party tools and control planes to implement
 - `v12` Coordination OS
-  - make critique, trust, disagreement, and decomposition stronger as first-class coordination systems
 - `v13` Learning OS
-  - turn evidence, evals, and incidents into governed behavioral improvement
+
+The next direction is refinement, hardening, and broader ecosystem uptake:
+
+- deeper external interoperability and certification depth
+- stronger operator surfaces for coordination and learning
+- governed-learning refinement instead of opaque self-modification
+
+After the current `v13` core, the next roadmap horizon is:
+
+- `v14` Fleet OS
+  - rollout control, canary evaluation, and fleet-level safety boundaries
+- `v15` Assurance OS
+  - invariants, scenario simulation, and stronger pre-deployment assurance
+- `v16` Operator OS
+  - day-2 intervention, triage, rollback, and governance continuity
+
+The current `v14` maintained baseline starts with rollout artifacts, fleet
+health summaries, canary halt/rollback evaluation, fleet safety controls, and
+before/after rollout impact comparison, plus rollback advice for broader fleet regressions.
+The maintained operator guidance for that baseline now lives in the multi-runtime operations reference.
+The current `v15` maintained baseline starts with explicit invariants, assurance suites, assurance reports, rollout guardrails, and rollback/quarantine planning.
 
 The important architectural rule is:
 
@@ -73,7 +94,7 @@ The intended sequence across the forward path is:
 4. deepen coordination quality on top of that substrate
 5. only then close the loop with governed learning
 
-In shorter form:
+In shorter form, the maintained sequence that got the package here was:
 
 - `v11`: make those contracts public and interoperable
 - `v12`: strengthen coordination intelligence above the runtime
@@ -92,14 +113,14 @@ restore, inspect, or validate.
 
 ## How to interpret this
 
-The runtime and coordination foundation are strong.
+The runtime, interop, coordination, and governed-learning foundation are strong.
 
 The remaining work is now mostly:
 
 - ecosystem clarity
 - operational hardening
 - public certification depth
-- `v11+` interop, coordination, and learning evolution
+- interop, coordination, and learning refinement on top of the completed core
 
 That is a healthier pre-release state than having major unresolved core
 architecture work.

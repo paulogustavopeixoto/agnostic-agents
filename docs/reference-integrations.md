@@ -139,6 +139,7 @@ That keeps the runtime portable and lets each deployment choose its own transpor
 
 For a fuller operator-facing architecture view, see [`docs/operator-architecture.md`](operator-architecture.md).
 For remote governance callback patterns, see [`docs/remote-control-planes.md`](remote-control-planes.md).
+For fleet rollout and multi-runtime control guidance, see [`docs/multi-runtime-operations.md`](multi-runtime-operations.md).
 
 Maintained split reference:
 

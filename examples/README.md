@@ -86,7 +86,13 @@ These examples are intended as reference deployment patterns rather than feature
   - shows operator-facing coordination diagnostics for disagreement, missing roles, escalation, and quality warnings
 - `referenceGovernedImprovement.js`
   - no API key required
-  - shows explicit learned-improvement artifacts and governed review requests built from runs and evals
+  - shows explicit learned-improvement artifacts, concrete action plans, bounded adaptation envelopes, governed review requests, artifact comparison, effect summaries, learning benchmarks, and regression-guard decisions built from runs and evals
+- `referenceFleetRollout.js`
+  - no API key required
+  - shows staged rollout artifacts, fleet health summaries, canary halt/rollback decisions, fleet safety throttling/halt controls, before/after rollout impact comparison, and rollback advice for broader regressions
+- `referenceAssuranceSuite.js`
+  - no API key required
+  - shows explicit invariants, branch/replay/recovery/coordination assurance scenarios, operator-facing assurance verdicts, rollout guardrails, and rollback/quarantine planning
 - `referenceProductionPolicyPack.js`
   - no API key required
   - shows a maintained production-oriented policy/governance pack contributing policy rules and governance hooks through `ExtensionHost`

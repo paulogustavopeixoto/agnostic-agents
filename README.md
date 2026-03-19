@@ -14,18 +14,25 @@ It is designed for projects that need more than a chat wrapper:
 - distributed handoff across processes or services
 - evals, benchmarks, and incident analysis
 
-The package also now includes a separate coordination layer above the runtime for:
+The package also includes a separate coordination layer above the runtime for:
 
 - structured critique
 - disagreement resolution
 - task decomposition
 - coordination benchmarks
 
-The longer-term direction is:
+It also includes governed learning, fleet rollout, and assurance surfaces for:
+
+- reviewed improvement proposals and bounded adaptation
+- staged rollout and canary control across many runtimes
+- invariant checks and rollout blocking before unsafe changes spread
+
+The maintained architecture is:
 
 - runtime OS first
 - coordination intelligence above the runtime
-- governed learning loops above coordination
+- governed learning above coordination
+- fleet and assurance layers above runtime, coordination, and learning
 
 ## Install
 
@@ -45,6 +52,11 @@ Use `agnostic-agents` when you want:
 - a runtime substrate for higher-level worker or organization systems
 - a package that keeps control, observability, and governance in the open
 - a package that can turn evidence into governed improvement proposals instead of hidden self-modification
+- a package that can keep learned changes inside explicit safety envelopes and measure their effect after review
+- a package that can turn eval, incident, and branch evidence into concrete runtime or coordination change plans
+- a package that can benchmark learned changes and halt adaptation when those changes start regressing outcomes
+- a package that can stage, compare, and roll back changes across a fleet of runtimes
+- a package that can block unsafe rollout candidates with explicit invariants and assurance reports
 
 Do not think of it as only a prompt helper or a chat abstraction. The maintained direction is a runtime control layer for serious agent systems.
 
@@ -52,7 +64,8 @@ The repo is intentionally split so that:
 
 - runtime primitives stay general-purpose and portable
 - coordination logic stays inspectable and separate from the runtime kernel
-- future learning/adaptation remains governed instead of hidden in opaque agent glue
+- learning/adaptation remains governed instead of hidden in opaque agent glue
+- fleet rollout and assurance remain operator-visible instead of collapsing into opaque control-plane logic
 
 ## Fastest Start
 
@@ -320,18 +333,52 @@ The current package already includes:
 
 - `v9` Policy OS core
 - `v10` State OS core
+- `v11` Interop OS core
+- `v12` Coordination OS core
+- `v13` Learning OS core
+- `v14` Fleet OS core
+- `v15` Assurance OS baseline
 
-The next public direction is:
+The maintained direction after this is refinement and extension of those layers:
 
-- `v11` Interop OS
-  - stable public schemas, manifests, and conformance for ecosystem packages
-- `v12` Coordination OS
-  - stronger critique, trust, disagreement, decomposition, and role-aware multi-agent coordination
-- `v13` Learning OS
-  - governed improvement loops that turn evals, incidents, and prior-run evidence into reviewable behavioral change
+- interop depth and external ecosystem adoption
+- stronger coordination quality and diagnostics
+- governed learning refinement instead of hidden autonomy
+- stronger fleet and assurance hardening above the completed core
+
+The next horizon after the current shipped core is:
+
+- `v16` Operator OS
+  - richer day-2 control, intervention, triage, and governance continuity
 
 That sequence is intentional.
 The package should become smarter without collapsing policy, state, interop, coordination, and learning into one opaque layer.
+
+The current maintained `v14` baseline starts with:
+
+- `FleetRolloutPlan`
+- `FleetHealthMonitor`
+- `FleetCanaryEvaluator`
+- `FleetSafetyController`
+- `FleetImpactComparator`
+- `FleetRollbackAdvisor`
+
+The current maintained `v15` baseline starts with:
+
+- `InvariantRegistry`
+- `AssuranceSuite`
+- `AssuranceReport`
+- `AssuranceGuardrail`
+- `AssuranceRecoveryPlanner`
+- `FleetSafetyController`
+- `FleetImpactComparator`
+- `FleetRollbackAdvisor`
+
+Useful docs for these layers:
+
+- [Governed improvement](docs/governed-improvement.md)
+- [Fleet OS](docs/fleet-os.md)
+- [Assurance OS](docs/assurance-os.md)
 
 ### Policy and Governance
 
@@ -479,6 +526,10 @@ Runtime operations:
 - [Common stack integrations](docs/common-stack-integrations.md)
 - [Operator workflows](docs/operator-workflows.md)
 - [Operator architecture](docs/operator-architecture.md)
+- [Governed improvement](docs/governed-improvement.md)
+- [Fleet OS](docs/fleet-os.md)
+- [Assurance OS](docs/assurance-os.md)
+- [Multi-runtime operations](docs/multi-runtime-operations.md)
 - [Public control-plane references](docs/public-control-plane-references.md)
 - [Run and trace visualization](docs/run-trace-visualization.md)
 - [Distributed execution](docs/distributed-execution.md)
@@ -550,6 +601,9 @@ This package currently targets:
 - distributed handoff and recovery
 - adaptive runtime tuning and operator-facing evals
 - a separate coordination layer above the runtime
+- governed learning and bounded adaptation
+- fleet rollout and rollback control
+- assurance suites and rollout guardrails
 
 It does not try to be:
 

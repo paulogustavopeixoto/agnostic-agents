@@ -33,6 +33,11 @@ const { CoordinationDiagnostics } = require('../src/coordination/CoordinationDia
 const { Run } = require('../src/runtime/Run');
 const { EvidenceGraph } = require('../src/runtime/EvidenceGraph');
 const { EvalHarness } = require('../src/runtime/EvalHarness');
+const { InvariantRegistry } = require('../src/runtime/InvariantRegistry');
+const { AssuranceReport } = require('../src/runtime/AssuranceReport');
+const { AssuranceSuite } = require('../src/runtime/AssuranceSuite');
+const { AssuranceGuardrail } = require('../src/runtime/AssuranceGuardrail');
+const { AssuranceRecoveryPlanner } = require('../src/runtime/AssuranceRecoveryPlanner');
 const { EvalReportArtifact } = require('../src/runtime/EvalReportArtifact');
 const { ToolSchemaArtifact } = require('../src/runtime/ToolSchemaArtifact');
 const { LearningLoop } = require('../src/runtime/LearningLoop');
@@ -43,8 +48,19 @@ const { AdaptiveRetryPolicy } = require('../src/runtime/AdaptiveRetryPolicy');
 const { HistoricalRoutingAdvisor } = require('../src/runtime/HistoricalRoutingAdvisor');
 const { AdaptiveDecisionLedger } = require('../src/runtime/AdaptiveDecisionLedger');
 const { AdaptiveGovernanceGate } = require('../src/runtime/AdaptiveGovernanceGate');
+const { FleetRolloutPlan } = require('../src/runtime/FleetRolloutPlan');
+const { FleetHealthMonitor } = require('../src/runtime/FleetHealthMonitor');
+const { FleetCanaryEvaluator } = require('../src/runtime/FleetCanaryEvaluator');
+const { FleetSafetyController } = require('../src/runtime/FleetSafetyController');
+const { FleetImpactComparator } = require('../src/runtime/FleetImpactComparator');
+const { FleetRollbackAdvisor } = require('../src/runtime/FleetRollbackAdvisor');
+const { AdaptationPolicyEnvelope } = require('../src/runtime/AdaptationPolicyEnvelope');
+const { ImprovementEffectTracker } = require('../src/runtime/ImprovementEffectTracker');
 const { LearnedAdaptationArtifact } = require('../src/runtime/LearnedAdaptationArtifact');
 const { ImprovementProposalEngine } = require('../src/runtime/ImprovementProposalEngine');
+const { ImprovementActionPlanner } = require('../src/runtime/ImprovementActionPlanner');
+const { LearningBenchmarkSuite } = require('../src/runtime/LearningBenchmarkSuite');
+const { AdaptationRegressionGuard } = require('../src/runtime/AdaptationRegressionGuard');
 const { GovernedImprovementLoop } = require('../src/runtime/GovernedImprovementLoop');
 const { GovernanceHooks } = require('../src/runtime/GovernanceHooks');
 const { WebhookGovernanceAdapter } = require('../src/runtime/WebhookGovernanceAdapter');
@@ -190,6 +206,11 @@ describe('Package/module unit tests', () => {
     expect(pkg.TraceSerializer).toBeDefined();
     expect(pkg.EvidenceGraph).toBeDefined();
     expect(pkg.EvalHarness).toBeDefined();
+    expect(pkg.InvariantRegistry).toBeDefined();
+    expect(pkg.AssuranceReport).toBeDefined();
+    expect(pkg.AssuranceSuite).toBeDefined();
+    expect(pkg.AssuranceGuardrail).toBeDefined();
+    expect(pkg.AssuranceRecoveryPlanner).toBeDefined();
     expect(pkg.EvalReportArtifact).toBeDefined();
     expect(pkg.LearningLoop).toBeDefined();
     expect(pkg.PolicyTuningAdvisor).toBeDefined();
@@ -199,8 +220,19 @@ describe('Package/module unit tests', () => {
     expect(pkg.HistoricalRoutingAdvisor).toBeDefined();
     expect(pkg.AdaptiveDecisionLedger).toBeDefined();
     expect(pkg.AdaptiveGovernanceGate).toBeDefined();
+    expect(pkg.FleetRolloutPlan).toBeDefined();
+    expect(pkg.FleetHealthMonitor).toBeDefined();
+    expect(pkg.FleetCanaryEvaluator).toBeDefined();
+    expect(pkg.FleetSafetyController).toBeDefined();
+    expect(pkg.FleetImpactComparator).toBeDefined();
+    expect(pkg.FleetRollbackAdvisor).toBeDefined();
+    expect(pkg.AdaptationPolicyEnvelope).toBeDefined();
+    expect(pkg.ImprovementEffectTracker).toBeDefined();
     expect(pkg.LearnedAdaptationArtifact).toBeDefined();
     expect(pkg.ImprovementProposalEngine).toBeDefined();
+    expect(pkg.ImprovementActionPlanner).toBeDefined();
+    expect(pkg.LearningBenchmarkSuite).toBeDefined();
+    expect(pkg.AdaptationRegressionGuard).toBeDefined();
     expect(pkg.GovernedImprovementLoop).toBeDefined();
     expect(pkg.GovernanceHooks).toBeDefined();
     expect(pkg.WebhookGovernanceAdapter).toBeDefined();
@@ -2924,6 +2956,73 @@ describe('Package/module unit tests', () => {
     );
   });
 
+  test('InvariantRegistry and AssuranceSuite produce explicit assurance verdicts', async () => {
+    const registry = new InvariantRegistry();
+    registry.register({
+      id: 'policy-scope-stable',
+      surface: 'policy',
+      description: 'Policy scope must stay explicit.',
+      check: async context => ({
+        passed: context.policyScopeExplicit === true,
+        reason: context.policyScopeExplicit === true ? null : 'Policy scope was not explicit.',
+      }),
+    });
+    registry.register({
+      id: 'learning-bounded',
+      surface: 'learning',
+      severity: 'critical',
+      description: 'Learning changes must stay bounded.',
+      check: async context => context.learningBounded === true,
+    });
+
+    const suite = new AssuranceSuite({
+      invariants: registry,
+      scenarios: [
+        {
+          id: 'assurance-scenario-pass',
+          run: async () => ({ ok: true }),
+          assert: async output => output.ok === true,
+        },
+      ],
+    });
+
+    const report = await suite.run({
+      policyScopeExplicit: true,
+      learningBounded: false,
+    });
+
+    expect(report).toBeInstanceOf(AssuranceReport);
+    expect(report.summarize()).toEqual(
+      expect.objectContaining({
+        failedInvariants: 1,
+        failedScenarios: 0,
+        verdict: 'block',
+      })
+    );
+    expect(report.explain()).toEqual(
+      expect.objectContaining({
+        operatorSummary: expect.stringContaining('block rollout'),
+        violations: expect.arrayContaining([
+          expect.objectContaining({
+            type: 'invariant',
+            id: 'learning-bounded',
+          }),
+        ]),
+      })
+    );
+    expect(new AssuranceGuardrail().evaluate(report)).toEqual(
+      expect.objectContaining({
+        action: 'block_rollout',
+      })
+    );
+    expect(new AssuranceRecoveryPlanner().plan(report)).toEqual(
+      expect.objectContaining({
+        action: 'rollback_or_quarantine',
+        affectedSurfaces: expect.arrayContaining(['learning']),
+      })
+    );
+  });
+
   test('run stores persist and reload runs', async () => {
     const run = new Run({ input: 'persist me' });
     run.setStatus('completed');
@@ -4494,6 +4593,270 @@ describe('Package/module unit tests', () => {
     );
   });
 
+  test('Fleet rollout classes summarize staged rollout and halt on unhealthy canaries', () => {
+    const plan = new FleetRolloutPlan({
+      target: {
+        id: 'policy-pack:v14',
+        type: 'policy_pack',
+        version: '14.0.0-canary',
+      },
+      stages: [
+        {
+          percentage: 10,
+          scope: 'environment',
+          environmentIds: ['staging'],
+        },
+        {
+          percentage: 50,
+          scope: 'tenant',
+          tenantIds: ['tenant-a', 'tenant-b'],
+        },
+      ],
+      rollbackTriggers: [
+        {
+          metric: 'adaptiveRegressions',
+          operator: '>',
+          threshold: 0,
+        },
+      ],
+    });
+    const monitor = new FleetHealthMonitor();
+    monitor.record({
+      environmentId: 'staging',
+      tenantId: 'tenant-a',
+      runs: 24,
+      failedRuns: 1,
+      adaptiveRegressions: 1,
+      saturation: 0.62,
+    });
+    const evaluator = new FleetCanaryEvaluator({ monitor });
+    const decision = evaluator.evaluate(plan);
+
+    expect(plan.toJSON()).toEqual(
+      expect.objectContaining({
+        target: expect.objectContaining({
+          type: 'policy_pack',
+        }),
+      })
+    );
+    expect(monitor.summarize()).toEqual(
+      expect.objectContaining({
+        snapshots: 1,
+        adaptiveRegressions: 1,
+        environments: 1,
+      })
+    );
+    expect(decision).toEqual(
+      expect.objectContaining({
+        action: 'halt_and_rollback',
+        triggered: expect.arrayContaining([
+          expect.objectContaining({
+            metric: 'adaptiveRegressions',
+          }),
+        ]),
+      })
+    );
+  });
+
+  test('FleetSafetyController enforces concurrency, backlog, risk-budget, and rollout boundaries', () => {
+    const monitor = new FleetHealthMonitor();
+    monitor.record({
+      environmentId: 'prod-eu',
+      tenantId: 'tenant-a',
+      runs: 120,
+      failedRuns: 3,
+      adaptiveRegressions: 2,
+      schedulerBacklog: 18,
+      saturation: 0.94,
+    });
+
+    const controller = new FleetSafetyController({
+      monitor,
+      maxConcurrentRuns: 100,
+      maxSchedulerBacklog: 10,
+      maxAdaptiveRegressions: 0,
+      maxSaturation: 0.85,
+      allowedEnvironmentIds: ['staging', 'prod-eu'],
+      allowedTenantIds: ['tenant-a'],
+    });
+
+    const decision = controller.evaluate(null, {
+      environmentId: 'prod-eu',
+      tenantId: 'tenant-a',
+    });
+
+    expect(decision).toEqual(
+      expect.objectContaining({
+        action: 'halt',
+        reasons: expect.arrayContaining([
+          expect.stringContaining('concurrency budget'),
+          expect.stringContaining('backlog budget'),
+          expect.stringContaining('risk budget'),
+          expect.stringContaining('safety threshold'),
+        ]),
+      })
+    );
+  });
+
+  test('FleetImpactComparator compares rollout state before and after adaptive changes', () => {
+    const before = new FleetHealthMonitor();
+    before.record({
+      environmentId: 'staging',
+      runs: 20,
+      failedRuns: 2,
+      adaptiveRegressions: 1,
+      schedulerBacklog: 3,
+      saturation: 0.71,
+    });
+    const after = new FleetHealthMonitor();
+    after.record({
+      environmentId: 'staging',
+      runs: 24,
+      failedRuns: 1,
+      adaptiveRegressions: 0,
+      schedulerBacklog: 1,
+      saturation: 0.62,
+    });
+
+    const comparator = new FleetImpactComparator({ before, after });
+    const comparison = comparator.compare();
+
+    expect(comparison).toEqual(
+      expect.objectContaining({
+        delta: expect.objectContaining({
+          runs: 4,
+          failedRuns: -1,
+          adaptiveRegressions: -1,
+          schedulerBacklog: -2,
+        }),
+        impact: expect.objectContaining({
+          improved: true,
+          regressed: false,
+        }),
+      })
+    );
+  });
+
+  test('FleetRollbackAdvisor recommends rollback on broader fleet regressions', () => {
+    const plan = new FleetRolloutPlan({
+      target: {
+        id: 'learning-pack:v14-canary',
+        type: 'learned_change_bundle',
+        version: '14.0.0-canary',
+      },
+      stages: [{ percentage: 10, scope: 'environment' }],
+    });
+    const before = new FleetHealthMonitor();
+    before.record({
+      environmentId: 'staging',
+      runs: 20,
+      failedRuns: 1,
+      adaptiveRegressions: 0,
+      schedulerBacklog: 1,
+      saturation: 0.55,
+    });
+    const after = new FleetHealthMonitor();
+    after.record({
+      environmentId: 'staging',
+      runs: 24,
+      failedRuns: 4,
+      adaptiveRegressions: 2,
+      schedulerBacklog: 5,
+      saturation: 0.81,
+    });
+
+    const comparator = new FleetImpactComparator({ before, after });
+    const controller = new FleetSafetyController({
+      monitor: after,
+      maxConcurrentRuns: 30,
+      maxSchedulerBacklog: 3,
+      maxAdaptiveRegressions: 0,
+      maxSaturation: 0.75,
+    });
+    const advisor = new FleetRollbackAdvisor({ comparator });
+    const advice = advisor.advise({
+      plan,
+      comparison: comparator.compare(),
+      safetyDecision: controller.evaluate(),
+    });
+
+    expect(advice).toEqual(
+      expect.objectContaining({
+        action: 'rollback_recommended',
+        reasons: expect.arrayContaining([
+          expect.stringContaining('regressed key health signals'),
+          expect.stringContaining('Failed runs increased'),
+          expect.stringContaining('Adaptive regressions increased'),
+          expect.stringContaining('Fleet safety controller halted'),
+        ]),
+        rollback: expect.objectContaining({
+          targetId: 'learning-pack:v14-canary',
+        }),
+      })
+    );
+  });
+
+  test('ImprovementActionPlanner turns proposals into concrete plans and compares learned artifacts', () => {
+    const planner = new ImprovementActionPlanner();
+    const left = new LearnedAdaptationArtifact({
+      proposal: {
+        id: 'proposal-left',
+        category: 'evaluation',
+        changeType: 'routing_adjustment',
+        targetSurface: 'routing',
+        recommendedChange: {
+          summary: 'Tighten retrieval thresholds.',
+          actions: ['Tighten retrieval thresholds.', 'Raise verifier bar for uncertain runs.'],
+        },
+        rollback: {
+          action: 'restore_prior_configuration',
+          reason: 'undo',
+        },
+      },
+    });
+    const right = new LearnedAdaptationArtifact({
+      proposal: {
+        id: 'proposal-right',
+        category: 'incident',
+        changeType: 'incident_driven_adjustment',
+        targetSurface: 'policy',
+        recommendedChange: {
+          summary: 'Tighten approval policy.',
+          actions: ['Require approval for the failing path.'],
+        },
+        rollback: {
+          action: 'restore_prior_incident_policy',
+          reason: 'undo incident change',
+        },
+      },
+    });
+
+    const plan = planner.buildPlan(left);
+    const comparison = planner.compareArtifacts(left, right);
+
+    expect(plan).toEqual(
+      expect.objectContaining({
+        proposalId: 'proposal-left',
+        actionTarget: 'routing_policy',
+        steps: expect.arrayContaining([
+          expect.objectContaining({ type: 'review' }),
+          expect.objectContaining({ type: 'apply' }),
+        ]),
+        rollback: expect.objectContaining({
+          action: 'restore_prior_configuration',
+        }),
+      })
+    );
+    expect(comparison).toEqual(
+      expect.objectContaining({
+        changed: true,
+        diff: expect.objectContaining({
+          recommendationChanged: true,
+        }),
+      })
+    );
+  });
+
   test('GovernedImprovementLoop routes learned proposals through adaptive governance review', async () => {
     const learningLoop = new LearningLoop();
     learningLoop.recordRun(
@@ -4552,6 +4915,138 @@ describe('Package/module unit tests', () => {
         ledger: expect.objectContaining({
           total: expect.any(Number),
         }),
+      })
+    );
+  });
+
+  test('AdaptationPolicyEnvelope bounds learned changes and ImprovementEffectTracker measures outcomes', async () => {
+    const envelope = new AdaptationPolicyEnvelope({
+      allowedTargetSurfaces: ['routing'],
+      deniedChangeTypes: ['policy_adjustment'],
+      maxPriority: 'high',
+    });
+    const loop = new GovernedImprovementLoop({
+      proposalEngine: {
+        buildProposals: () => [
+          {
+            id: 'routing-ok',
+            category: 'evaluation',
+            priority: 'high',
+            changeType: 'routing_adjustment',
+            targetSurface: 'routing',
+            rationale: 'Safe routing change',
+            evidence: {},
+            recommendedChange: { summary: 'Adjust route', actions: ['adjust route'] },
+            rollback: { action: 'restore_prior_configuration', reason: 'undo' },
+          },
+          {
+            id: 'policy-denied',
+            category: 'governance',
+            priority: 'high',
+            changeType: 'policy_adjustment',
+            targetSurface: 'policy',
+            rationale: 'Unsafe direct policy change',
+            evidence: {},
+            recommendedChange: { summary: 'Adjust policy', actions: ['adjust policy'] },
+            rollback: { action: 'restore_prior_configuration', reason: 'undo' },
+          },
+        ],
+      },
+      adaptationEnvelope: envelope,
+      governanceGate: {
+        approvalInbox: new ApprovalInbox(),
+      },
+    });
+
+    const review = await loop.review();
+    const denied = review.reviews.find(item => item.artifact.proposal.id === 'policy-denied');
+    const allowed = review.reviews.find(item => item.artifact.proposal.id === 'routing-ok');
+    const effect = loop.recordOutcome({
+      proposalId: 'routing-ok',
+      baseline: { averageConfidence: 0.45, failedEvaluations: 2 },
+      outcome: { averageConfidence: 0.73, failedEvaluations: 0 },
+      summary: 'Routing stabilized after approval.',
+    });
+
+    expect(denied.review.action).toBe('deny');
+    expect(denied.review.decision.reason).toContain('not listed in the approved adaptation envelope');
+    expect(allowed.review.envelope.action).toBe('require_approval');
+    expect(effect.delta).toEqual(
+      expect.objectContaining({
+        improved: true,
+        regressed: false,
+      })
+    );
+    expect(loop.summarizeEffects()).toEqual(
+      expect.objectContaining({
+        total: 1,
+        improved: 1,
+      })
+    );
+    expect(new ImprovementEffectTracker().explain(effect)).toEqual(
+      expect.objectContaining({
+        proposalId: 'routing-ok',
+        improved: true,
+      })
+    );
+    expect(loop.buildActionPlans()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          actionTarget: expect.any(String),
+          steps: expect.any(Array),
+        }),
+      ])
+    );
+  });
+
+  test('LearningBenchmarkSuite and AdaptationRegressionGuard measure improvement outcomes safely', async () => {
+    const effectTracker = new ImprovementEffectTracker();
+    effectTracker.record({
+      proposalId: 'safe-improvement',
+      baseline: { averageConfidence: 0.42, failedEvaluations: 2 },
+      outcome: { averageConfidence: 0.71, failedEvaluations: 0 },
+      summary: 'Improved retrieval and reduced failures.',
+    });
+    effectTracker.record({
+      proposalId: 'risky-improvement',
+      baseline: { averageConfidence: 0.68, failedEvaluations: 0 },
+      outcome: { averageConfidence: 0.52, failedEvaluations: 1 },
+      summary: 'Regression after overly aggressive routing change.',
+    });
+
+    const suite = new LearningBenchmarkSuite({
+      effectTracker,
+      scenarios: [
+        {
+          id: 'at-least-one-improvement',
+          run: async () => effectTracker.summarize(),
+          assert: async summary => summary.improved >= 1,
+        },
+      ],
+    });
+    const report = await suite.run();
+    const guard = new AdaptationRegressionGuard({
+      effectTracker,
+      maxRegressions: 0,
+      minConfidenceDelta: -0.05,
+      maxFailureDelta: 0,
+    });
+    const decision = guard.evaluate();
+
+    expect(report).toEqual(
+      expect.objectContaining({
+        total: 3,
+        failed: 0,
+      })
+    );
+    expect(decision).toEqual(
+      expect.objectContaining({
+        action: 'halt_adaptation',
+        regressions: expect.arrayContaining([
+          expect.objectContaining({
+            proposalId: 'risky-improvement',
+          }),
+        ]),
       })
     );
   });

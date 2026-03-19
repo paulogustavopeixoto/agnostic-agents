@@ -11,6 +11,11 @@ const { TraceSerializer } = require('./TraceSerializer');
 const { ExecutionIdentity } = require('./ExecutionIdentity');
 const { EvidenceGraph } = require('./EvidenceGraph');
 const { EvalHarness } = require('./EvalHarness');
+const { InvariantRegistry } = require('./InvariantRegistry');
+const { AssuranceReport } = require('./AssuranceReport');
+const { AssuranceSuite } = require('./AssuranceSuite');
+const { AssuranceGuardrail } = require('./AssuranceGuardrail');
+const { AssuranceRecoveryPlanner } = require('./AssuranceRecoveryPlanner');
 const { EvalReportArtifact } = require('./EvalReportArtifact');
 const { LearningLoop } = require('./LearningLoop');
 const { PolicyTuningAdvisor } = require('./PolicyTuningAdvisor');
@@ -20,9 +25,20 @@ const { AdaptiveRetryPolicy } = require('./AdaptiveRetryPolicy');
 const { HistoricalRoutingAdvisor } = require('./HistoricalRoutingAdvisor');
 const { AdaptiveDecisionLedger } = require('./AdaptiveDecisionLedger');
 const { AdaptiveGovernanceGate } = require('./AdaptiveGovernanceGate');
+const { FleetRolloutPlan } = require('./FleetRolloutPlan');
+const { FleetHealthMonitor } = require('./FleetHealthMonitor');
+const { FleetCanaryEvaluator } = require('./FleetCanaryEvaluator');
+const { FleetSafetyController } = require('./FleetSafetyController');
+const { FleetImpactComparator } = require('./FleetImpactComparator');
+const { FleetRollbackAdvisor } = require('./FleetRollbackAdvisor');
 const { LearnedAdaptationArtifact } = require('./LearnedAdaptationArtifact');
 const { ImprovementProposalEngine } = require('./ImprovementProposalEngine');
 const { GovernedImprovementLoop } = require('./GovernedImprovementLoop');
+const { AdaptationPolicyEnvelope } = require('./AdaptationPolicyEnvelope');
+const { ImprovementEffectTracker } = require('./ImprovementEffectTracker');
+const { ImprovementActionPlanner } = require('./ImprovementActionPlanner');
+const { LearningBenchmarkSuite } = require('./LearningBenchmarkSuite');
+const { AdaptationRegressionGuard } = require('./AdaptationRegressionGuard');
 const { GovernanceHooks } = require('./GovernanceHooks');
 const { WebhookGovernanceAdapter } = require('./WebhookGovernanceAdapter');
 const { ExtensionHost } = require('./ExtensionHost');
@@ -99,6 +115,11 @@ module.exports = {
   ExecutionIdentity,
   EvidenceGraph,
   EvalHarness,
+  InvariantRegistry,
+  AssuranceReport,
+  AssuranceSuite,
+  AssuranceGuardrail,
+  AssuranceRecoveryPlanner,
   EvalReportArtifact,
   LearningLoop,
   PolicyTuningAdvisor,
@@ -108,9 +129,20 @@ module.exports = {
   HistoricalRoutingAdvisor,
   AdaptiveDecisionLedger,
   AdaptiveGovernanceGate,
+  FleetRolloutPlan,
+  FleetHealthMonitor,
+  FleetCanaryEvaluator,
+  FleetSafetyController,
+  FleetImpactComparator,
+  FleetRollbackAdvisor,
   LearnedAdaptationArtifact,
   ImprovementProposalEngine,
   GovernedImprovementLoop,
+  AdaptationPolicyEnvelope,
+  ImprovementEffectTracker,
+  ImprovementActionPlanner,
+  LearningBenchmarkSuite,
+  AdaptationRegressionGuard,
   GovernanceHooks,
   WebhookGovernanceAdapter,
   ExtensionHost,

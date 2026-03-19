@@ -8,7 +8,12 @@ The format is intentionally simple:
 
 ### Added
 
+- `v13` Learning OS maintained surfaces including `LearnedAdaptationArtifact`, `ImprovementProposalEngine`, `ImprovementActionPlanner`, `GovernedImprovementLoop`, `AdaptationPolicyEnvelope`, `ImprovementEffectTracker`, `LearningBenchmarkSuite`, and `AdaptationRegressionGuard`
+- governed improvement documentation and maintained examples covering learned-change artifacts, action planning, bounded adaptation, effect tracking, learning benchmarks, and regression-guard decisions
+
 ### Changed
+
+- updated the roadmap, README, and community roadmap status so `v11` through `v13` are reflected as current maintained package capabilities instead of future-only direction
 
 ### Fixed
 

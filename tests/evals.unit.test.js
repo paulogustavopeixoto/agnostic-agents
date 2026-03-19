@@ -4,12 +4,18 @@ const { RetryManager } = require('../src/utils/RetryManager');
 const { RAG } = require('../src/rag/RAG');
 const { LocalVectorStore } = require('../src/db/LocalVectorStore');
 const { EvalHarness } = require('../src/runtime/EvalHarness');
+const { InvariantRegistry } = require('../src/runtime/InvariantRegistry');
+const { AssuranceSuite } = require('../src/runtime/AssuranceSuite');
+const { AssuranceGuardrail } = require('../src/runtime/AssuranceGuardrail');
+const { AssuranceRecoveryPlanner } = require('../src/runtime/AssuranceRecoveryPlanner');
 const { InMemoryRunStore } = require('../src/runtime/stores/InMemoryRunStore');
 const { LearningLoop } = require('../src/runtime/LearningLoop');
 const { PolicyTuningAdvisor } = require('../src/runtime/PolicyTuningAdvisor');
 const { HistoricalRoutingAdvisor } = require('../src/runtime/HistoricalRoutingAdvisor');
 const { AdaptiveDecisionLedger } = require('../src/runtime/AdaptiveDecisionLedger');
 const { AdaptiveGovernanceGate } = require('../src/runtime/AdaptiveGovernanceGate');
+const { ImprovementEffectTracker } = require('../src/runtime/ImprovementEffectTracker');
+const { LearningBenchmarkSuite } = require('../src/runtime/LearningBenchmarkSuite');
 const { ApprovalInbox } = require('../src/runtime/ApprovalInbox');
 const { PolicyPack } = require('../src/runtime/PolicyPack');
 const { PolicySimulator } = require('../src/runtime/PolicySimulator');
@@ -327,6 +333,112 @@ describe('Eval and benchmark discipline', () => {
         expect.objectContaining({ id: 'adaptive-policy-suggestion-benchmark', passed: true }),
         expect.objectContaining({ id: 'adaptive-governance-benchmark', passed: true }),
       ])
+    );
+  });
+
+  test('LearningBenchmarkSuite benchmarks whether learned changes improve outcomes', async () => {
+    const effectTracker = new ImprovementEffectTracker();
+    effectTracker.record({
+      proposalId: 'improvement-a',
+      baseline: { averageConfidence: 0.4, failedEvaluations: 2 },
+      outcome: { averageConfidence: 0.75, failedEvaluations: 0 },
+    });
+
+    const suite = new LearningBenchmarkSuite({
+      effectTracker,
+    });
+    const report = await suite.run();
+
+    expect(report).toEqual(
+      expect.objectContaining({
+        total: 2,
+        failed: 0,
+        results: expect.arrayContaining([
+          expect.objectContaining({ id: 'learning-effect-improvement', passed: true }),
+          expect.objectContaining({ id: 'learning-effect-net-positive', passed: true }),
+        ]),
+      })
+    );
+  });
+
+  test('AssuranceSuite evaluates invariants and scenarios before rollout', async () => {
+    const invariants = new InvariantRegistry({
+      invariants: [
+        {
+          id: 'state-integrity',
+          surface: 'state',
+          check: async context => ({
+            passed: context.stateIntegrity === true,
+            reason: context.stateIntegrity === true ? null : 'State integrity failed.',
+          }),
+        },
+      ],
+    });
+    const suite = new AssuranceSuite({
+      invariants,
+      scenarios: [
+        {
+          id: 'replay-safe',
+          run: async () => ({ replayable: true }),
+          assert: async output => output.replayable === true,
+        },
+      ],
+    });
+
+    const report = await suite.run({ stateIntegrity: true });
+
+    expect(report.summarize()).toEqual(
+      expect.objectContaining({
+        failedInvariants: 0,
+        failedScenarios: 0,
+        verdict: 'allow',
+      })
+    );
+  });
+
+  test('Assurance guardrails and recovery plans react to failed rollout candidates', async () => {
+    const invariants = new InvariantRegistry({
+      invariants: [
+        {
+          id: 'coordination-safe',
+          surface: 'coordination',
+          check: async () => ({
+            passed: false,
+            reason: 'Coordination fallback was not ready.',
+          }),
+        },
+      ],
+    });
+    const suite = new AssuranceSuite({
+      invariants,
+      scenarios: [
+        {
+          id: 'recovery-check',
+          run: async () => ({ ok: true }),
+          assert: async output => output.ok === true,
+        },
+      ],
+    });
+
+    const report = await suite.run({});
+    const guardrail = new AssuranceGuardrail().evaluate(report);
+    const recovery = new AssuranceRecoveryPlanner().plan(report);
+
+    expect(guardrail).toEqual(
+      expect.objectContaining({
+        action: 'block_rollout',
+      })
+    );
+    expect(recovery).toEqual(
+      expect.objectContaining({
+        action: 'rollback_or_quarantine',
+        regressionLinks: expect.arrayContaining([
+          expect.objectContaining({
+            sourceId: 'coordination-safe',
+            surface: 'coordination',
+          }),
+        ]),
+      })
     );
   });
 
