@@ -11,6 +11,7 @@ const { TraceSerializer } = require('./TraceSerializer');
 const { ExecutionIdentity } = require('./ExecutionIdentity');
 const { EvidenceGraph } = require('./EvidenceGraph');
 const { EvalHarness } = require('./EvalHarness');
+const { EvalReportArtifact } = require('./EvalReportArtifact');
 const { LearningLoop } = require('./LearningLoop');
 const { PolicyTuningAdvisor } = require('./PolicyTuningAdvisor');
 const { VerifierEnsemble } = require('./VerifierEnsemble');
@@ -30,7 +31,13 @@ const { PlanningRuntime } = require('./PlanningRuntime');
 const { ToolPolicy } = require('./ToolPolicy');
 const { ProductionPolicyPack } = require('./ProductionPolicyPack');
 const { ExtensionManifest } = require('./ExtensionManifest');
+const { ToolSchemaArtifact } = require('./ToolSchemaArtifact');
+const { InteropArtifactRegistry } = require('./InteropArtifactRegistry');
 const { ConformanceKit } = require('./ConformanceKit');
+const { ArtifactCompatibilitySuite } = require('./ArtifactCompatibilitySuite');
+const { InteropContractValidator } = require('./InteropContractValidator');
+const { CertificationKit } = require('./CertificationKit');
+const { CompatibilitySummary } = require('./CompatibilitySummary');
 const { PolicyPack } = require('./PolicyPack');
 const { PolicyDecisionReport } = require('./PolicyDecisionReport');
 const { PolicyEvaluationRecord } = require('./PolicyEvaluationRecord');
@@ -89,6 +96,7 @@ module.exports = {
   ExecutionIdentity,
   EvidenceGraph,
   EvalHarness,
+  EvalReportArtifact,
   LearningLoop,
   PolicyTuningAdvisor,
   VerifierEnsemble,
@@ -108,7 +116,13 @@ module.exports = {
   ToolPolicy,
   ProductionPolicyPack,
   ExtensionManifest,
+  ToolSchemaArtifact,
+  InteropArtifactRegistry,
   ConformanceKit,
+  ArtifactCompatibilitySuite,
+  InteropContractValidator,
+  CertificationKit,
+  CompatibilitySummary,
   PolicyPack,
   PolicyDecisionReport,
   PolicyEvaluationRecord,

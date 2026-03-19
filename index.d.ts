@@ -449,6 +449,28 @@ export class ExtensionManifest {
   static fromExtension(extension?: JsonObject): ExtensionManifest;
 }
 
+export class ToolSchemaArtifact {
+  constructor(options?: {
+    tool?: Tool | JsonObject | null;
+    metadata?: JsonObject;
+  });
+  tool: Tool | null;
+  schema: JsonObject | null;
+  metadata: JsonObject;
+  toJSON(): JsonObject;
+  toTool(options: {
+    implementation: (args: Record<string, any>, context?: any) => Promise<any> | any;
+  }): Tool;
+  static fromJSON(payload?: JsonObject): ToolSchemaArtifact;
+  static readonly FORMAT: string;
+  static readonly SCHEMA_VERSION: string;
+}
+
+export class InteropArtifactRegistry {
+  export(type: string, value: any, metadata?: JsonObject): JsonObject;
+  import(type: string, payload?: JsonObject): any;
+}
+
 export class ConformanceKit {
   validateManifest(manifest?: ExtensionManifest | JsonObject): { valid: boolean; errors: string[] };
   validateExtension(
@@ -469,6 +491,71 @@ export class ConformanceKit {
       type?: string;
     }
   ): { valid: boolean; errors: string[] };
+}
+
+export class EvalReportArtifact {
+  constructor(options?: {
+    report?: JsonObject | null;
+    metadata?: JsonObject;
+  });
+  report: JsonObject | null;
+  metadata: JsonObject;
+  summarize(): JsonObject;
+  toJSON(): JsonObject;
+  static fromJSON(payload?: JsonObject): EvalReportArtifact;
+  static fromReport(report?: JsonObject, metadata?: JsonObject): EvalReportArtifact;
+}
+
+export class ArtifactCompatibilitySuite {
+  constructor(options?: {
+    conformanceKit?: ConformanceKit | JsonObject | null;
+  });
+  conformanceKit: ConformanceKit;
+  run(fixtures?: JsonObject): {
+    total: number;
+    passed: number;
+    failed: number;
+    checks: JsonObject[];
+  };
+}
+
+export class InteropContractValidator {
+  constructor(options?: {
+    conformanceKit?: ConformanceKit | JsonObject | null;
+  });
+  conformanceKit: ConformanceKit;
+  validateFile(
+    filePath: string,
+    options?: {
+      type?: string;
+    }
+  ): { filePath: string; type: string; valid: boolean; errors: string[] };
+  validateFiles(
+    entries?: Array<{
+      filePath: string;
+      type: string;
+    }>
+  ): { total: number; passed: number; failed: number; results: JsonObject[] };
+}
+
+export class CertificationKit {
+  certifyProvider(
+    adapter: any,
+    options?: {
+      name?: string | null;
+    }
+  ): JsonObject;
+  certifyStore(
+    store: any,
+    options?: {
+      type?: string;
+      name?: string | null;
+    }
+  ): JsonObject;
+}
+
+export class CompatibilitySummary {
+  static build(entries?: JsonObject[]): JsonObject;
 }
 
 export interface RunMetrics {

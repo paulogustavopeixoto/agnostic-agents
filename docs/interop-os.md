@@ -7,6 +7,7 @@ The first maintained slice includes:
 
 - `ExtensionManifest`
 - `ConformanceKit`
+- `InteropContractValidator`
 
 ## What these surfaces are for
 
@@ -26,12 +27,22 @@ Use `ConformanceKit` when you want to:
 - verify that an extension registers cleanly through `ExtensionHost`
 - verify base store compatibility without depending on repo internals
 
+### `InteropContractValidator`
+
+Use `InteropContractValidator` when you want to:
+
+- validate manifest or artifact files from another repo
+- run conformance checks without importing local test helpers
+- turn file-based compatibility checks into a small external CI step
+
 ## Maintained example
 
 - [`examples/referenceInteropManifest.js`](../examples/referenceInteropManifest.js)
+- [`examples/referenceExternalConformanceFlow.js`](../examples/referenceExternalConformanceFlow.js)
 
 That example shows:
 
 - generating a manifest from an extension contribution
 - validating extension compatibility
 - validating a job-store integration through the conformance kit
+- validating portable manifest/eval files through the external contract-validator flow

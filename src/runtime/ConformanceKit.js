@@ -1,5 +1,10 @@
 const { ExtensionHost } = require('./ExtensionHost');
 const { ExtensionManifest } = require('./ExtensionManifest');
+const { TraceSerializer } = require('./TraceSerializer');
+const { PolicyPack } = require('./PolicyPack');
+const { PolicyEvaluationRecord } = require('./PolicyEvaluationRecord');
+const { StateBundleSerializer } = require('./StateBundleSerializer');
+const { EvalReportArtifact } = require('./EvalReportArtifact');
 const { BaseRunStore } = require('./stores/BaseRunStore');
 const { BaseJobStore } = require('./stores/BaseJobStore');
 const { BaseLayerStore } = require('../agent/memory/BaseLayerStore');
@@ -72,6 +77,47 @@ class ConformanceKit {
       return this.validateManifest(artifact);
     }
 
+    if (type === 'trace') {
+      const validation = TraceSerializer.validateTrace(artifact);
+      return {
+        valid: validation.valid,
+        errors: validation.errors,
+      };
+    }
+
+    if (type === 'traceBundle') {
+      const validation = TraceSerializer.validateTrace(artifact, { allowBundle: true });
+      return {
+        valid: validation.valid,
+        errors: validation.errors,
+      };
+    }
+
+    if (type === 'policyPack') {
+      return this._validateShapedArtifact(artifact, {
+        format: PolicyPack.FORMAT,
+        schemaVersion: PolicyPack.SCHEMA_VERSION,
+      });
+    }
+
+    if (type === 'policyEvaluation') {
+      return this._validateShapedArtifact(artifact, {
+        format: PolicyEvaluationRecord.FORMAT,
+        schemaVersion: PolicyEvaluationRecord.SCHEMA_VERSION,
+      });
+    }
+
+    if (type === 'stateBundle') {
+      return StateBundleSerializer.validate(artifact);
+    }
+
+    if (type === 'evalReport') {
+      return this._validateShapedArtifact(artifact, {
+        format: EvalReportArtifact.FORMAT,
+        schemaVersion: EvalReportArtifact.SCHEMA_VERSION,
+      });
+    }
+
     if (!artifact || typeof artifact !== 'object') {
       return {
         valid: false,
@@ -89,6 +135,30 @@ class ConformanceKit {
     return {
       valid: true,
       errors: [],
+    };
+  }
+
+  _validateShapedArtifact(artifact, { format, schemaVersion }) {
+    if (!artifact || typeof artifact !== 'object') {
+      return {
+        valid: false,
+        errors: ['Artifact must be an object.'],
+      };
+    }
+
+    const errors = [];
+
+    if (artifact.format !== format) {
+      errors.push(`Artifact format must be "${format}".`);
+    }
+
+    if (artifact.schemaVersion !== schemaVersion) {
+      errors.push(`Artifact schemaVersion must be "${schemaVersion}".`);
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors,
     };
   }
 }

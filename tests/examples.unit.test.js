@@ -284,6 +284,60 @@ describe('Maintained examples', () => {
     expect(stdout).toContain("type: 'job'");
   });
 
+  test('reference interop artifacts example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceInteropArtifacts.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Interop artifact compatibility report');
+    expect(stdout).toContain("type: 'trace'");
+    expect(stdout).toContain("type: 'traceBundle'");
+    expect(stdout).toContain("type: 'policyPack'");
+    expect(stdout).toContain("type: 'policyEvaluation'");
+    expect(stdout).toContain("type: 'stateBundle'");
+    expect(stdout).toContain("type: 'evalReport'");
+    expect(stdout).toContain("type: 'manifest'");
+  });
+
+  test('reference external conformance flow example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceExternalConformanceFlow.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('External conformance flow summary');
+    expect(stdout).toContain("type: 'manifest'");
+    expect(stdout).toContain("type: 'evalReport'");
+    expect(stdout).toContain('passed: 2');
+  });
+
+  test('reference certification kit example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceCertificationKit.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Certification kit summary');
+    expect(stdout).toContain("kind: 'provider_adapter'");
+    expect(stdout).toContain("kind: 'job_store'");
+    expect(stdout).toContain("contract_verified: 2");
+  });
+
+  test('reference interop registry example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceInteropRegistry.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Interop registry summary');
+    expect(stdout).toContain("toolFormat: 'agnostic-agents-tool-schema'");
+    expect(stdout).toContain("traceFormat: 'agnostic-agents-run-trace'");
+    expect(stdout).toContain("policyFormat: 'agnostic-agents-policy-pack'");
+    expect(stdout).toContain("evalFormat: 'agnostic-agents-eval-report'");
+    expect(stdout).toContain("manifestFormat: 'agnostic-agents-extension-manifest'");
+  });
+
   test('reference state bundle example runs', async () => {
     const examplePath = path.join(__dirname, '..', 'examples', 'referenceStateBundle.js');
     const { stdout } = await execFileAsync(process.execPath, [examplePath], {

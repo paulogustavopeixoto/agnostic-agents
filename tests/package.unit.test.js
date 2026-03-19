@@ -26,6 +26,8 @@ const { CoordinationBenchmarkSuite } = require('../src/coordination/Coordination
 const { Run } = require('../src/runtime/Run');
 const { EvidenceGraph } = require('../src/runtime/EvidenceGraph');
 const { EvalHarness } = require('../src/runtime/EvalHarness');
+const { EvalReportArtifact } = require('../src/runtime/EvalReportArtifact');
+const { ToolSchemaArtifact } = require('../src/runtime/ToolSchemaArtifact');
 const { LearningLoop } = require('../src/runtime/LearningLoop');
 const { PolicyTuningAdvisor } = require('../src/runtime/PolicyTuningAdvisor');
 const { VerifierEnsemble } = require('../src/runtime/VerifierEnsemble');
@@ -59,6 +61,11 @@ const { ToolPolicy } = require('../src/runtime/ToolPolicy');
 const { ProductionPolicyPack } = require('../src/runtime/ProductionPolicyPack');
 const { ExtensionManifest } = require('../src/runtime/ExtensionManifest');
 const { ConformanceKit } = require('../src/runtime/ConformanceKit');
+const { ArtifactCompatibilitySuite } = require('../src/runtime/ArtifactCompatibilitySuite');
+const { InteropContractValidator } = require('../src/runtime/InteropContractValidator');
+const { CertificationKit } = require('../src/runtime/CertificationKit');
+const { CompatibilitySummary } = require('../src/runtime/CompatibilitySummary');
+const { InteropArtifactRegistry } = require('../src/runtime/InteropArtifactRegistry');
 const { PolicyPack } = require('../src/runtime/PolicyPack');
 const { PolicyDecisionReport } = require('../src/runtime/PolicyDecisionReport');
 const { PolicyEvaluationRecord } = require('../src/runtime/PolicyEvaluationRecord');
@@ -136,7 +143,13 @@ describe('Package/module unit tests', () => {
     expect(pkg.ToolPolicy).toBeDefined();
     expect(pkg.ProductionPolicyPack).toBeDefined();
     expect(pkg.ExtensionManifest).toBeDefined();
+    expect(pkg.ToolSchemaArtifact).toBeDefined();
+    expect(pkg.InteropArtifactRegistry).toBeDefined();
     expect(pkg.ConformanceKit).toBeDefined();
+    expect(pkg.ArtifactCompatibilitySuite).toBeDefined();
+    expect(pkg.InteropContractValidator).toBeDefined();
+    expect(pkg.CertificationKit).toBeDefined();
+    expect(pkg.CompatibilitySummary).toBeDefined();
     expect(pkg.PolicyPack).toBeDefined();
     expect(pkg.PolicyDecisionReport).toBeDefined();
     expect(pkg.PolicyEvaluationRecord).toBeDefined();
@@ -160,6 +173,7 @@ describe('Package/module unit tests', () => {
     expect(pkg.TraceSerializer).toBeDefined();
     expect(pkg.EvidenceGraph).toBeDefined();
     expect(pkg.EvalHarness).toBeDefined();
+    expect(pkg.EvalReportArtifact).toBeDefined();
     expect(pkg.LearningLoop).toBeDefined();
     expect(pkg.PolicyTuningAdvisor).toBeDefined();
     expect(pkg.VerifierEnsemble).toBeDefined();
@@ -373,6 +387,233 @@ describe('Package/module unit tests', () => {
         type: 'job',
       },
     });
+  });
+
+  test('EvalReportArtifact and ArtifactCompatibilitySuite validate maintained interop artifacts', () => {
+    const run = new Run({
+      input: 'validate artifacts',
+      status: 'completed',
+      metadata: {
+        lineage: {
+          rootRunId: 'interop-root',
+          parentRunId: null,
+          childRunIds: [],
+          branchOriginRunId: null,
+          branchCheckpointId: null,
+        },
+      },
+    });
+    run.addCheckpoint({
+      id: `${run.id}:checkpoint:1`,
+      label: 'run_completed',
+      status: 'completed',
+      snapshot: run.createCheckpointSnapshot(),
+    });
+
+    const suite = new ArtifactCompatibilitySuite();
+    const report = suite.run({
+      trace: TraceSerializer.exportRun(run),
+      traceBundle: TraceSerializer.exportBundle([run]),
+      policyPack: PolicyPack.fromToolPolicy(new ToolPolicy(), { name: 'interop-policy' }).toJSON(),
+      policyEvaluation: new PolicyEvaluationRecord({
+        subject: { type: 'run', runId: run.id },
+        report: {
+          summary: { total: 1 },
+          explanations: [],
+        },
+      }).toJSON(),
+      stateBundle: new StateBundle({ run }).toJSON(),
+      evalReport: EvalReportArtifact.fromReport({
+        total: 1,
+        passed: 1,
+        failed: 0,
+        results: [{ id: 'interop-eval', passed: true, durationMs: 1, error: null }],
+      }).toJSON(),
+      manifest: ExtensionManifest.fromExtension({
+        name: 'interop-manifest',
+        contributes: { evalScenarios: [{ id: 'scenario-1', run: async () => 'ok', assert: output => output === 'ok' }] },
+      }).toJSON(),
+    });
+
+    expect(report).toMatchObject({
+      total: 7,
+      passed: 7,
+      failed: 0,
+    });
+    expect(report.checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'trace', valid: true }),
+        expect.objectContaining({ type: 'traceBundle', valid: true }),
+        expect.objectContaining({ type: 'policyPack', valid: true }),
+        expect.objectContaining({ type: 'policyEvaluation', valid: true }),
+        expect.objectContaining({ type: 'stateBundle', valid: true }),
+        expect.objectContaining({ type: 'evalReport', valid: true }),
+        expect.objectContaining({ type: 'manifest', valid: true }),
+      ])
+    );
+  });
+
+  test('InteropContractValidator validates manifest and eval artifacts from files', () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'interop-validator-'));
+    const manifestPath = path.join(tempDir, 'manifest.json');
+    const evalReportPath = path.join(tempDir, 'eval-report.json');
+
+    fs.writeFileSync(
+      manifestPath,
+      JSON.stringify(
+        ExtensionManifest.fromExtension({
+          name: 'external-package',
+          contributes: { evalScenarios: [{ id: 'external-scenario', run: async () => 'ok', assert: output => output === 'ok' }] },
+        }).toJSON()
+      )
+    );
+    fs.writeFileSync(
+      evalReportPath,
+      JSON.stringify(
+        EvalReportArtifact.fromReport({
+          total: 1,
+          passed: 1,
+          failed: 0,
+          results: [{ id: 'external-check', passed: true, durationMs: 1, error: null }],
+        }).toJSON()
+      )
+    );
+
+    const validator = new InteropContractValidator();
+    const report = validator.validateFiles([
+      { filePath: manifestPath, type: 'manifest' },
+      { filePath: evalReportPath, type: 'evalReport' },
+    ]);
+
+    expect(report).toMatchObject({
+      total: 2,
+      passed: 2,
+      failed: 0,
+    });
+    expect(report.results).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'manifest', valid: true }),
+        expect.objectContaining({ type: 'evalReport', valid: true }),
+      ])
+    );
+  });
+
+  test('CertificationKit and CompatibilitySummary build public certification rollups for adapters and stores', () => {
+    const kit = new CertificationKit();
+    const providerResult = kit.certifyProvider({
+      getCapabilities: () => ({
+        generateText: true,
+        toolCalling: true,
+      }),
+      supports: capability => capability === 'generateText' || capability === 'toolCalling',
+      generateText: async () => ({ message: 'ok' }),
+    }, {
+      name: 'reference-provider',
+    });
+    const storeResult = kit.certifyStore(new InMemoryJobStore(), {
+      type: 'job',
+      name: 'reference-job-store',
+    });
+    const summary = CompatibilitySummary.build([providerResult, storeResult]);
+
+    expect(providerResult).toMatchObject({
+      target: 'reference-provider',
+      kind: 'provider_adapter',
+      level: 'contract_verified',
+      valid: true,
+    });
+    expect(storeResult).toMatchObject({
+      target: 'reference-job-store',
+      kind: 'job_store',
+      level: 'contract_verified',
+      valid: true,
+    });
+    expect(summary).toMatchObject({
+      total: 2,
+      valid: 2,
+      invalid: 0,
+      byLevel: {
+        contract_verified: 2,
+      },
+    });
+  });
+
+  test('ToolSchemaArtifact and InteropArtifactRegistry import and export maintained artifact families', () => {
+    const registry = new InteropArtifactRegistry();
+    const tool = new Tool({
+      name: 'send_status_update',
+      description: 'Send a status update.',
+      parameters: {
+        type: 'object',
+        properties: {
+          recipient: { type: 'string' },
+          summary: { type: 'string' },
+        },
+        required: ['recipient', 'summary'],
+      },
+      metadata: {
+        sideEffectLevel: 'external_write',
+      },
+      implementation: async ({ recipient, summary }) => ({
+        delivered: true,
+        recipient,
+        summary,
+      }),
+    });
+    const run = new Run({
+      id: 'interop-registry-run',
+      input: 'send update',
+      status: 'completed',
+      output: 'ok',
+    });
+    run.addCheckpoint({
+      id: 'interop-registry-run:checkpoint:1',
+      label: 'run_completed',
+      status: 'completed',
+      snapshot: run.createCheckpointSnapshot(),
+    });
+
+    const toolArtifact = registry.export('tool', tool);
+    const traceArtifact = registry.export('trace', run);
+    const policyArtifact = registry.export(
+      'policyPack',
+      PolicyPack.fromToolPolicy(new ToolPolicy(), { name: 'interop-registry-policy' })
+    );
+    const evalArtifact = registry.export('evalReport', {
+      total: 1,
+      passed: 1,
+      failed: 0,
+    });
+    const manifestArtifact = registry.export(
+      'manifest',
+      ExtensionManifest.fromExtension({
+        name: 'interop-registry-extension',
+        contributes: {
+          policyRules: [{ id: 'interop-registry-rule' }],
+        },
+      })
+    );
+
+    const importedToolArtifact = registry.import('tool', toolArtifact);
+    const importedTool = importedToolArtifact.toTool({
+      implementation: async args => args,
+    });
+    const importedTrace = registry.import('trace', traceArtifact);
+    const importedPolicyPack = registry.import('policyPack', policyArtifact);
+    const importedEvalArtifact = registry.import('evalReport', evalArtifact);
+    const importedManifest = registry.import('manifest', manifestArtifact);
+
+    expect(toolArtifact.format).toBe('agnostic-agents-tool-schema');
+    expect(importedToolArtifact).toBeInstanceOf(ToolSchemaArtifact);
+    expect(importedTool.name).toBe('send_status_update');
+    expect(importedTrace.id).toBe('interop-registry-run');
+    expect(importedPolicyPack.name).toBe('interop-registry-policy');
+    expect(importedEvalArtifact.summarize()).toMatchObject({
+      total: 1,
+      passed: 1,
+      failed: 0,
+    });
+    expect(importedManifest.name).toBe('interop-registry-extension');
   });
 
   test('PolicyPack can diff versions of a policy artifact', () => {

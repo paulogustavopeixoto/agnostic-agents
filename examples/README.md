@@ -111,6 +111,18 @@ These examples are intended as reference deployment patterns rather than feature
 - `referenceInteropManifest.js`
   - no API key required
   - shows a public extension manifest plus conformance validation for extension and store integrations
+- `referenceInteropArtifacts.js`
+  - no API key required
+  - shows shared compatibility validation for trace, policy, state, eval, and manifest artifacts
+- `referenceExternalConformanceFlow.js`
+  - no API key required
+  - shows a third-party-style file-based validation flow using only the published interop validator surface
+- `referenceCertificationKit.js`
+  - no API key required
+  - shows public certification results for a provider adapter and backend store plus a compatibility rollup summary
+- `referenceInteropRegistry.js`
+  - no API key required
+  - shows one public import/export registry across tool, trace, policy, eval, and manifest artifacts
 - `referenceOpenApiImport.js`
   - no API key required
   - shows importing a small OpenAPI spec into runtime tools
