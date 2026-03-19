@@ -84,6 +84,9 @@ These examples are intended as reference deployment patterns rather than feature
 - `referenceCoordinationDiagnostics.js`
   - no API key required
   - shows operator-facing coordination diagnostics for disagreement, missing roles, escalation, and quality warnings
+- `referenceGovernedImprovement.js`
+  - no API key required
+  - shows explicit learned-improvement artifacts and governed review requests built from runs and evals
 - `referenceProductionPolicyPack.js`
   - no API key required
   - shows a maintained production-oriented policy/governance pack contributing policy rules and governance hooks through `ExtensionHost`

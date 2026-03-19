@@ -1086,6 +1086,55 @@ export class AdaptiveDecisionLedger {
   buildRollbackPlan(entryId: string): JsonObject;
 }
 
+export class LearnedAdaptationArtifact {
+  constructor(options?: {
+    proposal?: JsonObject;
+    metadata?: JsonObject;
+  });
+  proposal: JsonObject;
+  metadata: JsonObject;
+  summarize(): JsonObject;
+  toJSON(): JsonObject;
+  diff(other?: LearnedAdaptationArtifact | JsonObject): JsonObject;
+  static fromJSON(payload?: JsonObject): LearnedAdaptationArtifact;
+  static readonly FORMAT: string;
+  static readonly SCHEMA_VERSION: string;
+}
+
+export class ImprovementProposalEngine {
+  constructor(options?: {
+    learningLoop?: LearningLoop | JsonObject | null;
+  });
+  learningLoop: LearningLoop;
+  buildProposals(options?: {
+    branchComparison?: JsonObject | null;
+    incident?: JsonObject | null;
+  }): JsonObject[];
+  exportArtifacts(options?: {
+    branchComparison?: JsonObject | null;
+    incident?: JsonObject | null;
+  }): JsonObject[];
+}
+
+export class GovernedImprovementLoop {
+  constructor(options?: {
+    proposalEngine?: ImprovementProposalEngine | JsonObject | null;
+    governanceGate?: AdaptiveGovernanceGate | JsonObject | null;
+    ledger?: AdaptiveDecisionLedger | JsonObject | null;
+  });
+  ledger: AdaptiveDecisionLedger;
+  proposalEngine: ImprovementProposalEngine;
+  governanceGate: AdaptiveGovernanceGate;
+  propose(options?: {
+    branchComparison?: JsonObject | null;
+    incident?: JsonObject | null;
+  }): Promise<LearnedAdaptationArtifact[]>;
+  review(options?: {
+    branchComparison?: JsonObject | null;
+    incident?: JsonObject | null;
+  }): Promise<JsonObject>;
+}
+
 export class AdaptiveGovernanceGate {
   constructor(options?: {
     ledger?: AdaptiveDecisionLedger | null;

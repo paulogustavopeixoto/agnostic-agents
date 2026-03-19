@@ -44,6 +44,7 @@ Use `agnostic-agents` when you want:
 - a provider-agnostic execution layer behind one adapter contract
 - a runtime substrate for higher-level worker or organization systems
 - a package that keeps control, observability, and governance in the open
+- a package that can turn evidence into governed improvement proposals instead of hidden self-modification
 
 Do not think of it as only a prompt helper or a chat abstraction. The maintained direction is a runtime control layer for serious agent systems.
 

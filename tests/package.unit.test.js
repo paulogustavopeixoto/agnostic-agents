@@ -43,6 +43,9 @@ const { AdaptiveRetryPolicy } = require('../src/runtime/AdaptiveRetryPolicy');
 const { HistoricalRoutingAdvisor } = require('../src/runtime/HistoricalRoutingAdvisor');
 const { AdaptiveDecisionLedger } = require('../src/runtime/AdaptiveDecisionLedger');
 const { AdaptiveGovernanceGate } = require('../src/runtime/AdaptiveGovernanceGate');
+const { LearnedAdaptationArtifact } = require('../src/runtime/LearnedAdaptationArtifact');
+const { ImprovementProposalEngine } = require('../src/runtime/ImprovementProposalEngine');
+const { GovernedImprovementLoop } = require('../src/runtime/GovernedImprovementLoop');
 const { GovernanceHooks } = require('../src/runtime/GovernanceHooks');
 const { WebhookGovernanceAdapter } = require('../src/runtime/WebhookGovernanceAdapter');
 const { FileAuditSink } = require('../src/runtime/FileAuditSink');
@@ -196,6 +199,9 @@ describe('Package/module unit tests', () => {
     expect(pkg.HistoricalRoutingAdvisor).toBeDefined();
     expect(pkg.AdaptiveDecisionLedger).toBeDefined();
     expect(pkg.AdaptiveGovernanceGate).toBeDefined();
+    expect(pkg.LearnedAdaptationArtifact).toBeDefined();
+    expect(pkg.ImprovementProposalEngine).toBeDefined();
+    expect(pkg.GovernedImprovementLoop).toBeDefined();
     expect(pkg.GovernanceHooks).toBeDefined();
     expect(pkg.WebhookGovernanceAdapter).toBeDefined();
     expect(pkg.FileAuditSink).toBeDefined();
@@ -4427,6 +4433,127 @@ describe('Package/module unit tests', () => {
       })
     );
     expect(events).toEqual(['adaptive_review_allowed']);
+  });
+
+  test('ImprovementProposalEngine and LearnedAdaptationArtifact turn evidence into portable change proposals', () => {
+    const learningLoop = new LearningLoop();
+    learningLoop.recordRun(
+      new Run({
+        input: 'risky release summary',
+        status: 'failed',
+        pendingApproval: { toolName: 'send_status_update' },
+        state: {
+          assessment: {
+            confidence: 0.41,
+            evidenceConflicts: 1,
+          },
+          selfVerification: {
+            action: 'require_approval',
+          },
+        },
+      })
+    );
+    learningLoop.recordEvaluation({
+      total: 1,
+      passed: 0,
+      failed: 1,
+      results: [
+        {
+          id: 'routing-regression',
+          passed: false,
+          category: 'routing',
+          error: 'retrieval grounding failed',
+        },
+      ],
+    });
+
+    const engine = new ImprovementProposalEngine({ learningLoop });
+    const proposals = engine.buildProposals({
+      branchComparison: { rootRunId: 'run-root-1', strongestBranchId: 'run-branch-2' },
+      incident: { runId: 'incident-run-1', type: 'grounding_failure' },
+    });
+    const artifact = new LearnedAdaptationArtifact({
+      proposal: proposals[0],
+      metadata: { source: 'test' },
+    });
+
+    expect(proposals.length).toBeGreaterThan(1);
+    expect(artifact.toJSON()).toEqual(
+      expect.objectContaining({
+        format: 'agnostic-agents-learned-adaptation',
+        proposal: expect.objectContaining({
+          changeType: expect.any(String),
+          targetSurface: expect.any(String),
+        }),
+      })
+    );
+    expect(LearnedAdaptationArtifact.fromJSON(artifact.toJSON()).summarize()).toEqual(
+      expect.objectContaining({
+        id: artifact.proposal.id,
+      })
+    );
+  });
+
+  test('GovernedImprovementLoop routes learned proposals through adaptive governance review', async () => {
+    const learningLoop = new LearningLoop();
+    learningLoop.recordRun(
+      new Run({
+        input: 'risky release summary',
+        status: 'failed',
+        pendingApproval: { toolName: 'send_status_update' },
+        state: {
+          assessment: {
+            confidence: 0.41,
+            evidenceConflicts: 1,
+          },
+          selfVerification: {
+            action: 'require_approval',
+          },
+        },
+      })
+    );
+    learningLoop.recordEvaluation({
+      total: 1,
+      passed: 0,
+      failed: 1,
+      results: [
+        {
+          id: 'routing-regression',
+          passed: false,
+          category: 'routing',
+          error: 'retrieval grounding failed',
+        },
+      ],
+    });
+
+    const loop = new GovernedImprovementLoop({
+      proposalEngine: new ImprovementProposalEngine({ learningLoop }),
+      ledger: new AdaptiveDecisionLedger(),
+      governanceGate: {
+        approvalInbox: new ApprovalInbox(),
+      },
+    });
+
+    const review = await loop.review();
+
+    expect(review).toEqual(
+      expect.objectContaining({
+        total: expect.any(Number),
+        reviews: expect.arrayContaining([
+          expect.objectContaining({
+            artifact: expect.objectContaining({
+              format: 'agnostic-agents-learned-adaptation',
+            }),
+            review: expect.objectContaining({
+              action: expect.stringMatching(/allow|require_approval/),
+            }),
+          }),
+        ]),
+        ledger: expect.objectContaining({
+          total: expect.any(Number),
+        }),
+      })
+    );
   });
 
   test('GovernanceHooks dispatches named governance events', async () => {

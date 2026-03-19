@@ -505,4 +505,16 @@ describe('Maintained examples', () => {
     expect(stdout).toContain('reference-require-approval');
     expect(stdout).toContain('reference-extension-scenario');
   });
+
+  test('reference governed improvement example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceGovernedImprovement.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Governed improvement summary');
+    expect(stdout).toContain('agnostic-agents-learned-adaptation');
+    expect(stdout).toContain('adaptive_change');
+    expect(stdout).toContain('rollback');
+  });
 });

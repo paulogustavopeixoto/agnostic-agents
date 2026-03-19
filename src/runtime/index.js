@@ -20,6 +20,9 @@ const { AdaptiveRetryPolicy } = require('./AdaptiveRetryPolicy');
 const { HistoricalRoutingAdvisor } = require('./HistoricalRoutingAdvisor');
 const { AdaptiveDecisionLedger } = require('./AdaptiveDecisionLedger');
 const { AdaptiveGovernanceGate } = require('./AdaptiveGovernanceGate');
+const { LearnedAdaptationArtifact } = require('./LearnedAdaptationArtifact');
+const { ImprovementProposalEngine } = require('./ImprovementProposalEngine');
+const { GovernedImprovementLoop } = require('./GovernedImprovementLoop');
 const { GovernanceHooks } = require('./GovernanceHooks');
 const { WebhookGovernanceAdapter } = require('./WebhookGovernanceAdapter');
 const { ExtensionHost } = require('./ExtensionHost');
@@ -105,6 +108,9 @@ module.exports = {
   HistoricalRoutingAdvisor,
   AdaptiveDecisionLedger,
   AdaptiveGovernanceGate,
+  LearnedAdaptationArtifact,
+  ImprovementProposalEngine,
+  GovernedImprovementLoop,
   GovernanceHooks,
   WebhookGovernanceAdapter,
   ExtensionHost,
