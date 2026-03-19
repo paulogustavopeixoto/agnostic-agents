@@ -5,6 +5,9 @@ const { DisagreementResolver } = require('./DisagreementResolver');
 const { CoordinationLoop } = require('./CoordinationLoop');
 const { DecompositionAdvisor } = require('./DecompositionAdvisor');
 const { CoordinationBenchmarkSuite } = require('./CoordinationBenchmarkSuite');
+const { CoordinationRoleContract } = require('./CoordinationRoleContract');
+const { CoordinationTrace } = require('./CoordinationTrace');
+const { RoleAwareCoordinationPlanner } = require('./RoleAwareCoordinationPlanner');
 
 module.exports = {
   CritiqueProtocol,
@@ -14,4 +17,7 @@ module.exports = {
   CoordinationLoop,
   DecompositionAdvisor,
   CoordinationBenchmarkSuite,
+  CoordinationRoleContract,
+  CoordinationTrace,
+  RoleAwareCoordinationPlanner,
 };

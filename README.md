@@ -290,12 +290,15 @@ Above the runtime core, the package now includes:
 - `CoordinationLoop`
 - `DecompositionAdvisor`
 - `CoordinationBenchmarkSuite`
+- `CoordinationRoleContract`
+- `RoleAwareCoordinationPlanner`
+- `CoordinationTrace`
 
 This layer is for:
 
 - structured critique records
 - trust-weighted disagreement handling
-- decomposition recommendations
+- role-aware decomposition and assignment
 - coordination evals and benchmarks
 
 It is intentionally separate from the runtime kernel.
@@ -401,6 +404,7 @@ Local/no-key examples:
 - `npm run example:reference-decomposition-advisor`
 - `npm run example:reference-coordination-benchmarks`
 - `npm run example:reference-coordination-policy-gate`
+- `npm run example:reference-role-aware-coordination`
 - `npm run example:reference-production-policy-pack`
 - `npm run example:reference-policy-simulation`
 - `npm run example:reference-policy-inheritance`
@@ -474,6 +478,7 @@ Runtime operations:
 Policy, governance, and security:
 
 - [Policy and governance packs](docs/policy-governance-packs.md)
+- [Role-aware coordination](docs/role-aware-coordination.md)
 - [Secret handling](docs/secret-handling.md)
 - [Tool auth propagation](docs/tool-auth-propagation.md)
 

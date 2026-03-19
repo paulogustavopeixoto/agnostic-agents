@@ -69,6 +69,9 @@ These examples are intended as reference deployment patterns rather than feature
 - `referenceCoordinationPolicyGate.js`
   - no API key required
   - shows policy gating of coordination outcomes so runtime policy can require escalation or deny automatic retry paths
+- `referenceRoleAwareCoordination.js`
+  - no API key required
+  - shows public planner/executor/verifier/critic/aggregator role contracts, trust-weighted role assignment, and an inspectable coordination trace
 - `referenceProductionPolicyPack.js`
   - no API key required
   - shows a maintained production-oriented policy/governance pack contributing policy rules and governance hooks through `ExtensionHost`

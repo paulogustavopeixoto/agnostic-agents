@@ -23,6 +23,9 @@ const { DisagreementResolver } = require('../src/coordination/DisagreementResolv
 const { CoordinationLoop } = require('../src/coordination/CoordinationLoop');
 const { DecompositionAdvisor } = require('../src/coordination/DecompositionAdvisor');
 const { CoordinationBenchmarkSuite } = require('../src/coordination/CoordinationBenchmarkSuite');
+const { CoordinationRoleContract } = require('../src/coordination/CoordinationRoleContract');
+const { CoordinationTrace } = require('../src/coordination/CoordinationTrace');
+const { RoleAwareCoordinationPlanner } = require('../src/coordination/RoleAwareCoordinationPlanner');
 const { Run } = require('../src/runtime/Run');
 const { EvidenceGraph } = require('../src/runtime/EvidenceGraph');
 const { EvalHarness } = require('../src/runtime/EvalHarness');
@@ -132,6 +135,9 @@ describe('Package/module unit tests', () => {
     expect(pkg.CoordinationLoop).toBeDefined();
     expect(pkg.DecompositionAdvisor).toBeDefined();
     expect(pkg.CoordinationBenchmarkSuite).toBeDefined();
+    expect(pkg.CoordinationRoleContract).toBeDefined();
+    expect(pkg.CoordinationTrace).toBeDefined();
+    expect(pkg.RoleAwareCoordinationPlanner).toBeDefined();
     expect(pkg.Run).toBeDefined();
     expect(pkg.DistributedRunEnvelope).toBeDefined();
     expect(pkg.ExecutionIdentity).toBeDefined();
@@ -1825,6 +1831,107 @@ describe('Package/module unit tests', () => {
         expect.objectContaining({ id: 'coordination-decomposition-benchmark', passed: true }),
       ])
     );
+  });
+
+  test('RoleAwareCoordinationPlanner assigns public coordination roles and emits a trace', () => {
+    const trustRegistry = new TrustRegistry({
+      records: [
+        { actorId: 'planner-alpha', domain: 'release_review', success: true, confidence: 0.95 },
+        { actorId: 'executor-beta', domain: 'release_review', success: true, confidence: 0.88 },
+        { actorId: 'verifier-gamma', domain: 'release_review', success: true, confidence: 0.97 },
+        { actorId: 'critic-delta', domain: 'release_review', success: true, confidence: 0.91 },
+        { actorId: 'aggregator-epsilon', domain: 'release_review', success: true, confidence: 0.9 },
+      ],
+    });
+    const planner = new RoleAwareCoordinationPlanner({ trustRegistry });
+    const task = {
+      id: 'release-review-task',
+      taskType: 'release_review',
+      complexity: 0.88,
+      risk: 0.82,
+      suggestedSubtasks: [
+        {
+          task: 'Inspect release evidence',
+          taskType: 'analysis',
+          requiredCapabilities: ['retrieval'],
+        },
+        {
+          task: 'Draft release recommendation',
+          taskType: 'writing',
+          requiredCapabilities: ['generateText'],
+        },
+      ],
+    };
+    const actors = [
+      {
+        id: 'planner-alpha',
+        roles: ['planner'],
+        capabilities: ['planning', 'retrieval'],
+        specializations: ['analysis'],
+        trustScore: 0.92,
+      },
+      {
+        id: 'executor-beta',
+        roles: ['executor'],
+        capabilities: ['execution', 'generateText'],
+        specializations: ['writing'],
+        trustScore: 0.87,
+      },
+      {
+        id: 'verifier-gamma',
+        roles: ['verifier'],
+        capabilities: ['verification', 'retrieval'],
+        specializations: ['review'],
+        trustScore: 0.95,
+      },
+      {
+        id: 'critic-delta',
+        roles: ['critic'],
+        capabilities: ['critique', 'verification'],
+        specializations: ['review'],
+        trustScore: 0.9,
+      },
+      {
+        id: 'aggregator-epsilon',
+        roles: ['aggregator'],
+        capabilities: ['synthesis', 'generateText'],
+        specializations: ['synthesis'],
+        trustScore: 0.89,
+      },
+    ];
+
+    const plan = planner.plan(task, {
+      actors,
+      context: { domain: 'release_review' },
+    });
+
+    expect(plan.strategy).toBe('role_routed_split_execution');
+    expect(plan.roleContracts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ role: 'planner' }),
+        expect.objectContaining({ role: 'executor' }),
+        expect.objectContaining({ role: 'verifier' }),
+        expect.objectContaining({ role: 'critic' }),
+        expect.objectContaining({ role: 'aggregator' }),
+      ])
+    );
+    expect(plan.assignments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ role: 'planner', actor: expect.objectContaining({ id: 'planner-alpha' }) }),
+        expect.objectContaining({ role: 'executor', actor: expect.objectContaining({ id: 'executor-beta' }) }),
+        expect.objectContaining({ role: 'verifier', actor: expect.objectContaining({ id: 'verifier-gamma' }) }),
+        expect.objectContaining({ role: 'critic', actor: expect.objectContaining({ id: 'critic-delta' }) }),
+        expect.objectContaining({ role: 'aggregator', actor: expect.objectContaining({ id: 'aggregator-epsilon' }) }),
+      ])
+    );
+    expect(CoordinationRoleContract.fromJSON(plan.roleContracts[0])).toBeInstanceOf(CoordinationRoleContract);
+    expect(plan.trace).toEqual(
+      expect.objectContaining({
+        traceType: 'role_aware_coordination',
+        strategy: 'role_routed_split_execution',
+      })
+    );
+    expect(CoordinationTrace.render(plan.trace)).toContain('planner: planner-alpha');
   });
 
   test('Run tracks state and serializes cleanly', () => {

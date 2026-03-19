@@ -35,6 +35,9 @@ const {
   CoordinationLoop,
   DecompositionAdvisor,
   CoordinationBenchmarkSuite,
+  CoordinationRoleContract,
+  CoordinationTrace,
+  RoleAwareCoordinationPlanner,
 } = require('./src/coordination');
 const {
   Run,
@@ -170,6 +173,9 @@ module.exports = {
   CoordinationLoop,
   DecompositionAdvisor,
   CoordinationBenchmarkSuite,
+  CoordinationRoleContract,
+  CoordinationTrace,
+  RoleAwareCoordinationPlanner,
   Run,
   RunInspector,
   RunTreeInspector,

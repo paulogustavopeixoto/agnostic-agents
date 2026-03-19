@@ -182,6 +182,20 @@ describe('Maintained examples', () => {
     expect(stdout).toContain('Coordination policy evaluation artifact');
   });
 
+  test('reference role-aware coordination example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceRoleAwareCoordination.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Role-aware coordination plan');
+    expect(stdout).toContain("strategy: 'role_routed_split_execution'");
+    expect(stdout).toContain("role: 'planner'");
+    expect(stdout).toContain("actorId: 'planner-alpha'");
+    expect(stdout).toContain('Role-aware coordination trace');
+    expect(stdout).toContain('verifier: verifier-gamma');
+  });
+
   test('reference production policy pack example runs', async () => {
     const examplePath = path.join(__dirname, '..', 'examples', 'referenceProductionPolicyPack.js');
     const { stdout } = await execFileAsync(process.execPath, [examplePath], {

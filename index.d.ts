@@ -147,6 +147,46 @@ export class CoordinationBenchmarkSuite {
   run(options?: JsonObject): Promise<JsonObject>;
 }
 
+export class CoordinationRoleContract {
+  constructor(options?: {
+    id?: string | null;
+    role?: string;
+    capabilities?: string[];
+    responsibilities?: string[];
+    trustDomain?: string | null;
+    reviewMode?: string;
+    metadata?: JsonObject;
+  });
+  id: string;
+  role: string;
+  capabilities: string[];
+  responsibilities: string[];
+  trustDomain: string | null;
+  reviewMode: string;
+  metadata: JsonObject;
+  toJSON(): JsonObject;
+  static fromJSON(payload?: JsonObject): CoordinationRoleContract;
+  static readonly DEFAULT_ROLES: string[];
+}
+
+export class CoordinationTrace {
+  static fromPlan(plan?: JsonObject, options?: { task?: JsonObject; context?: JsonObject }): JsonObject;
+  static render(trace?: JsonObject): string;
+}
+
+export class RoleAwareCoordinationPlanner {
+  constructor(options?: {
+    trustRegistry?: TrustRegistry | JsonObject | null;
+    decompositionAdvisor?: DecompositionAdvisor | JsonObject | null;
+    roleContracts?: Array<CoordinationRoleContract | JsonObject>;
+  });
+  trustRegistry: TrustRegistry;
+  decompositionAdvisor: DecompositionAdvisor;
+  roleContracts: CoordinationRoleContract[];
+  plan(task?: JsonObject, options?: { actors?: JsonObject[]; context?: JsonObject }): JsonObject;
+  getRoleContract(role: string, task?: JsonObject): JsonObject;
+}
+
 export class PolicyPack {
   constructor(options?: {
     id?: string | null;
