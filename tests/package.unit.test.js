@@ -54,6 +54,14 @@ const { FleetCanaryEvaluator } = require('../src/runtime/FleetCanaryEvaluator');
 const { FleetSafetyController } = require('../src/runtime/FleetSafetyController');
 const { FleetImpactComparator } = require('../src/runtime/FleetImpactComparator');
 const { FleetRollbackAdvisor } = require('../src/runtime/FleetRollbackAdvisor');
+const { OperatorInterventionPlanner } = require('../src/runtime/OperatorInterventionPlanner');
+const { OperatorSummary } = require('../src/runtime/OperatorSummary');
+const { OperatorTriageWorkflow } = require('../src/runtime/OperatorTriageWorkflow');
+const { GovernanceRecordLedger } = require('../src/runtime/GovernanceRecordLedger');
+const { AuditStitcher } = require('../src/runtime/AuditStitcher');
+const { GovernanceTimeline } = require('../src/runtime/GovernanceTimeline');
+const { OperatorDashboardSnapshot } = require('../src/runtime/OperatorDashboardSnapshot');
+const { OperatorControlLoop } = require('../src/runtime/OperatorControlLoop');
 const { AdaptationPolicyEnvelope } = require('../src/runtime/AdaptationPolicyEnvelope');
 const { ImprovementEffectTracker } = require('../src/runtime/ImprovementEffectTracker');
 const { LearnedAdaptationArtifact } = require('../src/runtime/LearnedAdaptationArtifact');
@@ -226,6 +234,14 @@ describe('Package/module unit tests', () => {
     expect(pkg.FleetSafetyController).toBeDefined();
     expect(pkg.FleetImpactComparator).toBeDefined();
     expect(pkg.FleetRollbackAdvisor).toBeDefined();
+    expect(pkg.OperatorInterventionPlanner).toBeDefined();
+    expect(pkg.OperatorSummary).toBeDefined();
+    expect(pkg.OperatorTriageWorkflow).toBeDefined();
+    expect(pkg.GovernanceRecordLedger).toBeDefined();
+    expect(pkg.AuditStitcher).toBeDefined();
+    expect(pkg.GovernanceTimeline).toBeDefined();
+    expect(pkg.OperatorDashboardSnapshot).toBeDefined();
+    expect(pkg.OperatorControlLoop).toBeDefined();
     expect(pkg.AdaptationPolicyEnvelope).toBeDefined();
     expect(pkg.ImprovementEffectTracker).toBeDefined();
     expect(pkg.LearnedAdaptationArtifact).toBeDefined();
@@ -4793,6 +4809,171 @@ describe('Package/module unit tests', () => {
           targetId: 'learning-pack:v14-canary',
         }),
       })
+    );
+  });
+
+  test('OperatorInterventionPlanner recommends mixed runtime, assurance, and rollback actions', () => {
+    const planner = new OperatorInterventionPlanner();
+    const decision = planner.plan({
+      incident: { recommendedAction: 'branch_from_failure_checkpoint' },
+      assurance: { verdict: 'block' },
+      rollout: { action: 'halt' },
+      rollback: { action: 'rollback_recommended' },
+    });
+
+    expect(decision.actions).toEqual(
+      expect.arrayContaining([
+        'branch_from_failure_checkpoint',
+        'quarantine_candidate',
+        'halt_rollout',
+        'rollback_rollout',
+      ])
+    );
+    expect(decision.recommendedAction).toBe('branch_from_failure_checkpoint');
+  });
+
+  test('OperatorSummary builds operator-centered highlights', () => {
+    const summary = new OperatorSummary().summarize({
+      runs: [{ status: 'failed' }, { status: 'completed' }],
+      incidents: [{ id: 'incident-1' }],
+      rollouts: [{ action: 'rollback_recommended' }],
+      learnedChanges: [{ id: 'change-1', status: 'pending_review' }],
+      assuranceReports: [{ verdict: 'block' }],
+    });
+
+    expect(summary.totals.runs).toBe(2);
+    expect(summary.assurance.blocked).toBe(1);
+    expect(summary.rollouts.rollbackRecommendations).toBe(1);
+    expect(summary.highlights.join(' ')).toContain('waiting for operator review');
+  });
+
+  test('OperatorTriageWorkflow builds summary, intervention, and checklist output', () => {
+    const triage = new OperatorTriageWorkflow().run({
+      runs: [{ status: 'failed' }],
+      incidents: [{ id: 'incident-1' }],
+      rollouts: [{ action: 'rollback_recommended' }],
+      learnedChanges: [{ id: 'change-1', status: 'pending_review' }],
+      assuranceReports: [{ verdict: 'block' }],
+      primaryIncident: { recommendedAction: 'branch_from_failure_checkpoint' },
+      primaryAssurance: { verdict: 'block' },
+      primaryRollout: { action: 'halt' },
+      primaryRollback: { action: 'rollback_recommended' },
+      context: { scope: 'cross-runtime-triage' },
+    });
+
+    expect(triage.operatorSummary.totals.incidents).toBe(1);
+    expect(triage.intervention.actions).toEqual(
+      expect.arrayContaining(['branch_from_failure_checkpoint', 'quarantine_candidate'])
+    );
+    expect(triage.checklist).toHaveLength(3);
+    expect(triage.context.scope).toBe('cross-runtime-triage');
+  });
+
+  test('GovernanceRecordLedger records and summarizes long-horizon governance entries', () => {
+    const ledger = new GovernanceRecordLedger();
+
+    ledger.record({ surface: 'policy', action: 'promote', correlationId: 'change-1' });
+    ledger.record({ surface: 'learning', action: 'approve_change', correlationId: 'change-1' });
+    ledger.record({ surface: 'rollback', action: 'rollback_rollout', correlationId: 'change-1' });
+
+    expect(ledger.list({ correlationId: 'change-1' })).toHaveLength(3);
+    expect(ledger.summarize()).toMatchObject({
+      total: 3,
+      bySurface: expect.objectContaining({ policy: 1, learning: 1, rollback: 1 }),
+    });
+  });
+
+  test('AuditStitcher stitches replay, rollout, and rollback events into one chain', () => {
+    const ledger = new GovernanceRecordLedger({
+      records: [
+        { id: '1', timestamp: '2026-01-01T00:00:00.000Z', surface: 'replay', action: 'partial_replay', correlationId: 'change-1' },
+        { id: '2', timestamp: '2026-01-01T00:01:00.000Z', surface: 'rollout', action: 'start_canary', correlationId: 'change-1' },
+        { id: '3', timestamp: '2026-01-01T00:02:00.000Z', surface: 'rollback', action: 'rollback_rollout', correlationId: 'change-1' },
+      ],
+    });
+
+    const stitched = new AuditStitcher({ ledger }).stitch({ correlationId: 'change-1' });
+
+    expect(stitched.records).toHaveLength(3);
+    expect(stitched.surfaces).toEqual(expect.arrayContaining(['replay', 'rollout', 'rollback']));
+    expect(stitched.links).toHaveLength(2);
+  });
+
+  test('GovernanceTimeline builds operator-facing change timelines', () => {
+    const ledger = new GovernanceRecordLedger({
+      records: [
+        {
+          id: '1',
+          timestamp: '2026-01-01T00:00:00.000Z',
+          surface: 'policy',
+          action: 'promote',
+          correlationId: 'change-1',
+          summary: 'Promoted the runtime policy pack.',
+          status: 'completed',
+        },
+        {
+          id: '2',
+          timestamp: '2026-01-01T00:02:00.000Z',
+          surface: 'rollback',
+          action: 'rollback_rollout',
+          correlationId: 'change-1',
+          summary: 'Rolled back the canary.',
+          status: 'completed',
+        },
+      ],
+    });
+
+    const timeline = new GovernanceTimeline({ ledger }).build({ correlationId: 'change-1' });
+
+    expect(timeline.entries).toHaveLength(2);
+    expect(new GovernanceTimeline({ ledger }).render(timeline)).toContain('policy:promote');
+    expect(new GovernanceTimeline({ ledger }).render(timeline)).toContain('rollback:rollback_rollout');
+  });
+
+  test('OperatorDashboardSnapshot builds dashboard panels and governance timeline', () => {
+    const dashboard = new OperatorDashboardSnapshot({
+      timeline: new GovernanceTimeline({
+        ledger: new GovernanceRecordLedger({
+          records: [
+            {
+              id: '1',
+              timestamp: '2026-01-01T00:00:00.000Z',
+              surface: 'rollout',
+              action: 'start_canary',
+              correlationId: 'dashboard-1',
+            },
+          ],
+        }),
+      }),
+    }).build({
+      runs: [{ status: 'failed' }],
+      incidents: [{ id: 'incident-1' }],
+      governance: { correlationId: 'dashboard-1' },
+    });
+
+    expect(dashboard.panels.runs).toBe(1);
+    expect(dashboard.governanceTimeline.entries).toHaveLength(1);
+  });
+
+  test('OperatorControlLoop composes dashboard and triage output', () => {
+    const loop = new OperatorControlLoop().run({
+      runs: [{ status: 'failed' }],
+      incidents: [{ id: 'incident-1' }],
+      rollouts: [{ action: 'rollback_recommended' }],
+      learnedChanges: [{ id: 'change-1', status: 'pending_review' }],
+      assuranceReports: [{ verdict: 'block' }],
+      primaryIncident: { recommendedAction: 'branch_from_failure_checkpoint' },
+      primaryAssurance: { verdict: 'block' },
+      primaryRollback: { action: 'rollback_recommended' },
+      governance: { correlationId: 'dashboard-1' },
+    });
+
+    expect(loop.dashboard.summary.totals.incidents).toBe(1);
+    expect(loop.triage.intervention.actions).toEqual(
+      expect.arrayContaining(['branch_from_failure_checkpoint', 'quarantine_candidate'])
+    );
+    expect(loop.nextActions).toEqual(
+      expect.arrayContaining(['review_dashboard', 'confirm_intervention', 'record_governance_decision'])
     );
   });
 

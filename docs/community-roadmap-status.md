@@ -21,6 +21,9 @@ reading the entire long-form planning document.
 - `v11` Interop OS core
 - `v12` Coordination OS core
 - `v13` Learning OS core
+- `v14` Fleet OS core
+- `v15` Assurance OS core
+- `v16` Operator OS core
 
 ### Completed higher-level coordination track
 
@@ -51,32 +54,29 @@ Still open:
 
 ## Direction after the current release line
 
-The current package already covers the `v11` through `v13` core program:
+The current package already covers the `v11` through `v16` core program:
 
 - `v11` Interop OS
 - `v12` Coordination OS
 - `v13` Learning OS
+- `v14` Fleet OS
+- `v15` Assurance OS
+- `v16` Operator OS
 
 The next direction is refinement, hardening, and broader ecosystem uptake:
 
 - deeper external interoperability and certification depth
-- stronger operator surfaces for coordination and learning
+- stronger operator and ecosystem surfaces above the completed core
 - governed-learning refinement instead of opaque self-modification
 
-After the current `v13` core, the next roadmap horizon is:
-
-- `v14` Fleet OS
-  - rollout control, canary evaluation, and fleet-level safety boundaries
-- `v15` Assurance OS
-  - invariants, scenario simulation, and stronger pre-deployment assurance
-- `v16` Operator OS
-  - day-2 intervention, triage, rollback, and governance continuity
+After the current `v16` core, the next roadmap horizon is refinement and hardening across fleet, assurance, operator, and ecosystem depth rather than another brand-new top-level layer.
 
 The current `v14` maintained baseline starts with rollout artifacts, fleet
 health summaries, canary halt/rollback evaluation, fleet safety controls, and
 before/after rollout impact comparison, plus rollback advice for broader fleet regressions.
 The maintained operator guidance for that baseline now lives in the multi-runtime operations reference.
 The current `v15` maintained baseline starts with explicit invariants, assurance suites, assurance reports, rollout guardrails, and rollback/quarantine planning.
+The current `v16` maintained baseline starts with operator triage workflows, governance record stitching, governance timelines, dashboard snapshots, and control-loop references.
 
 The important architectural rule is:
 
@@ -113,7 +113,7 @@ restore, inspect, or validate.
 
 ## How to interpret this
 
-The runtime, interop, coordination, and governed-learning foundation are strong.
+The runtime, interop, coordination, learning, fleet, assurance, and operator foundation are strong.
 
 The remaining work is now mostly:
 

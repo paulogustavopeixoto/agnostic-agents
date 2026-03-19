@@ -374,11 +374,25 @@ The current maintained `v15` baseline starts with:
 - `FleetImpactComparator`
 - `FleetRollbackAdvisor`
 
+The current `v16` baseline starts with:
+
+- `OperatorSummary`
+- `OperatorInterventionPlanner`
+- `OperatorTriageWorkflow`
+- `GovernanceRecordLedger`
+- `AuditStitcher`
+- `GovernanceTimeline`
+- `OperatorDashboardSnapshot`
+- `OperatorControlLoop`
+
 Useful docs for these layers:
 
 - [Governed improvement](docs/governed-improvement.md)
 - [Fleet OS](docs/fleet-os.md)
 - [Assurance OS](docs/assurance-os.md)
+- [Operator day-2 guidance](docs/operator-day2.md)
+- [Operator checklists](docs/operator-checklists.md)
+- [Operator OS](docs/operator-os.md)
 
 ### Policy and Governance
 
@@ -454,6 +468,7 @@ Local/no-key examples:
 - `npm run example:reference-worker`
 - `npm run example:reference-incident`
 - `npm run example:reference-operator`
+- `npm run example:reference-operator-dashboard`
 - `npm run example:reference-evals`
 - `npm run example:reference-replay-benchmarks`
 - `npm run example:reference-adaptive-benchmarks`
@@ -526,6 +541,9 @@ Runtime operations:
 - [Common stack integrations](docs/common-stack-integrations.md)
 - [Operator workflows](docs/operator-workflows.md)
 - [Operator architecture](docs/operator-architecture.md)
+- [Operator day-2 guidance](docs/operator-day2.md)
+- [Operator checklists](docs/operator-checklists.md)
+- [Operator OS](docs/operator-os.md)
 - [Governed improvement](docs/governed-improvement.md)
 - [Fleet OS](docs/fleet-os.md)
 - [Assurance OS](docs/assurance-os.md)
@@ -604,6 +622,8 @@ This package currently targets:
 - governed learning and bounded adaptation
 - fleet rollout and rollback control
 - assurance suites and rollout guardrails
+- operator-centered triage and intervention workflows
+- operator dashboard snapshots and control-loop references
 
 It does not try to be:
 

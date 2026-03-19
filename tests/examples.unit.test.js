@@ -230,6 +230,37 @@ describe('Maintained examples', () => {
     expect(stdout).toContain('trustProfile');
   });
 
+  test('reference operator workflow example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceOperatorWorkflow.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Operator summary');
+    expect(stdout).toContain('Operator intervention plan');
+    expect(stdout).toContain('Operator triage workflow');
+    expect(stdout).toContain('Governance ledger summary');
+    expect(stdout).toContain('Stitched audit chain');
+    expect(stdout).toContain('Governance timeline');
+    expect(stdout).toContain("recommendedAction: 'rollback_rollout'");
+    expect(stdout).toContain('cross-runtime-triage');
+    expect(stdout).toContain('policy:promote');
+    expect(stdout).toContain('rollback:rollback_rollout');
+  });
+
+  test('reference operator dashboard example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceOperatorDashboard.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Operator dashboard snapshot');
+    expect(stdout).toContain('Operator control loop');
+    expect(stdout).toContain('governanceTimeline');
+    expect(stdout).toContain('operator-dashboard-1');
+    expect(stdout).toContain('review_dashboard');
+  });
+
   test('reference coordination verification example runs', async () => {
     const examplePath = path.join(__dirname, '..', 'examples', 'referenceCoordinationVerification.js');
     const { stdout } = await execFileAsync(process.execPath, [examplePath], {

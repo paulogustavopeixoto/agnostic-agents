@@ -1186,6 +1186,129 @@ export class FleetRollbackAdvisor {
   }): JsonObject;
 }
 
+export class OperatorInterventionPlanner {
+  plan(options?: {
+    run?: Run | JsonObject | null;
+    incident?: JsonObject | null;
+    assurance?: JsonObject | null;
+    rollout?: JsonObject | null;
+    rollback?: JsonObject | null;
+    context?: JsonObject;
+  }): JsonObject;
+}
+
+export class OperatorSummary {
+  summarize(options?: {
+    runs?: JsonObject[];
+    incidents?: JsonObject[];
+    rollouts?: JsonObject[];
+    learnedChanges?: JsonObject[];
+    assuranceReports?: JsonObject[];
+  }): JsonObject;
+}
+
+export class OperatorTriageWorkflow {
+  constructor(options?: {
+    summary?: OperatorSummary | JsonObject | null;
+    planner?: OperatorInterventionPlanner | JsonObject | null;
+  });
+  summary: OperatorSummary;
+  planner: OperatorInterventionPlanner;
+  run(options?: {
+    runs?: JsonObject[];
+    incidents?: JsonObject[];
+    rollouts?: JsonObject[];
+    learnedChanges?: JsonObject[];
+    assuranceReports?: JsonObject[];
+    primaryRun?: Run | JsonObject | null;
+    primaryIncident?: JsonObject | null;
+    primaryAssurance?: JsonObject | null;
+    primaryRollout?: JsonObject | null;
+    primaryRollback?: JsonObject | null;
+    context?: JsonObject;
+  }): JsonObject;
+}
+
+export class GovernanceRecordLedger {
+  constructor(options?: { records?: JsonObject[] });
+  records: JsonObject[];
+  record(entry?: JsonObject): JsonObject;
+  list(filters?: {
+    surface?: string;
+    correlationId?: string;
+    candidateId?: string;
+    runId?: string;
+  }): JsonObject[];
+  summarize(): JsonObject;
+}
+
+export class AuditStitcher {
+  constructor(options?: {
+    ledger?: GovernanceRecordLedger | JsonObject | null;
+  });
+  ledger: GovernanceRecordLedger;
+  stitch(options?: {
+    surface?: string;
+    correlationId?: string;
+    candidateId?: string;
+    runId?: string;
+  }): JsonObject;
+}
+
+export class GovernanceTimeline {
+  constructor(options?: {
+    ledger?: GovernanceRecordLedger | JsonObject | null;
+  });
+  ledger: GovernanceRecordLedger;
+  build(options?: {
+    surface?: string;
+    correlationId?: string;
+    candidateId?: string;
+    runId?: string;
+  }): JsonObject;
+  render(timeline?: JsonObject): string;
+}
+
+export class OperatorDashboardSnapshot {
+  constructor(options?: {
+    summary?: OperatorSummary | JsonObject | null;
+    timeline?: GovernanceTimeline | JsonObject | null;
+  });
+  summary: OperatorSummary;
+  timeline: GovernanceTimeline;
+  build(options?: {
+    runs?: JsonObject[];
+    incidents?: JsonObject[];
+    rollouts?: JsonObject[];
+    learnedChanges?: JsonObject[];
+    assuranceReports?: JsonObject[];
+    governance?: JsonObject;
+  }): JsonObject;
+}
+
+export class OperatorControlLoop {
+  constructor(options?: {
+    triage?: OperatorTriageWorkflow | JsonObject | null;
+    dashboard?: OperatorDashboardSnapshot | JsonObject | null;
+  });
+  triage: OperatorTriageWorkflow;
+  dashboard: OperatorDashboardSnapshot;
+  run(options?: {
+    runs?: JsonObject[];
+    incidents?: JsonObject[];
+    rollouts?: JsonObject[];
+    learnedChanges?: JsonObject[];
+    assuranceReports?: JsonObject[];
+    governance?: JsonObject;
+    primaryRun?: Run | JsonObject | null;
+    primaryIncident?: JsonObject | null;
+    primaryAssurance?: JsonObject | null;
+    primaryRollout?: JsonObject | null;
+    primaryRollback?: JsonObject | null;
+    context?: JsonObject;
+  }): JsonObject;
+}
+
 export class LearnedAdaptationArtifact {
   constructor(options?: {
     proposal?: JsonObject;

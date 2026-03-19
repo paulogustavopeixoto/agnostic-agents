@@ -44,7 +44,10 @@ These examples are intended as reference deployment patterns rather than feature
   - shows how to inspect stored runs and export a portable trace bundle
 - `referenceOperatorWorkflow.js`
   - no API key required
-  - shows common operator tasks: run tree inspection, incident reporting, trace diffing, and partial trace export
+  - shows common operator tasks: run tree inspection, incident reporting, trace diffing, partial trace export, operator-centered summaries, intervention planning, cross-runtime triage, governance record capture, audit stitching, and governance timelines
+- `referenceOperatorDashboard.js`
+  - no API key required
+  - shows a maintained operator dashboard snapshot, governance timeline panel, and a compact operator control loop
 - `referenceEvalBenchmarks.js`
   - no API key required
   - shows maintained eval categories: prompt regression, tool selection accuracy, and RAG grounding

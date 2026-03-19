@@ -8,16 +8,43 @@ The format is intentionally simple:
 
 ### Added
 
-- `v13` Learning OS maintained surfaces including `LearnedAdaptationArtifact`, `ImprovementProposalEngine`, `ImprovementActionPlanner`, `GovernedImprovementLoop`, `AdaptationPolicyEnvelope`, `ImprovementEffectTracker`, `LearningBenchmarkSuite`, and `AdaptationRegressionGuard`
-- governed improvement documentation and maintained examples covering learned-change artifacts, action planning, bounded adaptation, effect tracking, learning benchmarks, and regression-guard decisions
+- none yet
 
 ### Changed
 
-- updated the roadmap, README, and community roadmap status so `v11` through `v13` are reflected as current maintained package capabilities instead of future-only direction
+- none yet
 
 ### Fixed
 
+- none yet
+
 ### Removed
+
+- none yet
+
+## 1.3.2 - 2026-03-19
+
+### Added
+
+- `v13` Learning OS maintained surfaces including `LearnedAdaptationArtifact`, `ImprovementProposalEngine`, `ImprovementActionPlanner`, `GovernedImprovementLoop`, `AdaptationPolicyEnvelope`, `ImprovementEffectTracker`, `LearningBenchmarkSuite`, and `AdaptationRegressionGuard`
+- `v14` Fleet OS maintained surfaces including `FleetRolloutPlan`, `FleetHealthMonitor`, `FleetCanaryEvaluator`, `FleetSafetyController`, `FleetImpactComparator`, and `FleetRollbackAdvisor`
+- `v15` Assurance OS maintained surfaces including `InvariantRegistry`, `AssuranceReport`, `AssuranceSuite`, `AssuranceGuardrail`, and `AssuranceRecoveryPlanner`
+- `v16` Operator OS maintained surfaces including `OperatorSummary`, `OperatorInterventionPlanner`, `OperatorTriageWorkflow`, `GovernanceRecordLedger`, `AuditStitcher`, `GovernanceTimeline`, `OperatorDashboardSnapshot`, and `OperatorControlLoop`
+- maintained operator-facing docs and examples covering governance timelines, day-2 guidance, rollout/incident/adaptation review checklists, and operator dashboard/control-loop references
+
+### Changed
+
+- updated the roadmap, README, examples, and community roadmap status so the current package state reflects maintained surfaces through `v16` instead of stopping at earlier roadmap phases
+- expanded the published package surface to include fleet, assurance, and operator docs/examples needed to use the current release line coherently
+
+### Fixed
+
+- operator reference examples now use the actual `RunTreeInspector` static API instead of stale instance-method assumptions
+- roadmap and community status docs now align with the completed `v14` to `v16` baselines instead of leaving stale unchecked items behind
+
+### Removed
+
+- none
 
 ## 1.3.1
 

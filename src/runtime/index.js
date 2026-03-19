@@ -31,6 +31,9 @@ const { FleetCanaryEvaluator } = require('./FleetCanaryEvaluator');
 const { FleetSafetyController } = require('./FleetSafetyController');
 const { FleetImpactComparator } = require('./FleetImpactComparator');
 const { FleetRollbackAdvisor } = require('./FleetRollbackAdvisor');
+const { OperatorInterventionPlanner } = require('./OperatorInterventionPlanner');
+const { OperatorSummary } = require('./OperatorSummary');
+const { OperatorTriageWorkflow } = require('./OperatorTriageWorkflow');
 const { LearnedAdaptationArtifact } = require('./LearnedAdaptationArtifact');
 const { ImprovementProposalEngine } = require('./ImprovementProposalEngine');
 const { GovernedImprovementLoop } = require('./GovernedImprovementLoop');
@@ -40,6 +43,11 @@ const { ImprovementActionPlanner } = require('./ImprovementActionPlanner');
 const { LearningBenchmarkSuite } = require('./LearningBenchmarkSuite');
 const { AdaptationRegressionGuard } = require('./AdaptationRegressionGuard');
 const { GovernanceHooks } = require('./GovernanceHooks');
+const { GovernanceRecordLedger } = require('./GovernanceRecordLedger');
+const { AuditStitcher } = require('./AuditStitcher');
+const { GovernanceTimeline } = require('./GovernanceTimeline');
+const { OperatorDashboardSnapshot } = require('./OperatorDashboardSnapshot');
+const { OperatorControlLoop } = require('./OperatorControlLoop');
 const { WebhookGovernanceAdapter } = require('./WebhookGovernanceAdapter');
 const { ExtensionHost } = require('./ExtensionHost');
 const { StorageBackendRegistry } = require('./StorageBackendRegistry');
@@ -135,6 +143,9 @@ module.exports = {
   FleetSafetyController,
   FleetImpactComparator,
   FleetRollbackAdvisor,
+  OperatorInterventionPlanner,
+  OperatorSummary,
+  OperatorTriageWorkflow,
   LearnedAdaptationArtifact,
   ImprovementProposalEngine,
   GovernedImprovementLoop,
@@ -144,6 +155,11 @@ module.exports = {
   LearningBenchmarkSuite,
   AdaptationRegressionGuard,
   GovernanceHooks,
+  GovernanceRecordLedger,
+  AuditStitcher,
+  GovernanceTimeline,
+  OperatorDashboardSnapshot,
+  OperatorControlLoop,
   WebhookGovernanceAdapter,
   ExtensionHost,
   StorageBackendRegistry,
