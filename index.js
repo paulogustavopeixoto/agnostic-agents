@@ -38,6 +38,10 @@ const {
   CoordinationRoleContract,
   CoordinationTrace,
   RoleAwareCoordinationPlanner,
+  VerificationStrategySelector,
+  MultiPassVerificationEngine,
+  CoordinationQualityTracker,
+  CoordinationDiagnostics,
 } = require('./src/coordination');
 const {
   Run,
@@ -176,6 +180,10 @@ module.exports = {
   CoordinationRoleContract,
   CoordinationTrace,
   RoleAwareCoordinationPlanner,
+  VerificationStrategySelector,
+  MultiPassVerificationEngine,
+  CoordinationQualityTracker,
+  CoordinationDiagnostics,
   Run,
   RunInspector,
   RunTreeInspector,

@@ -123,6 +123,16 @@ class CritiqueProtocol {
           candidate.taskType ||
           candidate.metadata?.taskFamily ||
           null,
+        riskClass:
+          context.riskClass ||
+          candidate.riskClass ||
+          candidate.metadata?.riskClass ||
+          null,
+        artifactType:
+          context.artifactType ||
+          candidate.artifactType ||
+          candidate.metadata?.artifactType ||
+          null,
         requiredEvidence,
         ...(schema?.metadata || {}),
         ...(taxonomyDefaults?.metadata || {}),

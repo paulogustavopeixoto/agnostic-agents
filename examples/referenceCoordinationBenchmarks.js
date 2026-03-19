@@ -6,6 +6,7 @@ const {
   CoordinationLoop,
   DecompositionAdvisor,
   CoordinationBenchmarkSuite,
+  RoleAwareCoordinationPlanner,
 } = require('../index');
 
 async function main() {
@@ -69,11 +70,13 @@ async function main() {
   });
 
   const decompositionAdvisor = new DecompositionAdvisor();
+  const roleAwareCoordinationPlanner = new RoleAwareCoordinationPlanner({ trustRegistry });
   const benchmarkSuite = new CoordinationBenchmarkSuite({
     critiqueProtocol,
     disagreementResolver,
     coordinationLoop,
     decompositionAdvisor,
+    roleAwareCoordinationPlanner,
   });
 
   const report = await benchmarkSuite.run({
@@ -86,6 +89,34 @@ async function main() {
       domain: 'policy',
     },
     expectedResolutionAction: 'escalate',
+    disagreementCritiques: [
+      {
+        criticId: 'policy-reviewer',
+        verdict: 'escalate',
+        failureType: 'policy',
+        severity: 'critical',
+        confidence: 0.94,
+        recommendedAction: 'escalate',
+      },
+      {
+        criticId: 'style-reviewer',
+        verdict: 'revise',
+        failureType: 'format',
+        severity: 'low',
+        confidence: 0.42,
+        recommendedAction: 'revise',
+      },
+    ],
+    expectedDisagreementAction: 'escalate',
+    recoveryCandidate: {
+      id: 'coordination-recovery-candidate',
+      taskFamily: 'release_review',
+    },
+    recoveryContext: {
+      taskFamily: 'release_review',
+      domain: 'grounding',
+    },
+    expectedRecoveryAction: 'escalate',
     decompositionTask: {
       id: 'coordination-benchmark-task',
       task: 'Investigate release health and prepare executive summary',
@@ -123,6 +154,98 @@ async function main() {
       ],
     },
     expectedDecompositionAction: 'split_and_delegate',
+    roleTask: {
+      id: 'coordination-role-task',
+      taskType: 'release_review',
+      complexity: 0.88,
+      risk: 0.82,
+      suggestedSubtasks: [
+        {
+          task: 'Inspect release evidence',
+          taskType: 'analysis',
+          requiredCapabilities: ['retrieval'],
+        },
+        {
+          task: 'Draft release recommendation',
+          taskType: 'writing',
+          requiredCapabilities: ['generateText'],
+        },
+      ],
+    },
+    roleActors: [
+      {
+        id: 'planner-alpha',
+        roles: ['planner'],
+        capabilities: ['planning', 'retrieval'],
+        specializations: ['analysis'],
+        trustScore: 0.92,
+      },
+      {
+        id: 'executor-beta',
+        roles: ['executor'],
+        capabilities: ['execution', 'generateText'],
+        specializations: ['writing'],
+        trustScore: 0.87,
+      },
+      {
+        id: 'verifier-gamma',
+        roles: ['verifier'],
+        capabilities: ['verification', 'retrieval'],
+        specializations: ['review'],
+        trustScore: 0.95,
+      },
+      {
+        id: 'critic-delta',
+        roles: ['critic'],
+        capabilities: ['critique', 'verification'],
+        specializations: ['review'],
+        trustScore: 0.9,
+      },
+      {
+        id: 'aggregator-epsilon',
+        roles: ['aggregator'],
+        capabilities: ['synthesis', 'generateText'],
+        specializations: ['synthesis'],
+        trustScore: 0.89,
+      },
+    ],
+    roleContext: {
+      domain: 'release_review',
+    },
+    expectedRoleStrategy: 'role_routed_split_execution',
+    failureDecompositionTask: {
+      id: 'coordination-failure-task',
+      task: 'Execute risky production change without a verifier',
+      taskType: 'operations',
+      complexity: 0.93,
+      risk: 0.95,
+      requiredCapabilities: ['shell'],
+    },
+    failureDecompositionOptions: {
+      availableDelegates: [],
+    },
+    expectedFailureDecompositionAction: 'escalate',
+    trustSensitiveCritiques: [
+      {
+        criticId: 'policy-reviewer',
+        verdict: 'escalate',
+        failureType: 'policy',
+        severity: 'critical',
+        confidence: 0.94,
+        recommendedAction: 'escalate',
+        metadata: { role: 'critic', taskFamily: 'release_review' },
+      },
+      {
+        criticId: 'style-reviewer',
+        verdict: 'accept',
+        failureType: 'general',
+        severity: 'low',
+        confidence: 0.35,
+        recommendedAction: 'accept',
+        metadata: { role: 'critic', taskFamily: 'release_review' },
+      },
+    ],
+    expectedTrustAction: 'escalate',
   });
 
   console.log('Coordination benchmark report:');

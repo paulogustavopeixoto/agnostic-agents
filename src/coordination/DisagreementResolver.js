@@ -10,10 +10,17 @@ class DisagreementResolver {
    * @param {TrustRegistry|null} [options.trustRegistry]
    * @param {boolean} [options.escalateOnDisagreement]
    */
-  constructor({ trustRegistry = null, escalateOnDisagreement = true } = {}) {
+  constructor({
+    trustRegistry = null,
+    escalateOnDisagreement = true,
+    strategy = 'weighted_impact',
+    trustThreshold = 0.75,
+  } = {}) {
     this.trustRegistry =
       trustRegistry instanceof TrustRegistry ? trustRegistry : trustRegistry ? new TrustRegistry(trustRegistry) : null;
     this.escalateOnDisagreement = escalateOnDisagreement !== false;
+    this.strategy = strategy || 'weighted_impact';
+    this.trustThreshold = typeof trustThreshold === 'number' ? trustThreshold : 0.75;
   }
 
   /**
@@ -37,6 +44,8 @@ class DisagreementResolver {
     const weighted = critiques.map(critique => {
       const trust = this.trustRegistry?.getScore(critique.criticId, {
         domain: context.domain || critique.failureType || null,
+        taskFamily: context.taskFamily || critique.metadata?.taskFamily || null,
+        role: critique.metadata?.role || 'critic',
       }) || 0.5;
       const severityWeight = {
         low: 0.25,
@@ -74,21 +83,18 @@ class DisagreementResolver {
       ['grounding', 'reasoning', 'tooling', 'completeness'].includes(critique.failureType)
     );
 
-    let action = 'accept';
-    if (hasCritical || hasEscalation) {
-      action = 'escalate';
-    } else if (disagreement && this.escalateOnDisagreement) {
-      action = 'escalate';
-    } else if (hasRejection && branchWorthy) {
-      action = 'branch_and_retry';
-    } else if (hasRejection || totalImpact < -0.25) {
-      action = 'reject';
-    } else if (weighted.some(critique => critique.verdict === 'revise')) {
-      action = 'revise';
-    }
+    const action = this._resolveAction(weighted, {
+      disagreement,
+      hasCritical,
+      hasEscalation,
+      hasRejection,
+      branchWorthy,
+      totalImpact,
+    });
 
     return {
       action,
+      strategy: this.strategy,
       reason: this._buildReason(action, { disagreement, hasCritical, hasEscalation, hasRejection, branchWorthy }),
       disagreement,
       rankedCritiques,
@@ -96,7 +102,122 @@ class DisagreementResolver {
         totalCritiques: critiques.length,
         weightedImpact: Number(totalImpact.toFixed(3)),
         strongestCritic: rankedCritiques[0]?.criticId || null,
+        trustConsensus: this._buildTrustConsensus(weighted),
       },
+    };
+  }
+
+  _resolveAction(weighted, flags) {
+    if (flags.hasCritical || flags.hasEscalation) {
+      return 'escalate';
+    }
+
+    if (this.strategy === 'majority_vote') {
+      return this._resolveByMajority(weighted, flags);
+    }
+
+    if (this.strategy === 'trust_consensus') {
+      return this._resolveByTrustConsensus(weighted, flags);
+    }
+
+    if (this.strategy === 'severity_first') {
+      return this._resolveBySeverity(weighted, flags);
+    }
+
+    return this._resolveByWeightedImpact(weighted, flags);
+  }
+
+  _resolveByWeightedImpact(weighted, flags) {
+    if (flags.disagreement && this.escalateOnDisagreement) {
+      return 'escalate';
+    }
+    if (flags.hasRejection && flags.branchWorthy) {
+      return 'branch_and_retry';
+    }
+    if (flags.hasRejection || flags.totalImpact < -0.25) {
+      return 'reject';
+    }
+    if (weighted.some(critique => critique.verdict === 'revise')) {
+      return 'revise';
+    }
+    return 'accept';
+  }
+
+  _resolveByMajority(weighted, flags) {
+    const counts = weighted.reduce((acc, critique) => {
+      acc[critique.verdict] = (acc[critique.verdict] || 0) + 1;
+      return acc;
+    }, {});
+    const majorityVerdict = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'accept';
+
+    if (flags.disagreement && this.escalateOnDisagreement && counts.escalate) {
+      return 'escalate';
+    }
+    if (majorityVerdict === 'reject') {
+      return flags.branchWorthy ? 'branch_and_retry' : 'reject';
+    }
+    if (majorityVerdict === 'revise') {
+      return 'revise';
+    }
+    if (majorityVerdict === 'escalate') {
+      return 'escalate';
+    }
+    return 'accept';
+  }
+
+  _resolveByTrustConsensus(weighted, flags) {
+    const trustByVerdict = weighted.reduce((acc, critique) => {
+      acc[critique.verdict] = (acc[critique.verdict] || 0) + critique.trust;
+      return acc;
+    }, {});
+    const topVerdict = Object.entries(trustByVerdict).sort((a, b) => b[1] - a[1])[0]?.[0] || 'accept';
+    const topTrust = trustByVerdict[topVerdict] || 0;
+
+    if (flags.disagreement && topTrust < this.trustThreshold && this.escalateOnDisagreement) {
+      return 'escalate';
+    }
+    if (topVerdict === 'reject') {
+      return flags.branchWorthy ? 'branch_and_retry' : 'reject';
+    }
+    if (topVerdict === 'revise') {
+      return 'revise';
+    }
+    if (topVerdict === 'escalate') {
+      return 'escalate';
+    }
+    return 'accept';
+  }
+
+  _resolveBySeverity(weighted, flags) {
+    const topSeverity = [...weighted].sort((a, b) => {
+      const order = { critical: 4, high: 3, medium: 2, low: 1 };
+      return order[b.severity || 'medium'] - order[a.severity || 'medium'];
+    })[0];
+
+    if (!topSeverity) {
+      return 'accept';
+    }
+    if (topSeverity.severity === 'critical') {
+      return 'escalate';
+    }
+    if (topSeverity.verdict === 'reject') {
+      return flags.branchWorthy ? 'branch_and_retry' : 'reject';
+    }
+    if (topSeverity.verdict === 'revise') {
+      return 'revise';
+    }
+    return this._resolveByWeightedImpact(weighted, flags);
+  }
+
+  _buildTrustConsensus(weighted) {
+    const trustByVerdict = weighted.reduce((acc, critique) => {
+      acc[critique.verdict] = Number(((acc[critique.verdict] || 0) + critique.trust).toFixed(3));
+      return acc;
+    }, {});
+
+    return {
+      threshold: this.trustThreshold,
+      byVerdict: trustByVerdict,
     };
   }
 

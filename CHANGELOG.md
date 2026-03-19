@@ -14,6 +14,27 @@ The format is intentionally simple:
 
 ### Removed
 
+## 1.3.1
+
+### Added
+
+- `v11` Interop OS surfaces including `ExtensionManifest`, `ConformanceKit`, `ArtifactCompatibilitySuite`, `InteropContractValidator`, `CertificationKit`, `CompatibilitySummary`, `ToolSchemaArtifact`, and `InteropArtifactRegistry`
+- `v12` Coordination OS surfaces including role-aware coordination, richer disagreement and trust handling, multi-pass coordination verification, coordination-quality tracking, deeper coordination benchmarks, and operator-facing coordination diagnostics
+- maintained interop and advanced coordination reference examples covering manifests, artifact compatibility, external validation, certification, shared interop registry, role-aware coordination, advanced disagreement handling, coordination verification, coordination quality, and coordination diagnostics
+- public interop and coordination documentation covering artifact registry usage, schema evolution, contract validation, certification kits, role-aware coordination, advanced disagreement handling, coordination verification, coordination quality, and coordination diagnostics
+
+### Changed
+
+- expanded the public package surface from the `1.3.0` policy/state baseline into completed `v11` and `v12` maintained surfaces
+- updated the roadmap and README so the current package state reflects completed Policy OS, State OS, Interop OS, and Coordination OS foundations instead of stopping at the earlier forward-path framing
+- deepened the maintained coordination benchmark coverage to include disagreement, recovery, role routing, decomposition failures, and trust-assumption scenarios
+
+### Fixed
+
+- critique-schema overlays now merge task-family, risk-class, and artifact-type defaults without wiping prior taxonomy values
+- maintained coordination examples now preserve the richer task/risk/artifact context through the full coordination loop instead of losing it after the initial review step
+- release metadata now matches the shipped interop and coordination public surface for the `1.3.1` line
+
 ## 1.3.0
 
 ### Added

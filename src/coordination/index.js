@@ -8,6 +8,10 @@ const { CoordinationBenchmarkSuite } = require('./CoordinationBenchmarkSuite');
 const { CoordinationRoleContract } = require('./CoordinationRoleContract');
 const { CoordinationTrace } = require('./CoordinationTrace');
 const { RoleAwareCoordinationPlanner } = require('./RoleAwareCoordinationPlanner');
+const { VerificationStrategySelector } = require('./VerificationStrategySelector');
+const { MultiPassVerificationEngine } = require('./MultiPassVerificationEngine');
+const { CoordinationQualityTracker } = require('./CoordinationQualityTracker');
+const { CoordinationDiagnostics } = require('./CoordinationDiagnostics');
 
 module.exports = {
   CritiqueProtocol,
@@ -20,4 +24,8 @@ module.exports = {
   CoordinationRoleContract,
   CoordinationTrace,
   RoleAwareCoordinationPlanner,
+  VerificationStrategySelector,
+  MultiPassVerificationEngine,
+  CoordinationQualityTracker,
+  CoordinationDiagnostics,
 };

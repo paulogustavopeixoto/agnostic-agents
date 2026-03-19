@@ -33,16 +33,33 @@ class CritiqueSchemaRegistry {
   }
 
   resolve(candidateOrTaskFamily = null, context = {}) {
+    const candidate =
+      candidateOrTaskFamily && typeof candidateOrTaskFamily === 'object' ? candidateOrTaskFamily : {};
     const taskFamily =
       typeof candidateOrTaskFamily === 'string'
         ? candidateOrTaskFamily
         : context.taskFamily ||
-          candidateOrTaskFamily?.taskFamily ||
-          candidateOrTaskFamily?.taskType ||
-          candidateOrTaskFamily?.metadata?.taskFamily ||
+          candidate.taskFamily ||
+          candidate.taskType ||
+          candidate.metadata?.taskFamily ||
           null;
+    const riskClass = context.riskClass || candidate.riskClass || candidate.metadata?.riskClass || null;
+    const artifactType =
+      context.artifactType || candidate.artifactType || candidate.metadata?.artifactType || null;
 
-    return taskFamily ? this.schemas.get(taskFamily) || null : null;
+    if (!taskFamily) {
+      return null;
+    }
+
+    const base = this.schemas.get(taskFamily) || null;
+    if (!base) {
+      return null;
+    }
+
+    const riskOverlay = riskClass ? base.riskClasses?.[riskClass] || null : null;
+    const artifactOverlay = artifactType ? base.artifactTypes?.[artifactType] || null : null;
+
+    return this._mergeSchema(base, riskOverlay, artifactOverlay, { riskClass, artifactType });
   }
 
   list() {
@@ -50,18 +67,7 @@ class CritiqueSchemaRegistry {
   }
 
   _normalizeSchema(taskFamily, schema = {}) {
-    const taxonomy = {};
-    for (const [failureType, defaults] of Object.entries(schema.taxonomy || {})) {
-      taxonomy[failureType] = {
-        severity: defaults?.severity || 'medium',
-        verdict: defaults?.verdict || 'revise',
-        recommendedAction: defaults?.recommendedAction || 'revise',
-        requiredEvidence: Array.isArray(defaults?.requiredEvidence)
-          ? [...defaults.requiredEvidence]
-          : [],
-        metadata: defaults?.metadata || {},
-      };
-    }
+    const taxonomy = this._normalizeTaxonomy(schema.taxonomy || {});
 
     const allowedFailureTypes = new Set([
       ...(Array.isArray(schema.allowedFailureTypes) ? schema.allowedFailureTypes : []),
@@ -73,7 +79,95 @@ class CritiqueSchemaRegistry {
       defaultFailureType: schema.defaultFailureType || 'general',
       allowedFailureTypes: [...allowedFailureTypes],
       taxonomy,
+      riskClasses: this._normalizeDimensionMap(schema.riskClasses || {}),
+      artifactTypes: this._normalizeDimensionMap(schema.artifactTypes || {}),
       metadata: schema.metadata || {},
+    };
+  }
+
+  _normalizeTaxonomy(taxonomyInput = {}) {
+    const taxonomy = {};
+    for (const [failureType, defaults] of Object.entries(taxonomyInput || {})) {
+      taxonomy[failureType] = {
+        severity: defaults?.severity || 'medium',
+        verdict: defaults?.verdict || 'revise',
+        recommendedAction: defaults?.recommendedAction || 'revise',
+        requiredEvidence: Array.isArray(defaults?.requiredEvidence)
+          ? [...defaults.requiredEvidence]
+          : [],
+        metadata: defaults?.metadata || {},
+      };
+    }
+    return taxonomy;
+  }
+
+  _normalizeDimensionMap(input = {}) {
+    const normalized = {};
+    for (const [key, value] of Object.entries(input || {})) {
+      normalized[key] = {
+        taxonomy: this._normalizeOverlayTaxonomy(value?.taxonomy || {}),
+        metadata: value?.metadata || {},
+      };
+    }
+    return normalized;
+  }
+
+  _normalizeOverlayTaxonomy(taxonomyInput = {}) {
+    const taxonomy = {};
+    for (const [failureType, defaults] of Object.entries(taxonomyInput || {})) {
+      taxonomy[failureType] = {
+        ...(defaults && 'severity' in defaults ? { severity: defaults.severity } : {}),
+        ...(defaults && 'verdict' in defaults ? { verdict: defaults.verdict } : {}),
+        ...(defaults && 'recommendedAction' in defaults
+          ? { recommendedAction: defaults.recommendedAction }
+          : {}),
+        ...(Array.isArray(defaults?.requiredEvidence)
+          ? { requiredEvidence: [...defaults.requiredEvidence] }
+          : {}),
+        ...(defaults?.metadata ? { metadata: defaults.metadata } : {}),
+      };
+    }
+    return taxonomy;
+  }
+
+  _mergeSchema(base, riskOverlay, artifactOverlay, dimensions = {}) {
+    const mergedTaxonomy = JSON.parse(JSON.stringify(base.taxonomy || {}));
+
+    for (const overlay of [riskOverlay, artifactOverlay]) {
+      if (!overlay?.taxonomy) {
+        continue;
+      }
+
+      for (const [failureType, defaults] of Object.entries(overlay.taxonomy)) {
+        mergedTaxonomy[failureType] = {
+          ...(mergedTaxonomy[failureType] || {}),
+          ...defaults,
+          requiredEvidence: [
+            ...new Set([
+              ...((mergedTaxonomy[failureType]?.requiredEvidence) || []),
+              ...((defaults?.requiredEvidence) || []),
+            ]),
+          ],
+          metadata: {
+            ...((mergedTaxonomy[failureType]?.metadata) || {}),
+            ...(defaults?.metadata || {}),
+          },
+        };
+      }
+    }
+
+    return {
+      taskFamily: base.taskFamily,
+      defaultFailureType: base.defaultFailureType,
+      allowedFailureTypes: [...base.allowedFailureTypes],
+      taxonomy: mergedTaxonomy,
+      metadata: {
+        ...(base.metadata || {}),
+        ...(riskOverlay?.metadata || {}),
+        ...(artifactOverlay?.metadata || {}),
+        riskClass: dimensions.riskClass || null,
+        artifactType: dimensions.artifactType || null,
+      },
     };
   }
 }

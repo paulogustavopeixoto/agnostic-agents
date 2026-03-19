@@ -100,8 +100,15 @@ export class CritiqueSchemaRegistry {
 export class TrustRegistry {
   constructor(options?: { records?: JsonObject[] });
   recordOutcome(outcome?: JsonObject): JsonObject;
-  getScore(actorId: string, options?: { domain?: string | null }): number;
-  rankActors(actorIds?: string[], options?: { domain?: string | null }): JsonObject[];
+  getScore(
+    actorId: string,
+    options?: { domain?: string | null; taskFamily?: string | null; role?: string | null }
+  ): number;
+  rankActors(
+    actorIds?: string[],
+    options?: { domain?: string | null; taskFamily?: string | null; role?: string | null }
+  ): JsonObject[];
+  getProfile(actorId: string): JsonObject;
   summarize(): JsonObject;
 }
 
@@ -109,6 +116,8 @@ export class DisagreementResolver {
   constructor(options?: {
     trustRegistry?: TrustRegistry | JsonObject | null;
     escalateOnDisagreement?: boolean;
+    strategy?: string;
+    trustThreshold?: number;
   });
   resolve(critiques?: JsonObject[], context?: JsonObject): JsonObject;
 }
@@ -185,6 +194,57 @@ export class RoleAwareCoordinationPlanner {
   roleContracts: CoordinationRoleContract[];
   plan(task?: JsonObject, options?: { actors?: JsonObject[]; context?: JsonObject }): JsonObject;
   getRoleContract(role: string, task?: JsonObject): JsonObject;
+}
+
+export class VerificationStrategySelector {
+  constructor(options?: {
+    trustRegistry?: TrustRegistry | JsonObject | null;
+    thresholds?: JsonObject;
+  });
+  trustRegistry: TrustRegistry;
+  thresholds: JsonObject;
+  select(task?: JsonObject, context?: JsonObject): JsonObject;
+}
+
+export class MultiPassVerificationEngine {
+  constructor(options?: {
+    selector?: VerificationStrategySelector | JsonObject | null;
+    reviewers?: Array<Function | JsonObject>;
+  });
+  selector: VerificationStrategySelector;
+  reviewers: Array<Function | JsonObject>;
+  verify(candidate?: JsonObject, options?: { task?: JsonObject; context?: JsonObject }): Promise<JsonObject>;
+}
+
+export class CoordinationQualityTracker {
+  constructor(options?: {
+    trustRegistry?: TrustRegistry | JsonObject | null;
+    records?: JsonObject[];
+  });
+  trustRegistry: TrustRegistry;
+  records: JsonObject[];
+  record(record?: JsonObject): JsonObject;
+  getQualityScore(
+    actorId: string,
+    options?: {
+      qualityType?: string | null;
+      role?: string | null;
+      domain?: string | null;
+      taskFamily?: string | null;
+    }
+  ): number;
+  summarize(): JsonObject;
+  getProfile(actorId: string): JsonObject;
+}
+
+export class CoordinationDiagnostics {
+  summarize(options?: {
+    review?: JsonObject | null;
+    resolution?: JsonObject | null;
+    plan?: JsonObject | null;
+    verification?: JsonObject | null;
+    quality?: JsonObject | null;
+  }): JsonObject;
 }
 
 export class PolicyPack {

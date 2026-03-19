@@ -26,6 +26,10 @@ const { CoordinationBenchmarkSuite } = require('../src/coordination/Coordination
 const { CoordinationRoleContract } = require('../src/coordination/CoordinationRoleContract');
 const { CoordinationTrace } = require('../src/coordination/CoordinationTrace');
 const { RoleAwareCoordinationPlanner } = require('../src/coordination/RoleAwareCoordinationPlanner');
+const { VerificationStrategySelector } = require('../src/coordination/VerificationStrategySelector');
+const { MultiPassVerificationEngine } = require('../src/coordination/MultiPassVerificationEngine');
+const { CoordinationQualityTracker } = require('../src/coordination/CoordinationQualityTracker');
+const { CoordinationDiagnostics } = require('../src/coordination/CoordinationDiagnostics');
 const { Run } = require('../src/runtime/Run');
 const { EvidenceGraph } = require('../src/runtime/EvidenceGraph');
 const { EvalHarness } = require('../src/runtime/EvalHarness');
@@ -138,6 +142,10 @@ describe('Package/module unit tests', () => {
     expect(pkg.CoordinationRoleContract).toBeDefined();
     expect(pkg.CoordinationTrace).toBeDefined();
     expect(pkg.RoleAwareCoordinationPlanner).toBeDefined();
+    expect(pkg.VerificationStrategySelector).toBeDefined();
+    expect(pkg.MultiPassVerificationEngine).toBeDefined();
+    expect(pkg.CoordinationQualityTracker).toBeDefined();
+    expect(pkg.CoordinationDiagnostics).toBeDefined();
     expect(pkg.Run).toBeDefined();
     expect(pkg.DistributedRunEnvelope).toBeDefined();
     expect(pkg.ExecutionIdentity).toBeDefined();
@@ -1542,6 +1550,112 @@ describe('Package/module unit tests', () => {
     );
   });
 
+  test('TrustRegistry and DisagreementResolver support task-family trust profiles and trust consensus', () => {
+    const trustRegistry = new TrustRegistry({
+      records: [
+        {
+          actorId: 'verifier-release',
+          domain: 'release_review',
+          taskFamily: 'release_review',
+          role: 'verifier',
+          success: true,
+          confidence: 0.97,
+          outcomeType: 'direct',
+        },
+        {
+          actorId: 'critic-grounding',
+          domain: 'release_review',
+          taskFamily: 'release_review',
+          role: 'critic',
+          success: true,
+          confidence: 0.92,
+          outcomeType: 'recovery',
+          recoverySucceeded: true,
+        },
+        {
+          actorId: 'critic-style',
+          domain: 'release_review',
+          taskFamily: 'release_review',
+          role: 'critic',
+          success: false,
+          confidence: 0.45,
+          outcomeType: 'retry',
+          retries: 2,
+        },
+      ],
+    });
+
+    const resolver = new DisagreementResolver({
+      trustRegistry,
+      strategy: 'trust_consensus',
+      trustThreshold: 0.8,
+      escalateOnDisagreement: false,
+    });
+    const resolution = resolver.resolve(
+      [
+        {
+          criticId: 'verifier-release',
+          verdict: 'accept',
+          failureType: 'general',
+          severity: 'low',
+          confidence: 0.86,
+          recommendedAction: 'accept',
+          metadata: { role: 'verifier', taskFamily: 'release_review' },
+        },
+        {
+          criticId: 'critic-grounding',
+          verdict: 'reject',
+          failureType: 'grounding',
+          severity: 'high',
+          confidence: 0.88,
+          recommendedAction: 'branch_and_retry',
+          metadata: { role: 'critic', taskFamily: 'release_review' },
+        },
+        {
+          criticId: 'critic-style',
+          verdict: 'revise',
+          failureType: 'format',
+          severity: 'low',
+          confidence: 0.52,
+          recommendedAction: 'revise',
+          metadata: { role: 'critic', taskFamily: 'release_review' },
+        },
+      ],
+      {
+        domain: 'release_review',
+        taskFamily: 'release_review',
+      }
+    );
+
+    expect(trustRegistry.getScore('critic-grounding', {
+      domain: 'release_review',
+      taskFamily: 'release_review',
+      role: 'critic',
+    })).toBeGreaterThan(trustRegistry.getScore('critic-style', {
+      domain: 'release_review',
+      taskFamily: 'release_review',
+      role: 'critic',
+    }));
+    expect(trustRegistry.getProfile('critic-grounding')).toEqual(
+      expect.objectContaining({
+        actorId: 'critic-grounding',
+        byRole: [expect.objectContaining({ role: 'critic' })],
+        byTaskFamily: [expect.objectContaining({ taskFamily: 'release_review' })],
+      })
+    );
+    expect(resolution).toEqual(
+      expect.objectContaining({
+        strategy: 'trust_consensus',
+        action: 'branch_and_retry',
+      })
+    );
+    expect(resolution.summary.trustConsensus).toEqual(
+      expect.objectContaining({
+        threshold: 0.8,
+      })
+    );
+  });
+
   test('CritiqueProtocol applies task-family critique schemas and taxonomies', async () => {
     const schemaRegistry = new CritiqueSchemaRegistry({
       schemas: {
@@ -1595,6 +1709,85 @@ describe('Package/module unit tests', () => {
       expect.objectContaining({
         taskFamily: 'release_review',
         requiredEvidence: ['citations'],
+      })
+    );
+  });
+
+  test('CritiqueSchemaRegistry applies risk-class and artifact-type overlays', async () => {
+    const schemaRegistry = new CritiqueSchemaRegistry({
+      schemas: {
+        release_review: {
+          taxonomy: {
+            grounding: {
+              severity: 'high',
+              verdict: 'reject',
+              recommendedAction: 'branch_and_retry',
+              requiredEvidence: ['citations'],
+            },
+          },
+          riskClasses: {
+            high: {
+              taxonomy: {
+                grounding: {
+                  severity: 'critical',
+                  recommendedAction: 'escalate',
+                  requiredEvidence: ['incident_trace'],
+                },
+              },
+            },
+          },
+          artifactTypes: {
+            release_memo: {
+              taxonomy: {
+                grounding: {
+                  requiredEvidence: ['operator_signoff'],
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    const protocol = new CritiqueProtocol({
+      schemaRegistry,
+      reviewers: [
+        {
+          id: 'overlay-reviewer',
+          review: async () => ({
+            criticId: 'overlay-reviewer',
+            failureType: 'grounding',
+            rationale: 'The release memo needs stronger evidence.',
+          }),
+        },
+      ],
+    });
+
+    const review = await protocol.review(
+      {
+        id: 'candidate-overlay',
+        taskFamily: 'release_review',
+        riskClass: 'high',
+        artifactType: 'release_memo',
+      },
+      {
+        taskFamily: 'release_review',
+        riskClass: 'high',
+        artifactType: 'release_memo',
+      }
+    );
+
+    expect(review.critiques[0]).toEqual(
+      expect.objectContaining({
+        severity: 'critical',
+        recommendedAction: 'escalate',
+      })
+    );
+    expect(review.critiques[0].metadata).toEqual(
+      expect.objectContaining({
+        taskFamily: 'release_review',
+        riskClass: 'high',
+        artifactType: 'release_memo',
+        requiredEvidence: expect.arrayContaining(['citations', 'incident_trace', 'operator_signoff']),
       })
     );
   });
@@ -1932,6 +2125,397 @@ describe('Package/module unit tests', () => {
       })
     );
     expect(CoordinationTrace.render(plan.trace)).toContain('planner: planner-alpha');
+  });
+
+  test('VerificationStrategySelector chooses adversarial verification for high-risk disagreement-prone tasks', () => {
+    const trustRegistry = new TrustRegistry({
+      records: [
+        {
+          actorId: 'verifier-release',
+          domain: 'release_review',
+          taskFamily: 'release_review',
+          role: 'verifier',
+          success: true,
+          confidence: 0.58,
+        },
+      ],
+    });
+    const selector = new VerificationStrategySelector({ trustRegistry });
+
+    const selection = selector.select(
+      {
+        id: 'task-verification-1',
+        taskFamily: 'release_review',
+        risk: 0.86,
+      },
+      {
+        domain: 'release_review',
+        taskFamily: 'release_review',
+        history: {
+          disagreementRate: 0.42,
+          evidenceConflicts: 1,
+        },
+        verifierActorIds: ['verifier-release'],
+      }
+    );
+
+    expect(selection).toEqual(
+      expect.objectContaining({
+        strategy: 'adversarial_cross_check',
+        phases: [
+          expect.objectContaining({ role: 'verifier' }),
+          expect.objectContaining({ role: 'critic' }),
+          expect.objectContaining({ role: 'aggregator' }),
+        ],
+      })
+    );
+  });
+
+  test('MultiPassVerificationEngine runs verifier, critic, and aggregator phases for high-risk coordination', async () => {
+    const selector = new VerificationStrategySelector({
+      trustRegistry: new TrustRegistry({
+        records: [
+          {
+            actorId: 'verifier-release',
+            domain: 'release_review',
+            taskFamily: 'release_review',
+            role: 'verifier',
+            success: true,
+            confidence: 0.93,
+          },
+        ],
+      }),
+    });
+    const engine = new MultiPassVerificationEngine({
+      selector,
+      reviewers: [
+        {
+          id: 'verifier-release',
+          role: 'verifier',
+          review: async () => ({
+            verdict: 'accept',
+            confidence: 0.84,
+            rationale: 'Primary verification passed.',
+          }),
+        },
+        {
+          id: 'critic-adversary',
+          role: 'critic',
+          review: async () => ({
+            verdict: 'reject',
+            confidence: 0.87,
+            rationale: 'Adversarial review found grounding conflicts.',
+          }),
+        },
+        {
+          id: 'aggregator-final',
+          role: 'aggregator',
+          review: async () => ({
+            verdict: 'escalate',
+            confidence: 0.9,
+            rationale: 'Conflicting verification phases require escalation.',
+          }),
+        },
+      ],
+    });
+
+    const result = await engine.verify(
+      { id: 'candidate-verification-1' },
+      {
+        task: {
+          id: 'release-review-verification',
+          taskFamily: 'release_review',
+          risk: 0.86,
+        },
+        context: {
+          domain: 'release_review',
+          taskFamily: 'release_review',
+          history: {
+            disagreementRate: 0.42,
+            evidenceConflicts: 1,
+          },
+          verifierActorIds: ['verifier-release'],
+        },
+      }
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        strategy: 'adversarial_cross_check',
+        action: 'escalate',
+        summary: expect.objectContaining({
+          phasesRun: 3,
+          disagreement: true,
+          action: 'escalate',
+        }),
+      })
+    );
+    expect(result.verificationTrace).toEqual(
+      expect.objectContaining({
+        traceType: 'coordination_verification',
+        strategy: 'adversarial_cross_check',
+      })
+    );
+  });
+
+  test('CoordinationQualityTracker separates verifier quality from executor quality', () => {
+    const tracker = new CoordinationQualityTracker();
+
+    tracker.record({
+      actorId: 'executor-beta',
+      role: 'executor',
+      domain: 'release_review',
+      taskFamily: 'release_review',
+      success: true,
+      confidence: 0.81,
+    });
+    tracker.record({
+      actorId: 'executor-beta',
+      role: 'executor',
+      domain: 'release_review',
+      taskFamily: 'release_review',
+      success: false,
+      confidence: 0.42,
+      retries: 2,
+    });
+    tracker.record({
+      actorId: 'verifier-gamma',
+      role: 'verifier',
+      domain: 'release_review',
+      taskFamily: 'release_review',
+      success: true,
+      confidence: 0.94,
+    });
+    tracker.record({
+      actorId: 'verifier-gamma',
+      role: 'verifier',
+      domain: 'release_review',
+      taskFamily: 'release_review',
+      success: true,
+      confidence: 0.91,
+      recoverySucceeded: true,
+    });
+
+    const verifierScore = tracker.getQualityScore('verifier-gamma', {
+      qualityType: 'verification',
+    });
+    const executorScore = tracker.getQualityScore('executor-beta', {
+      qualityType: 'execution',
+    });
+
+    expect(verifierScore).toBeGreaterThan(executorScore);
+    expect(tracker.summarize()).toEqual(
+      expect.objectContaining({
+        verifierQuality: [expect.objectContaining({ actorId: 'verifier-gamma' })],
+        executorQuality: [expect.objectContaining({ actorId: 'executor-beta' })],
+      })
+    );
+    expect(tracker.getProfile('verifier-gamma')).toEqual(
+      expect.objectContaining({
+        actorId: 'verifier-gamma',
+        quality: [expect.objectContaining({ qualityType: 'verification' })],
+      })
+    );
+  });
+
+  test('CoordinationBenchmarkSuite supports deeper disagreement, recovery, role-routing, and failure scenarios', async () => {
+    const trustRegistry = new TrustRegistry({
+      records: [
+        { actorId: 'policy-reviewer', domain: 'policy', taskFamily: 'release_review', role: 'critic', success: true, confidence: 0.96 },
+      ],
+    });
+    const critiqueProtocol = new CritiqueProtocol({
+      schemaRegistry: new CritiqueSchemaRegistry({
+        schemas: {
+          release_review: {
+            taxonomy: {
+              policy: {
+                severity: 'critical',
+                verdict: 'escalate',
+                recommendedAction: 'escalate',
+              },
+            },
+          },
+        },
+      }),
+      reviewers: [
+        {
+          id: 'policy-reviewer',
+          review: async () => ({
+            criticId: 'policy-reviewer',
+            failureType: 'policy',
+            confidence: 0.94,
+            rationale: 'Approval is required.',
+          }),
+        },
+      ],
+    });
+    const disagreementResolver = new DisagreementResolver({ trustRegistry });
+    const coordinationLoop = new CoordinationLoop({
+      critiqueProtocol,
+      trustRegistry,
+      disagreementResolver,
+      handlers: {
+        escalate: async ({ candidate }) => ({ ok: true, escalated: true, candidateId: candidate.id }),
+      },
+    });
+    const suite = new CoordinationBenchmarkSuite({
+      critiqueProtocol,
+      disagreementResolver,
+      coordinationLoop,
+      decompositionAdvisor: new DecompositionAdvisor(),
+      roleAwareCoordinationPlanner: new RoleAwareCoordinationPlanner({ trustRegistry }),
+    });
+
+    const report = await suite.run({
+      candidate: { id: 'candidate-benchmark-1', taskFamily: 'release_review' },
+      reviewContext: { taskFamily: 'release_review', domain: 'policy' },
+      expectedResolutionAction: 'escalate',
+      disagreementCritiques: [
+        {
+          criticId: 'policy-reviewer',
+          verdict: 'escalate',
+          failureType: 'policy',
+          severity: 'critical',
+          confidence: 0.94,
+          recommendedAction: 'escalate',
+        },
+        {
+          criticId: 'style-reviewer',
+          verdict: 'revise',
+          failureType: 'format',
+          severity: 'low',
+          confidence: 0.42,
+          recommendedAction: 'revise',
+        },
+      ],
+      expectedDisagreementAction: 'escalate',
+      recoveryCandidate: { id: 'candidate-recovery-1', taskFamily: 'release_review' },
+      recoveryContext: { taskFamily: 'release_review', domain: 'policy' },
+      expectedRecoveryAction: 'escalate',
+      roleTask: {
+        id: 'role-task-1',
+        taskType: 'release_review',
+        complexity: 0.88,
+        risk: 0.82,
+        suggestedSubtasks: [
+          { task: 'Inspect release evidence', taskType: 'analysis', requiredCapabilities: ['retrieval'] },
+          { task: 'Draft release recommendation', taskType: 'writing', requiredCapabilities: ['generateText'] },
+        ],
+      },
+      roleActors: [
+        { id: 'planner-alpha', roles: ['planner'], capabilities: ['planning', 'retrieval'], specializations: ['analysis'], trustScore: 0.92 },
+        { id: 'executor-beta', roles: ['executor'], capabilities: ['execution', 'generateText'], specializations: ['writing'], trustScore: 0.87 },
+        { id: 'verifier-gamma', roles: ['verifier'], capabilities: ['verification', 'retrieval'], specializations: ['review'], trustScore: 0.95 },
+        { id: 'critic-delta', roles: ['critic'], capabilities: ['critique', 'verification'], specializations: ['review'], trustScore: 0.9 },
+        { id: 'aggregator-epsilon', roles: ['aggregator'], capabilities: ['synthesis', 'generateText'], specializations: ['synthesis'], trustScore: 0.89 },
+      ],
+      roleContext: { domain: 'release_review' },
+      expectedRoleStrategy: 'role_routed_split_execution',
+      failureDecompositionTask: {
+        id: 'failure-task-1',
+        task: 'Execute risky production change without a verifier',
+        taskType: 'operations',
+        complexity: 0.93,
+        risk: 0.95,
+        requiredCapabilities: ['shell'],
+      },
+      failureDecompositionOptions: { availableDelegates: [] },
+      expectedFailureDecompositionAction: 'escalate',
+      trustSensitiveCritiques: [
+        {
+          criticId: 'policy-reviewer',
+          verdict: 'escalate',
+          failureType: 'policy',
+          severity: 'critical',
+          confidence: 0.94,
+          recommendedAction: 'escalate',
+          metadata: { role: 'critic', taskFamily: 'release_review' },
+        },
+        {
+          criticId: 'style-reviewer',
+          verdict: 'accept',
+          failureType: 'general',
+          severity: 'low',
+          confidence: 0.35,
+          recommendedAction: 'accept',
+          metadata: { role: 'critic', taskFamily: 'release_review' },
+        },
+      ],
+      expectedTrustAction: 'escalate',
+    });
+
+    expect(report.total).toBe(8);
+    expect(report.failed).toBe(0);
+    expect(report.results).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'coordination-disagreement-benchmark', passed: true }),
+        expect.objectContaining({ id: 'coordination-recovery-benchmark', passed: true }),
+        expect.objectContaining({ id: 'coordination-role-routing-benchmark', passed: true }),
+        expect.objectContaining({ id: 'coordination-failure-decomposition-benchmark', passed: true }),
+        expect.objectContaining({ id: 'coordination-trust-assumption-benchmark', passed: true }),
+      ])
+    );
+  });
+
+  test('CoordinationDiagnostics builds operator-facing summaries', () => {
+    const diagnostics = new CoordinationDiagnostics();
+    const qualityTracker = new CoordinationQualityTracker();
+    qualityTracker.record({
+      actorId: 'verifier-gamma',
+      role: 'verifier',
+      domain: 'release_review',
+      taskFamily: 'release_review',
+      success: false,
+      confidence: 0.58,
+    });
+
+    const report = diagnostics.summarize({
+      review: {
+        summary: {
+          total: 2,
+          disagreement: true,
+        },
+      },
+      resolution: {
+        action: 'escalate',
+        disagreement: true,
+      },
+      plan: {
+        strategy: 'escalate_missing_roles',
+        gaps: ['aggregator'],
+      },
+      verification: {
+        action: 'escalate',
+        summary: {
+          disagreement: true,
+          action: 'escalate',
+        },
+      },
+      quality: qualityTracker.summarize(),
+    });
+
+    expect(report).toEqual(
+      expect.objectContaining({
+        flags: expect.arrayContaining([
+          'reviewer_disagreement',
+          'operator_escalation',
+          'missing_roles',
+          'verification_escalation',
+          'verification_disagreement',
+          'low_verifier_quality',
+        ]),
+        recommendations: expect.arrayContaining([
+          expect.stringContaining('automatic execution'),
+          expect.stringContaining('missing planner/executor/verifier/critic/aggregator roles'),
+        ]),
+        summary: expect.objectContaining({
+          disagreement: true,
+          resolutionAction: 'escalate',
+          roleStrategy: 'escalate_missing_roles',
+        }),
+      })
+    );
   });
 
   test('Run tracks state and serializes cleanly', () => {

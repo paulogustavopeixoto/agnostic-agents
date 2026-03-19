@@ -143,6 +143,10 @@ describe('Maintained examples', () => {
     expect(stdout).toContain('Trust summary');
     expect(stdout).toContain('Resolved coordination action');
     expect(stdout).toContain('Coordination loop record');
+    expect(stdout).toContain("riskClass: 'high'");
+    expect(stdout).toContain("artifactType: 'release_memo'");
+    expect(stdout).toContain('incident_trace');
+    expect(stdout).toContain('operator_signoff');
   });
 
   test('reference decomposition advisor example runs', async () => {
@@ -168,6 +172,23 @@ describe('Maintained examples', () => {
     expect(stdout).toContain('coordination-resolution-benchmark');
     expect(stdout).toContain('coordination-loop-benchmark');
     expect(stdout).toContain('coordination-decomposition-benchmark');
+    expect(stdout).toContain('coordination-disagreement-benchmark');
+    expect(stdout).toContain('coordination-recovery-benchmark');
+    expect(stdout).toContain('coordination-role-routing-benchmark');
+    expect(stdout).toContain('coordination-failure-decomposition-benchmark');
+    expect(stdout).toContain('coordination-trust-assumption-benchmark');
+  });
+
+  test('reference coordination diagnostics example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceCoordinationDiagnostics.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Coordination diagnostics summary');
+    expect(stdout).toContain('reviewer_disagreement');
+    expect(stdout).toContain('missing_roles');
+    expect(stdout).toContain('low_verifier_quality');
   });
 
   test('reference coordination policy gate example runs', async () => {
@@ -194,6 +215,45 @@ describe('Maintained examples', () => {
     expect(stdout).toContain("actorId: 'planner-alpha'");
     expect(stdout).toContain('Role-aware coordination trace');
     expect(stdout).toContain('verifier: verifier-gamma');
+  });
+
+  test('reference advanced disagreement example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceAdvancedDisagreement.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Advanced disagreement summary');
+    expect(stdout).toContain("strategy: 'trust_consensus'");
+    expect(stdout).toContain("taskFamily: 'release_review'");
+    expect(stdout).toContain("action: 'branch_and_retry'");
+    expect(stdout).toContain('trustProfile');
+  });
+
+  test('reference coordination verification example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceCoordinationVerification.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Coordination verification summary');
+    expect(stdout).toContain("strategy: 'adversarial_cross_check'");
+    expect(stdout).toContain("action: 'escalate'");
+    expect(stdout).toContain("role: 'critic'");
+    expect(stdout).toContain('verificationTrace');
+  });
+
+  test('reference coordination quality example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceCoordinationQuality.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Coordination quality summary');
+    expect(stdout).toContain('verifierProfile');
+    expect(stdout).toContain('executorProfile');
+    expect(stdout).toContain('verifierQuality');
+    expect(stdout).toContain('executorQuality');
   });
 
   test('reference production policy pack example runs', async () => {

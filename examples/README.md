@@ -59,7 +59,7 @@ These examples are intended as reference deployment patterns rather than feature
   - prints a single end-to-end `v7` audit across learning, branch analysis, verifier composition, confidence policy, adaptive retry, routing, governance review, and adaptive benchmarks
 - `referenceCoordinationReview.js`
   - no API key required
-  - shows a first coordination-layer slice where structured critics review a runtime summary, trust scores weight the critics, a disagreement resolver chooses the next action, and a coordination loop executes that action
+  - shows a first coordination-layer slice where structured critics review a runtime summary, task/risk/artifact-aware critique schemas apply defaults, trust scores weight the critics, a disagreement resolver chooses the next action, and a coordination loop executes that action
 - `referenceDecompositionAdvisor.js`
   - no API key required
   - shows how the coordination layer can recommend direct execution, delegation, or split-and-delegate plans based on task complexity, risk, capabilities, and delegate trust
@@ -72,6 +72,18 @@ These examples are intended as reference deployment patterns rather than feature
 - `referenceRoleAwareCoordination.js`
   - no API key required
   - shows public planner/executor/verifier/critic/aggregator role contracts, trust-weighted role assignment, and an inspectable coordination trace
+- `referenceAdvancedDisagreement.js`
+  - no API key required
+  - shows task-family and role-aware trust records plus disagreement resolution with the `trust_consensus` strategy
+- `referenceCoordinationVerification.js`
+  - no API key required
+  - shows strategy-selected single-pass vs multi-pass coordination verification, including adversarial verifier/critic/aggregator review for high-risk work
+- `referenceCoordinationQuality.js`
+  - no API key required
+  - shows verifier-quality and executor-quality tracking as separate coordination-quality surfaces
+- `referenceCoordinationDiagnostics.js`
+  - no API key required
+  - shows operator-facing coordination diagnostics for disagreement, missing roles, escalation, and quality warnings
 - `referenceProductionPolicyPack.js`
   - no API key required
   - shows a maintained production-oriented policy/governance pack contributing policy rules and governance hooks through `ExtensionHost`

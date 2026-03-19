@@ -51,6 +51,26 @@ async function main() {
             requiredEvidence: ['approval_record'],
           },
         },
+        riskClasses: {
+          high: {
+            taxonomy: {
+              grounding: {
+                severity: 'critical',
+                recommendedAction: 'escalate',
+                requiredEvidence: ['incident_trace'],
+              },
+            },
+          },
+        },
+        artifactTypes: {
+          release_memo: {
+            taxonomy: {
+              policy: {
+                requiredEvidence: ['operator_signoff'],
+              },
+            },
+          },
+        },
       },
     },
   });
@@ -104,15 +124,22 @@ async function main() {
     confidence: 0.97,
   });
 
-  const review = await protocol.review(
-    {
-      ...candidate,
-      taskFamily: 'release_review',
-    },
-    { taskFamily: 'release_review' }
-  );
+  const enrichedCandidate = {
+    ...candidate,
+    taskFamily: 'release_review',
+    riskClass: 'high',
+    artifactType: 'release_memo',
+  };
+  const enrichedContext = {
+    domain: 'policy',
+    taskFamily: 'release_review',
+    riskClass: 'high',
+    artifactType: 'release_memo',
+  };
+
+  const review = await protocol.review(enrichedCandidate, enrichedContext);
   const resolver = new DisagreementResolver({ trustRegistry });
-  const resolution = resolver.resolve(review.critiques, { domain: 'policy' });
+  const resolution = resolver.resolve(review.critiques, enrichedContext);
   const loop = new CoordinationLoop({
     critiqueProtocol: protocol,
     trustRegistry,
@@ -131,7 +158,7 @@ async function main() {
       }),
     },
   });
-  const loopRecord = await loop.coordinate(candidate, { domain: 'policy' });
+  const loopRecord = await loop.coordinate(enrichedCandidate, enrichedContext);
 
   console.log('Structured critique review:');
   console.dir(review, { depth: null });

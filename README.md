@@ -285,6 +285,7 @@ Above the runtime core, the package now includes:
 
 - `CritiqueProtocol`
 - `CritiqueSchemaRegistry`
+- risk-class and artifact-type-aware critique defaults through `CritiqueSchemaRegistry`
 - `TrustRegistry`
 - `DisagreementResolver`
 - `CoordinationLoop`
@@ -293,12 +294,21 @@ Above the runtime core, the package now includes:
 - `CoordinationRoleContract`
 - `RoleAwareCoordinationPlanner`
 - `CoordinationTrace`
+- `DisagreementResolver` strategies for weighted, majority, trust-consensus, and severity-first coordination
+- `VerificationStrategySelector`
+- `MultiPassVerificationEngine`
+- `CoordinationQualityTracker`
+- `CoordinationDiagnostics`
 
 This layer is for:
 
 - structured critique records
 - trust-weighted disagreement handling
 - role-aware decomposition and assignment
+- disagreement strategies shaped by trust, severity, and consensus mode
+- multi-pass and adversarial verification paths for higher-risk coordination
+- verifier quality tracked separately from executor quality
+- operator-facing coordination diagnostics for disagreement, missing roles, and verification escalation
 - coordination evals and benchmarks
 
 It is intentionally separate from the runtime kernel.

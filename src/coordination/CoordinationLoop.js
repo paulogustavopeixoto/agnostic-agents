@@ -75,6 +75,8 @@ class CoordinationLoop {
       this.trustRegistry.recordOutcome({
         actorId: critique.criticId,
         domain: context.domain || critique.failureType || 'general',
+        taskFamily: context.taskFamily || critique.metadata?.taskFamily || null,
+        role: critique.metadata?.role || 'critic',
         success:
           resolution.action === 'accept'
             ? critique.verdict === 'accept'
@@ -82,6 +84,16 @@ class CoordinationLoop {
               ? actionSucceeded
               : false,
         confidence: critique.confidence,
+        outcomeType:
+          result?.output?.recoveryExecuted || resolution.action === 'branch_and_retry'
+            ? 'recovery'
+            : resolution.action === 'escalate'
+              ? 'escalation'
+              : resolution.action === 'revise'
+                ? 'retry'
+                : 'direct',
+        retries: typeof result?.output?.retries === 'number' ? result.output.retries : 0,
+        recoverySucceeded: typeof result?.output?.recoverySucceeded === 'boolean' ? result.output.recoverySucceeded : null,
         metadata: {
           resolutionAction: resolution.action,
           candidateId: critique.candidateId,
