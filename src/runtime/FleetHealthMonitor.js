@@ -14,6 +14,7 @@ class FleetHealthMonitor {
       adaptiveRegressions: Number.isFinite(snapshot.adaptiveRegressions) ? snapshot.adaptiveRegressions : 0,
       schedulerBacklog: Number.isFinite(snapshot.schedulerBacklog) ? snapshot.schedulerBacklog : 0,
       saturation: Number.isFinite(snapshot.saturation) ? snapshot.saturation : 0,
+      routeMetrics: Array.isArray(snapshot.routeMetrics) ? [...snapshot.routeMetrics] : [],
     };
 
     this.snapshots.push(normalized);

@@ -16,6 +16,7 @@ It is designed for projects that need more than a chat wrapper:
 - grounded retrieval and layered memory
 - distributed handoff across processes or services
 - evals, benchmarks, and incident analysis
+- API and protocol tools imported from OpenAPI, curl, and MCP discovery
 
 The package also includes a separate coordination layer above the runtime for:
 
@@ -65,6 +66,7 @@ Use `agnostic-agents` when you want:
 - a package that can evolve toward capability-aware routing instead of static model/provider defaults
 - a package that treats memory as governed operational knowledge instead of ad hoc retrieval glue
 - a package that treats supervised autonomy as a core operating model rather than an exception path
+- a package that can turn OpenAPI files, curl commands, and MCP discovery into governed executable tools
 
 Do not think of it as only a prompt helper or a chat abstraction. The maintained direction is a runtime control layer for serious agent systems.
 
@@ -179,6 +181,22 @@ That gives you:
 - replay and branching
 - structured events
 - run inspection and trace export
+
+### API and MCP Tool Import
+
+The maintained import surfaces are:
+
+- `OpenAPILoader`
+- `ApiLoader`
+- `CurlLoader`
+- `MCPDiscoveryLoader`
+
+Use them when you want to:
+
+- turn an OpenAPI file into executable runtime tools
+- normalize a custom API spec into runtime tools
+- bootstrap a tool from a working curl command
+- discover remote MCP tools and expose them through the normal tool/runtime path
 
 ### Workflow and Delegation
 
@@ -370,6 +388,7 @@ The current maintained `v14` baseline starts with:
 - `FleetSafetyController`
 - `FleetImpactComparator`
 - `FleetRollbackAdvisor`
+- `RouteFleetDiagnostics`
 
 The current maintained `v15` baseline starts with:
 
@@ -574,6 +593,7 @@ Evals and ecosystem:
 
 - [Benchmarking](docs/benchmarking.md)
 - [Benchmark fixtures](docs/benchmark-fixtures.md)
+- [Capability fabric](docs/capability-fabric.md)
 - [Community summaries](docs/community-summaries.md)
 - [Community roadmap status](docs/community-roadmap-status.md)
 - [Plugin authoring](docs/plugin-authoring.md)
@@ -668,6 +688,11 @@ The governing rule stays the same:
 - supervised autonomy over blind automation
 - governed memory over ad hoc retrieval
 - policy and evaluation over hidden self-modification
+
+The first maintained `v17` surface is `CapabilityRouter`, which adds
+explainable capability-aware ranking above raw provider fallback.
+That routing surface now also plugs into decomposition, role-aware coordination,
+and verification strategy selection.
 
 It does not try to be:
 

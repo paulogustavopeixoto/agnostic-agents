@@ -5,6 +5,7 @@ This guide shows the maintained OpenAPI integration path in `agnostic-agents`.
 The package currently focuses on:
 
 - importing an OpenAPI spec into runtime tools
+- importing a `curl` command into the same API-tool path as a bootstrap step
 - executing those tools through the normal agent/runtime path
 
 It does not currently ship a maintained OpenAPI exporter.
@@ -12,6 +13,7 @@ It does not currently ship a maintained OpenAPI exporter.
 So the practical maintained story today is:
 
 - OpenAPI import: yes
+- curl import: yes
 - OpenAPI export: not yet a maintained package feature
 
 ## 1. Import an OpenAPI spec into tools
@@ -70,6 +72,7 @@ If the imported API requires auth:
 See:
 
 - [`examples/referenceOpenApiImport.js`](../examples/referenceOpenApiImport.js)
+- [`examples/referenceCurlImport.js`](../examples/referenceCurlImport.js)
 
 That example shows:
 
@@ -77,11 +80,33 @@ That example shows:
 - importing it into tools
 - inspecting the generated tool names and schemas
 
-## 5. Current boundary
+The curl example shows:
+
+- parsing a curl command
+- converting it into the `ApiLoader` spec shape
+- importing executable runtime tools from that command
+
+## 5. Use curl as a bootstrap path
+
+Use `CurlLoader` when you do not have an OpenAPI file yet but you do have a working curl command from docs, Postman, or an incident trace.
+
+```js
+const { CurlLoader } = require('agnostic-agents');
+
+const { tools } = CurlLoader.load(
+  "curl -X POST 'https://api.example.com/messages?channel=ops' -H 'Authorization: Bearer token-123' -d '{\"message\":\"hello\"}'",
+  { serviceName: 'imported' }
+);
+```
+
+This is best treated as a bootstrap/import path, not a perfect contract source. When a real OpenAPI spec exists, `OpenAPILoader` remains the stronger maintained source of truth.
+
+## 6. Current boundary
 
 Today, the maintained OpenAPI path is:
 
 - OpenAPI file -> `OpenAPILoader` -> runtime tools
+- curl command -> `CurlLoader` -> `ApiLoader` spec -> runtime tools
 
 What is not yet maintained:
 

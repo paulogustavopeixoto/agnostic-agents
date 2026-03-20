@@ -2,6 +2,7 @@ const {
   TrustRegistry,
   VerificationStrategySelector,
   MultiPassVerificationEngine,
+  CapabilityRouter,
 } = require('../index');
 
 async function main() {
@@ -34,7 +35,24 @@ async function main() {
     ],
   });
 
-  const selector = new VerificationStrategySelector({ trustRegistry });
+  const capabilityRouter = new CapabilityRouter({
+    candidates: [
+      {
+        id: 'adversarial-sandbox',
+        kind: 'simulator',
+        capabilities: ['verification', 'critique'],
+        profile: {
+          taskTypes: ['release_review'],
+          trustZones: ['private'],
+          supportsSimulation: true,
+          certificationLevel: 'certified',
+          reputationScore: 0.83,
+        },
+      },
+    ],
+  });
+
+  const selector = new VerificationStrategySelector({ trustRegistry, capabilityRouter });
   const engine = new MultiPassVerificationEngine({
     selector,
     reviewers: [
@@ -85,6 +103,8 @@ async function main() {
           evidenceConflicts: 1,
         },
         verifierActorIds: ['verifier-release'],
+        trustZone: 'private',
+        verificationCandidates: capabilityRouter.candidates,
       },
     }
   );
@@ -94,6 +114,7 @@ async function main() {
     {
       strategy: result.strategy,
       selection: result.selection,
+      routeTarget: result.selection.routeRecommendation?.candidate?.id || null,
       summary: result.summary,
       verificationTrace: result.verificationTrace,
     },

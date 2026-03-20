@@ -11,6 +11,7 @@ The maintained public surface now includes:
 - `FleetSafetyController`
 - `FleetImpactComparator`
 - `FleetRollbackAdvisor`
+- `RouteFleetDiagnostics`
 
 ## What this enables
 
@@ -20,6 +21,7 @@ The maintained public surface now includes:
 - fleet safety decisions for concurrency, backlog, regression, saturation, and rollout boundaries
 - rollout-impact comparison between baseline fleet state and post-change fleet state
 - rollback advice driven by broader post-rollout regression patterns
+- route-health diagnostics for degraded providers, route saturation, and route drift
 
 ## Maintained example
 
@@ -32,6 +34,7 @@ That example shows:
 - canary evaluation that halts rollout on unhealthy adaptive changes
 - fleet safety control that halts or throttles work when budgets are exceeded
 - rollout-impact comparison showing whether the fleet actually improved after a change
+- route diagnostics showing degraded and drifting intelligence paths across the fleet
 - rollback advice when broader fleet metrics worsen after rollout
 
 ## Operator guidance

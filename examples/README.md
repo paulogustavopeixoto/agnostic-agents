@@ -74,13 +74,13 @@ These examples are intended as reference deployment patterns rather than feature
   - shows policy gating of coordination outcomes so runtime policy can require escalation or deny automatic retry paths
 - `referenceRoleAwareCoordination.js`
   - no API key required
-  - shows public planner/executor/verifier/critic/aggregator role contracts, trust-weighted role assignment, and an inspectable coordination trace
+  - shows public planner/executor/verifier/critic/aggregator role contracts, trust-weighted role assignment, route-aware execution/verification targets, and an inspectable coordination trace
 - `referenceAdvancedDisagreement.js`
   - no API key required
   - shows task-family and role-aware trust records plus disagreement resolution with the `trust_consensus` strategy
 - `referenceCoordinationVerification.js`
   - no API key required
-  - shows strategy-selected single-pass vs multi-pass coordination verification, including adversarial verifier/critic/aggregator review for high-risk work
+  - shows strategy-selected single-pass vs multi-pass coordination verification, including adversarial verifier/critic/aggregator review plus capability-routed verification targets for high-risk work
 - `referenceCoordinationQuality.js`
   - no API key required
   - shows verifier-quality and executor-quality tracking as separate coordination-quality surfaces
@@ -93,6 +93,9 @@ These examples are intended as reference deployment patterns rather than feature
 - `referenceFleetRollout.js`
   - no API key required
   - shows staged rollout artifacts, fleet health summaries, canary halt/rollback decisions, fleet safety throttling/halt controls, before/after rollout impact comparison, and rollback advice for broader regressions
+- `referenceCapabilityRouter.js`
+  - no API key required
+  - shows capability-aware route ranking across model, simulator, and human candidates with trust-zone, cost/risk, certification, reputation, and historical-outcome signals
 - `referenceAssuranceSuite.js`
   - no API key required
   - shows explicit invariants, branch/replay/recovery/coordination assurance scenarios, operator-facing assurance verdicts, rollout guardrails, and rollback/quarantine planning
@@ -153,6 +156,9 @@ These examples are intended as reference deployment patterns rather than feature
 - `referenceOpenApiImport.js`
   - no API key required
   - shows importing a small OpenAPI spec into runtime tools
+- `referenceCurlImport.js`
+  - no API key required
+  - shows importing a `curl` command into an API spec and executable runtime tools
 - `referenceDurableBackends.js`
   - no API key required
   - shows custom durable run/job/layer store implementations and registry usage

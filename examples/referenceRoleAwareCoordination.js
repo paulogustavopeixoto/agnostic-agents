@@ -2,6 +2,7 @@ const {
   TrustRegistry,
   RoleAwareCoordinationPlanner,
   CoordinationTrace,
+  CapabilityRouter,
 } = require('../index');
 
 const trustRegistry = new TrustRegistry({
@@ -14,7 +15,24 @@ const trustRegistry = new TrustRegistry({
   ],
 });
 
-const planner = new RoleAwareCoordinationPlanner({ trustRegistry });
+const capabilityRouter = new CapabilityRouter({
+  candidates: [
+    {
+      id: 'verification-sandbox',
+      kind: 'simulator',
+      capabilities: ['verification', 'critique'],
+      profile: {
+        taskTypes: ['release_review'],
+        trustZones: ['private'],
+        supportsSimulation: true,
+        certificationLevel: 'certified',
+        reputationScore: 0.84,
+      },
+    },
+  ],
+});
+
+const planner = new RoleAwareCoordinationPlanner({ trustRegistry, capabilityRouter });
 
 const task = {
   id: 'release-review-task',
@@ -78,6 +96,8 @@ const plan = planner.plan(task, {
   actors,
   context: {
     domain: 'release_review',
+    trustZone: 'private',
+    routeCandidates: capabilityRouter.candidates,
   },
 });
 
@@ -91,6 +111,12 @@ console.dir(
       actorId: assignment.actor?.id || null,
       trustScore: assignment.trustScore,
     })),
+    routeTargets: Object.fromEntries(
+      Object.entries(plan.routeRecommendations).map(([key, value]) => [
+        key,
+        value?.candidate?.id || value?.candidate?.candidate?.id || null,
+      ])
+    ),
   },
   { depth: null }
 );

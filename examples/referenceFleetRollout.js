@@ -5,6 +5,7 @@ const {
   FleetSafetyController,
   FleetImpactComparator,
   FleetRollbackAdvisor,
+  RouteFleetDiagnostics,
 } = require('../index');
 
 async function main() {
@@ -46,6 +47,16 @@ async function main() {
     adaptiveRegressions: 1,
     schedulerBacklog: 3,
     saturation: 0.71,
+    routeMetrics: [
+      {
+        routeId: 'coding-route',
+        selectedCount: 14,
+        degraded: false,
+        saturation: 0.58,
+        driftScore: 0.18,
+        fallbackRate: 0.07,
+      },
+    ],
   });
 
   const monitor = new FleetHealthMonitor();
@@ -57,6 +68,24 @@ async function main() {
     adaptiveRegressions: 1,
     schedulerBacklog: 2,
     saturation: 0.62,
+    routeMetrics: [
+      {
+        routeId: 'coding-route',
+        selectedCount: 16,
+        degraded: true,
+        saturation: 0.84,
+        driftScore: 0.57,
+        fallbackRate: 0.31,
+      },
+      {
+        routeId: 'verification-route',
+        selectedCount: 8,
+        degraded: false,
+        saturation: 0.49,
+        driftScore: 0.16,
+        fallbackRate: 0.04,
+      },
+    ],
   });
 
   const evaluator = new FleetCanaryEvaluator({ monitor });
@@ -85,6 +114,7 @@ async function main() {
     comparison,
     safetyDecision: safety,
   });
+  const routeDiagnostics = new RouteFleetDiagnostics({ monitor }).analyze();
 
   console.log('Fleet rollout summary:');
   console.dir(
@@ -94,6 +124,7 @@ async function main() {
       decision,
       safety,
       comparison,
+      routeDiagnostics,
       rollbackAdvice,
     },
     { depth: null }

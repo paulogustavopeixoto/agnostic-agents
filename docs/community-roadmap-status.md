@@ -91,6 +91,12 @@ layer:
 3. make autonomy budgeted and supervised by default
 4. converge those layers into one coherent operator-facing system
 
+Current progress inside that next horizon:
+
+- `v17` has started with a maintained `CapabilityRouter` surface for explainable
+  capability-aware route ranking across models, simulators, and human-review paths
+- `v17` also now includes route-aware coordination hooks and fleet-facing route diagnostics
+
 The remaining themes inside that horizon are:
 
 - tool reputation, certification, and simulation before risky execution

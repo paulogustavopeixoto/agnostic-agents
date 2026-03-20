@@ -30,7 +30,6 @@ class MCPDiscoveryLoader {
     const tools = toolDefs.map(def => {
       const name = def.name || def.id;
       if (!name) {
-        console.warn('[MCPDiscoveryLoader] Skipping tool without a name:', def);
         return null;
       }
 
@@ -44,6 +43,7 @@ class MCPDiscoveryLoader {
 
       return new MCPTool({
         name: `${serviceName}_${name}`, // avoid collisions if multiple MCP servers
+        remoteName: name,
         description: def.description || `MCP tool "${name}"`,
         parameters,
         mcpClient: client,

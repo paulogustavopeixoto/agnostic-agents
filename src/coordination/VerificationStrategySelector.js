@@ -4,6 +4,7 @@ class VerificationStrategySelector {
   constructor({
     trustRegistry = null,
     thresholds = {},
+    capabilityRouter = null,
   } = {}) {
     this.trustRegistry =
       trustRegistry instanceof TrustRegistry ? trustRegistry : new TrustRegistry(trustRegistry || {});
@@ -15,6 +16,7 @@ class VerificationStrategySelector {
       lowVerifierTrust: 0.65,
       ...thresholds,
     };
+    this.capabilityRouter = capabilityRouter;
   }
 
   select(task = {}, context = {}) {
@@ -63,6 +65,7 @@ class VerificationStrategySelector {
       reasons,
       verifierRanking,
       phases,
+      routeRecommendation: this._buildRouteRecommendation(strategy, task, context),
     };
   }
 
@@ -87,6 +90,29 @@ class VerificationStrategySelector {
 
   _normalizeNumber(value, fallback) {
     return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+  }
+
+  _buildRouteRecommendation(strategy, task = {}, context = {}) {
+    if (!this.capabilityRouter?.select) {
+      return null;
+    }
+
+    return this.capabilityRouter.select(
+      {
+        taskType: task.taskFamily || task.taskType || task.domain || context.taskFamily || null,
+        requiredCapabilities: strategy === 'single_pass' ? ['verification'] : ['verification', 'critique'],
+        preferredKinds:
+          strategy === 'adversarial_cross_check'
+            ? ['simulator', 'human', 'agent', 'model']
+            : strategy === 'multi_pass_cross_check'
+              ? ['agent', 'model', 'human']
+              : ['agent', 'model'],
+        trustZone: context.trustZone || null,
+        requiresSimulation: strategy === 'adversarial_cross_check',
+        metadata: { source: 'verification_strategy' },
+      },
+      Array.isArray(context.verificationCandidates) ? context.verificationCandidates : []
+    );
   }
 }
 

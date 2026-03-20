@@ -544,6 +544,7 @@ Key methods:
 - `MCPDiscoveryLoader`
 - `OpenAPILoader`
 - `ApiLoader`
+- `CurlLoader`
 
 ## Utilities and errors
 

@@ -139,8 +139,12 @@ export class DecompositionAdvisor {
     delegateComplexityThreshold?: number;
     splitComplexityThreshold?: number;
     escalateRiskThreshold?: number;
+    capabilityRouter?: CapabilityRouter | JsonObject | null;
   });
-  recommend(task?: JsonObject, options?: { availableDelegates?: JsonObject[] }): JsonObject;
+  recommend(
+    task?: JsonObject,
+    options?: { availableDelegates?: JsonObject[]; routeCandidates?: JsonObject[] }
+  ): JsonObject;
   rankDelegates(task?: JsonObject, delegates?: JsonObject[]): JsonObject[];
 }
 
@@ -188,6 +192,7 @@ export class RoleAwareCoordinationPlanner {
     trustRegistry?: TrustRegistry | JsonObject | null;
     decompositionAdvisor?: DecompositionAdvisor | JsonObject | null;
     roleContracts?: Array<CoordinationRoleContract | JsonObject>;
+    capabilityRouter?: CapabilityRouter | JsonObject | null;
   });
   trustRegistry: TrustRegistry;
   decompositionAdvisor: DecompositionAdvisor;
@@ -200,6 +205,7 @@ export class VerificationStrategySelector {
   constructor(options?: {
     trustRegistry?: TrustRegistry | JsonObject | null;
     thresholds?: JsonObject;
+    capabilityRouter?: CapabilityRouter | JsonObject | null;
   });
   trustRegistry: TrustRegistry;
   thresholds: JsonObject;
@@ -1108,6 +1114,21 @@ export class HistoricalRoutingAdvisor {
   rankProviders(providers?: JsonObject[], options?: { methodName?: string; args?: any[] }): JsonObject[];
 }
 
+export class CapabilityRouter {
+  constructor(options?: {
+    candidates?: JsonObject[];
+    routingAdvisor?: HistoricalRoutingAdvisor | JsonObject | null;
+    weights?: JsonObject;
+  });
+  candidates: JsonObject[];
+  routingAdvisor: HistoricalRoutingAdvisor | JsonObject | null;
+  weights: JsonObject;
+  register(candidate?: JsonObject): JsonObject;
+  rank(request?: JsonObject, candidates?: JsonObject[]): JsonObject;
+  select(request?: JsonObject, candidates?: JsonObject[]): JsonObject;
+  explain(decision?: JsonObject): string;
+}
+
 export class AdaptiveDecisionLedger {
   constructor(options?: { entries?: JsonObject[]; filePath?: string | null });
   record(entry?: JsonObject): Promise<JsonObject>;
@@ -1184,6 +1205,12 @@ export class FleetRollbackAdvisor {
     comparison?: JsonObject | null;
     safetyDecision?: JsonObject | null;
   }): JsonObject;
+}
+
+export class RouteFleetDiagnostics {
+  constructor(options?: { monitor?: FleetHealthMonitor | JsonObject | null });
+  monitor: FleetHealthMonitor;
+  analyze(summary?: JsonObject | null): JsonObject;
 }
 
 export class OperatorInterventionPlanner {
@@ -1554,9 +1581,25 @@ export class FallbackRouter {
 
 export class MCPTool {}
 export class MCPClient {}
-export class MCPDiscoveryLoader {}
-export class OpenAPILoader {}
-export class ApiLoader {}
+export class MCPDiscoveryLoader {
+  static load(options?: { endpoint?: string; apiKey?: string | null; serviceName?: string }): Promise<JsonObject>;
+}
+export class OpenAPILoader {
+  static load(filePath: string, options?: { serviceName?: string; authToken?: string | null }): JsonObject;
+}
+export class ApiLoader {
+  static load(options?: {
+    serviceName?: string;
+    authToken?: string | null;
+    apiSpec?: JsonObject;
+    spec?: JsonObject | null;
+  }): JsonObject;
+}
+export class CurlLoader {
+  static load(curlCommand: string, options?: { serviceName?: string; authToken?: string | null }): JsonObject;
+  static parse(curlCommand: string): JsonObject;
+  static toApiSpec(parsed?: JsonObject): JsonObject;
+}
 export class PineconeManager {}
 
 export class RetryManager {

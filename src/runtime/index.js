@@ -23,6 +23,7 @@ const { VerifierEnsemble } = require('./VerifierEnsemble');
 const { ConfidencePolicy } = require('./ConfidencePolicy');
 const { AdaptiveRetryPolicy } = require('./AdaptiveRetryPolicy');
 const { HistoricalRoutingAdvisor } = require('./HistoricalRoutingAdvisor');
+const { CapabilityRouter } = require('./CapabilityRouter');
 const { AdaptiveDecisionLedger } = require('./AdaptiveDecisionLedger');
 const { AdaptiveGovernanceGate } = require('./AdaptiveGovernanceGate');
 const { FleetRolloutPlan } = require('./FleetRolloutPlan');
@@ -31,6 +32,7 @@ const { FleetCanaryEvaluator } = require('./FleetCanaryEvaluator');
 const { FleetSafetyController } = require('./FleetSafetyController');
 const { FleetImpactComparator } = require('./FleetImpactComparator');
 const { FleetRollbackAdvisor } = require('./FleetRollbackAdvisor');
+const { RouteFleetDiagnostics } = require('./RouteFleetDiagnostics');
 const { OperatorInterventionPlanner } = require('./OperatorInterventionPlanner');
 const { OperatorSummary } = require('./OperatorSummary');
 const { OperatorTriageWorkflow } = require('./OperatorTriageWorkflow');
@@ -135,6 +137,7 @@ module.exports = {
   ConfidencePolicy,
   AdaptiveRetryPolicy,
   HistoricalRoutingAdvisor,
+  CapabilityRouter,
   AdaptiveDecisionLedger,
   AdaptiveGovernanceGate,
   FleetRolloutPlan,
@@ -143,6 +146,7 @@ module.exports = {
   FleetSafetyController,
   FleetImpactComparator,
   FleetRollbackAdvisor,
+  RouteFleetDiagnostics,
   OperatorInterventionPlanner,
   OperatorSummary,
   OperatorTriageWorkflow,

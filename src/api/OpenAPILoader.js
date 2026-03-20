@@ -2,6 +2,7 @@
 const fs = require("fs");
 const path = require("path");
 const yaml = require("js-yaml");
+const axios = require("axios");
 const { ApiTool } = require("./ApiTool");
 
 /**
@@ -36,7 +37,13 @@ class OpenAPILoader {
 
         // Request body → put into properties.body
         if (endpoint.requestBody?.content?.["application/json"]?.schema) {
-          parameters.properties.body = endpoint.requestBody.content["application/json"].schema;
+          parameters.properties.body = {
+            ...endpoint.requestBody.content["application/json"].schema,
+            location: 'body',
+          };
+          if (endpoint.requestBody.required) {
+            parameters.required.push('body');
+          }
         }
 
         // ---------------------------
@@ -98,6 +105,7 @@ class OpenAPILoader {
       properties[p.name] = {
         type: schema.type || "string",
         description: p.description || "",
+        location: p.in || 'query',
         ...(schema.enum && { enum: schema.enum }),
       };
 
@@ -124,17 +132,31 @@ class OpenAPILoader {
 
   static buildImplementation({ baseUrl, route, method, authToken }) {
     return async (params = {}) => {
-      const axios = (await import("axios")).default;
-
-      let finalPath = route.replace(/{(\w+)}/g, (_, key) => params[key]);
+      let finalPath = route.replace(/{(\w+)}/g, (_, key) => {
+        if (params[key] === undefined) {
+          throw new Error(`Missing path param: ${key}`);
+        }
+        return encodeURIComponent(params[key]);
+      });
 
       const query = {};
       const headers = { "Content-Type": "application/json" };
-      const body = params.body || {};
+      let body = params.body || {};
 
-      // Extract query params from top-level params
       for (const [k, v] of Object.entries(params)) {
-        if (k !== "body") query[k] = v;
+        if (k === 'body' || k === '__parameterLocations') {
+          continue;
+        }
+
+        const location = params.__parameterLocations?.[k] || 'query';
+        if (location === 'path') {
+          continue;
+        }
+        if (location === 'header') {
+          headers[k] = v;
+          continue;
+        }
+        query[k] = v;
       }
 
       if (authToken) {
@@ -147,7 +169,7 @@ class OpenAPILoader {
 
       const url = baseUrl + finalPath + qs;
 
-      const response = await axios({
+      const response = await axios.request({
         url,
         method,
         headers,

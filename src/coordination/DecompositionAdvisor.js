@@ -13,10 +13,12 @@ class DecompositionAdvisor {
     delegateComplexityThreshold = 0.55,
     splitComplexityThreshold = 0.8,
     escalateRiskThreshold = 0.85,
+    capabilityRouter = null,
   } = {}) {
     this.delegateComplexityThreshold = delegateComplexityThreshold;
     this.splitComplexityThreshold = splitComplexityThreshold;
     this.escalateRiskThreshold = escalateRiskThreshold;
+    this.capabilityRouter = capabilityRouter;
   }
 
   /**
@@ -27,7 +29,7 @@ class DecompositionAdvisor {
    * @param {Array<object>} [options.availableDelegates]
    * @returns {object}
    */
-  recommend(task = {}, { availableDelegates = [] } = {}) {
+  recommend(task = {}, { availableDelegates = [], routeCandidates = [] } = {}) {
     const normalizedTask = this._normalizeTask(task);
     const delegates = Array.isArray(availableDelegates) ? availableDelegates : [];
     const rankedDelegates = this.rankDelegates(normalizedTask, delegates);
@@ -60,12 +62,21 @@ class DecompositionAdvisor {
       reason,
       task: normalizedTask,
       rankedDelegates,
+      routeRecommendation: this._selectRoute(normalizedTask, routeCandidates),
       suggestedPlan:
         action === 'split_and_delegate'
           ? normalizedTask.suggestedSubtasks.map((subtask, index) => ({
               id: `${normalizedTask.id || 'task'}:subtask:${index + 1}`,
               task: subtask.task,
               requiredCapabilities: [...subtask.requiredCapabilities],
+              routeRecommendation: this._selectRoute(
+                {
+                  ...normalizedTask,
+                  requiredCapabilities: [...subtask.requiredCapabilities],
+                  taskType: subtask.taskType || normalizedTask.taskType,
+                },
+                routeCandidates
+              ),
               delegate: this.rankDelegates(
                 {
                   ...normalizedTask,
@@ -132,6 +143,28 @@ class DecompositionAdvisor {
       return fallback;
     }
     return Number(Math.max(0, Math.min(1, value)).toFixed(3));
+  }
+
+  _selectRoute(task, routeCandidates = []) {
+    if (!this.capabilityRouter?.select) {
+      return null;
+    }
+
+    return this.capabilityRouter.select(
+      {
+        taskType: task.taskType,
+        requiredCapabilities: task.requiredCapabilities,
+        preferredKinds:
+          task.risk >= this.escalateRiskThreshold
+            ? ['human']
+            : task.risk >= this.splitComplexityThreshold
+              ? ['simulator', 'model']
+              : ['model'],
+        requiresSimulation: task.risk >= this.splitComplexityThreshold,
+        metadata: { source: 'decomposition' },
+      },
+      routeCandidates
+    );
   }
 }
 

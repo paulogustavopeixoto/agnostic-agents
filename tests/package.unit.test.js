@@ -16,6 +16,7 @@ const { FallbackRouter } = require('../src/llm/FallbackRouter');
 const { MCPClient } = require('../src/mcp/MCPClient');
 const { OpenAPILoader } = require('../src/api/OpenAPILoader');
 const { ApiLoader } = require('../src/api/ApiLoader');
+const { CurlLoader } = require('../src/api/CurlLoader');
 const { CritiqueProtocol } = require('../src/coordination/CritiqueProtocol');
 const { CritiqueSchemaRegistry } = require('../src/coordination/CritiqueSchemaRegistry');
 const { TrustRegistry } = require('../src/coordination/TrustRegistry');
@@ -46,6 +47,7 @@ const { VerifierEnsemble } = require('../src/runtime/VerifierEnsemble');
 const { ConfidencePolicy } = require('../src/runtime/ConfidencePolicy');
 const { AdaptiveRetryPolicy } = require('../src/runtime/AdaptiveRetryPolicy');
 const { HistoricalRoutingAdvisor } = require('../src/runtime/HistoricalRoutingAdvisor');
+const { CapabilityRouter } = require('../src/runtime/CapabilityRouter');
 const { AdaptiveDecisionLedger } = require('../src/runtime/AdaptiveDecisionLedger');
 const { AdaptiveGovernanceGate } = require('../src/runtime/AdaptiveGovernanceGate');
 const { FleetRolloutPlan } = require('../src/runtime/FleetRolloutPlan');
@@ -54,6 +56,7 @@ const { FleetCanaryEvaluator } = require('../src/runtime/FleetCanaryEvaluator');
 const { FleetSafetyController } = require('../src/runtime/FleetSafetyController');
 const { FleetImpactComparator } = require('../src/runtime/FleetImpactComparator');
 const { FleetRollbackAdvisor } = require('../src/runtime/FleetRollbackAdvisor');
+const { RouteFleetDiagnostics } = require('../src/runtime/RouteFleetDiagnostics');
 const { OperatorInterventionPlanner } = require('../src/runtime/OperatorInterventionPlanner');
 const { OperatorSummary } = require('../src/runtime/OperatorSummary');
 const { OperatorTriageWorkflow } = require('../src/runtime/OperatorTriageWorkflow');
@@ -159,6 +162,7 @@ describe('Package/module unit tests', () => {
     expect(pkg.MCPClient).toBeDefined();
     expect(pkg.OpenAPILoader).toBeDefined();
     expect(pkg.ApiLoader).toBeDefined();
+    expect(pkg.CurlLoader).toBeDefined();
     expect(pkg.CritiqueProtocol).toBeDefined();
     expect(pkg.CritiqueSchemaRegistry).toBeDefined();
     expect(pkg.TrustRegistry).toBeDefined();
@@ -226,6 +230,7 @@ describe('Package/module unit tests', () => {
     expect(pkg.ConfidencePolicy).toBeDefined();
     expect(pkg.AdaptiveRetryPolicy).toBeDefined();
     expect(pkg.HistoricalRoutingAdvisor).toBeDefined();
+    expect(pkg.CapabilityRouter).toBeDefined();
     expect(pkg.AdaptiveDecisionLedger).toBeDefined();
     expect(pkg.AdaptiveGovernanceGate).toBeDefined();
     expect(pkg.FleetRolloutPlan).toBeDefined();
@@ -234,6 +239,7 @@ describe('Package/module unit tests', () => {
     expect(pkg.FleetSafetyController).toBeDefined();
     expect(pkg.FleetImpactComparator).toBeDefined();
     expect(pkg.FleetRollbackAdvisor).toBeDefined();
+    expect(pkg.RouteFleetDiagnostics).toBeDefined();
     expect(pkg.OperatorInterventionPlanner).toBeDefined();
     expect(pkg.OperatorSummary).toBeDefined();
     expect(pkg.OperatorTriageWorkflow).toBeDefined();
@@ -1901,7 +1907,34 @@ describe('Package/module unit tests', () => {
   });
 
   test('DecompositionAdvisor recommends splitting or delegating based on task shape', () => {
-    const advisor = new DecompositionAdvisor();
+    const capabilityRouter = new CapabilityRouter({
+      candidates: [
+        {
+          id: 'writer-model',
+          kind: 'model',
+          capabilities: ['generateText'],
+          profile: {
+            taskTypes: ['writing'],
+            trustZones: ['private'],
+            certificationLevel: 'certified',
+            reputationScore: 0.9,
+          },
+        },
+        {
+          id: 'analysis-sandbox',
+          kind: 'simulator',
+          capabilities: ['retrieval', 'simulation'],
+          profile: {
+            taskTypes: ['analysis'],
+            trustZones: ['private'],
+            supportsSimulation: true,
+            certificationLevel: 'certified',
+            reputationScore: 0.8,
+          },
+        },
+      ],
+    });
+    const advisor = new DecompositionAdvisor({ capabilityRouter });
 
     const delegated = advisor.recommend(
       {
@@ -1921,6 +1954,7 @@ describe('Package/module unit tests', () => {
             trustScore: 0.9,
           },
         ],
+        routeCandidates: capabilityRouter.candidates,
       }
     );
 
@@ -1929,6 +1963,7 @@ describe('Package/module unit tests', () => {
         action: 'delegate',
       })
     );
+    expect(delegated.routeRecommendation.candidate).toEqual(expect.objectContaining({ id: 'writer-model' }));
 
     const split = advisor.recommend(
       {
@@ -1966,6 +2001,7 @@ describe('Package/module unit tests', () => {
             trustScore: 0.91,
           },
         ],
+        routeCandidates: capabilityRouter.candidates,
       }
     );
 
@@ -1977,6 +2013,9 @@ describe('Package/module unit tests', () => {
     expect(split.suggestedPlan).toHaveLength(2);
     expect(split.suggestedPlan[0].delegate).toEqual(expect.objectContaining({ id: 'researcher' }));
     expect(split.suggestedPlan[1].delegate).toEqual(expect.objectContaining({ id: 'writer' }));
+    expect(split.suggestedPlan[0].routeRecommendation.candidate).toEqual(
+      expect.objectContaining({ id: 'analysis-sandbox' })
+    );
   });
 
   test('CoordinationBenchmarkSuite builds and runs maintained coordination scenarios', async () => {
@@ -2090,7 +2129,23 @@ describe('Package/module unit tests', () => {
         { actorId: 'aggregator-epsilon', domain: 'release_review', success: true, confidence: 0.9 },
       ],
     });
-    const planner = new RoleAwareCoordinationPlanner({ trustRegistry });
+    const capabilityRouter = new CapabilityRouter({
+      candidates: [
+        {
+          id: 'verification-sandbox',
+          kind: 'simulator',
+          capabilities: ['verification', 'critique'],
+          profile: {
+            taskTypes: ['release_review'],
+            trustZones: ['private'],
+            supportsSimulation: true,
+            certificationLevel: 'certified',
+            reputationScore: 0.84,
+          },
+        },
+      ],
+    });
+    const planner = new RoleAwareCoordinationPlanner({ trustRegistry, capabilityRouter });
     const task = {
       id: 'release-review-task',
       taskType: 'release_review',
@@ -2149,7 +2204,7 @@ describe('Package/module unit tests', () => {
 
     const plan = planner.plan(task, {
       actors,
-      context: { domain: 'release_review' },
+      context: { domain: 'release_review', trustZone: 'private', routeCandidates: capabilityRouter.candidates },
     });
 
     expect(plan.strategy).toBe('role_routed_split_execution');
@@ -2179,6 +2234,12 @@ describe('Package/module unit tests', () => {
       })
     );
     expect(CoordinationTrace.render(plan.trace)).toContain('planner: planner-alpha');
+    expect(plan.routeRecommendations.execution.candidate).toEqual(
+      expect.objectContaining({ id: 'executor-beta' })
+    );
+    expect(plan.routeRecommendations.verification.candidate).toEqual(
+      expect.objectContaining({ id: 'verification-sandbox' })
+    );
   });
 
   test('VerificationStrategySelector chooses adversarial verification for high-risk disagreement-prone tasks', () => {
@@ -2194,7 +2255,23 @@ describe('Package/module unit tests', () => {
         },
       ],
     });
-    const selector = new VerificationStrategySelector({ trustRegistry });
+    const capabilityRouter = new CapabilityRouter({
+      candidates: [
+        {
+          id: 'adversarial-sandbox',
+          kind: 'simulator',
+          capabilities: ['verification', 'critique'],
+          profile: {
+            taskTypes: ['release_review'],
+            trustZones: ['private'],
+            supportsSimulation: true,
+            certificationLevel: 'certified',
+            reputationScore: 0.83,
+          },
+        },
+      ],
+    });
+    const selector = new VerificationStrategySelector({ trustRegistry, capabilityRouter });
 
     const selection = selector.select(
       {
@@ -2210,6 +2287,8 @@ describe('Package/module unit tests', () => {
           evidenceConflicts: 1,
         },
         verifierActorIds: ['verifier-release'],
+        trustZone: 'private',
+        verificationCandidates: capabilityRouter.candidates,
       }
     );
 
@@ -2221,6 +2300,9 @@ describe('Package/module unit tests', () => {
           expect.objectContaining({ role: 'critic' }),
           expect.objectContaining({ role: 'aggregator' }),
         ],
+        routeRecommendation: expect.objectContaining({
+          candidate: expect.objectContaining({ id: 'adversarial-sandbox' }),
+        }),
       })
     );
   });
@@ -3948,6 +4030,97 @@ describe('Package/module unit tests', () => {
     expect(cheapProvider.generateText).not.toHaveBeenCalled();
   });
 
+  test('CapabilityRouter ranks model, simulator, and human candidates with explanations', () => {
+    const advisor = new HistoricalRoutingAdvisor({
+      outcomes: [
+        { providerLabel: 'code-model', success: true, methodName: 'generateText', taskType: 'coding', confidence: 0.9 },
+        { providerLabel: 'human-review', success: true, methodName: 'generateText', taskType: 'release_review', confidence: 0.95 },
+        { providerLabel: 'cheap-extractor', success: false, methodName: 'generateText', taskType: 'coding' },
+      ],
+    });
+    const router = new CapabilityRouter({
+      routingAdvisor: advisor,
+      candidates: [
+        {
+          id: 'code-model',
+          kind: 'model',
+          capabilities: ['generateText', 'toolCalling', 'code_generation'],
+          profile: {
+            taskTypes: ['coding'],
+            trustZones: ['private'],
+            costTier: 'medium',
+            riskTier: 'high',
+            certificationLevel: 'certified',
+            reputationScore: 0.88,
+          },
+        },
+        {
+          id: 'sandbox-worker',
+          kind: 'simulator',
+          capabilities: ['simulation'],
+          profile: {
+            taskTypes: ['risky_execution'],
+            trustZones: ['sandbox_only'],
+            supportsSimulation: true,
+            certificationLevel: 'certified',
+            reputationScore: 0.75,
+          },
+        },
+        {
+          id: 'human-review',
+          kind: 'human',
+          capabilities: ['approval', 'release_signoff'],
+          profile: {
+            taskTypes: ['release_review'],
+            trustZones: ['private'],
+            certificationLevel: 'trusted',
+            reputationScore: 0.95,
+          },
+        },
+      ],
+    });
+
+    const codingDecision = router.select({
+      taskType: 'coding',
+      requiredCapabilities: ['generateText'],
+      preferredCapabilities: ['code_generation'],
+      preferredKinds: ['model'],
+      trustZone: 'private',
+      route: { hints: { risk: 'high', cost: 'medium' } },
+    });
+    const riskyDecision = router.select({
+      taskType: 'risky_execution',
+      requiredCapabilities: ['simulation'],
+      preferredKinds: ['simulator'],
+      trustZone: 'sandbox_only',
+      requiresSimulation: true,
+    });
+
+    expect(codingDecision.candidate).toEqual(
+      expect.objectContaining({
+        id: 'code-model',
+        kind: 'model',
+        eligible: true,
+      })
+    );
+    expect(codingDecision.explanation).toContain('Selected "code-model"');
+    expect(riskyDecision.candidate).toEqual(
+      expect.objectContaining({
+        id: 'sandbox-worker',
+        kind: 'simulator',
+        eligible: true,
+      })
+    );
+    expect(riskyDecision.rejectedCandidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'code-model',
+          eligible: false,
+        }),
+      ])
+    );
+  });
+
   test('Workflow validates step definitions and dependencies', () => {
     const step = new WorkflowStep({
       id: 'collect',
@@ -4810,6 +4983,71 @@ describe('Package/module unit tests', () => {
         }),
       })
     );
+  });
+
+  test('RouteFleetDiagnostics summarizes degraded, saturated, and drifting routes across fleet snapshots', () => {
+    const monitor = new FleetHealthMonitor();
+    monitor.record({
+      environmentId: 'prod-eu',
+      tenantId: 'tenant-a',
+      runs: 120,
+      saturation: 0.74,
+      routeMetrics: [
+        {
+          routeId: 'coding-route',
+          selectedCount: 42,
+          degraded: true,
+          saturation: 0.86,
+          driftScore: 0.61,
+          fallbackRate: 0.22,
+        },
+        {
+          routeId: 'verification-route',
+          selectedCount: 18,
+          degraded: false,
+          saturation: 0.43,
+          driftScore: 0.12,
+          fallbackRate: 0.05,
+        },
+      ],
+    });
+    monitor.record({
+      environmentId: 'prod-us',
+      tenantId: 'tenant-b',
+      runs: 95,
+      saturation: 0.69,
+      routeMetrics: [
+        {
+          routeId: 'coding-route',
+          selectedCount: 31,
+          degraded: false,
+          saturation: 0.71,
+          driftScore: 0.28,
+          fallbackRate: 0.09,
+        },
+      ],
+    });
+
+    const diagnostics = new RouteFleetDiagnostics({ monitor }).analyze();
+
+    expect(diagnostics).toEqual(
+      expect.objectContaining({
+        totalRoutes: 2,
+        degradedRoutes: 1,
+        highDriftRoutes: 1,
+        saturatedRoutes: 1,
+        routes: expect.arrayContaining([
+          expect.objectContaining({
+            routeId: 'coding-route',
+            selectedCount: 73,
+            degradedCount: 1,
+            maxSaturation: 0.86,
+            maxDriftScore: 0.61,
+          }),
+        ]),
+      })
+    );
+    expect(diagnostics.alerts.join(' ')).toContain('coding-route');
   });
 
   test('OperatorInterventionPlanner recommends mixed runtime, assurance, and rollback actions', () => {
@@ -5706,6 +5944,53 @@ describe('Package/module unit tests', () => {
     expect(tools[0].name).toContain('weather');
   });
 
+  test('OpenAPILoader preserves path and header params without leaking path into query', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'openapi-loader-'));
+    const specPath = path.join(tmpDir, 'spec.json');
+    const axios = require('axios');
+    const axiosSpy = jest.spyOn(axios, 'request').mockResolvedValue({
+      status: 200,
+      data: { ok: true },
+    });
+
+    fs.writeFileSync(specPath, JSON.stringify({
+      openapi: '3.0.0',
+      servers: [{ url: 'https://api.example.com' }],
+      paths: {
+        '/weather/{city}': {
+          get: {
+            summary: 'Get weather',
+            parameters: [
+              { name: 'city', in: 'path', required: true, schema: { type: 'string' } },
+              { name: 'unit', in: 'query', required: false, schema: { type: 'string' } },
+              { name: 'X-Trace-Id', in: 'header', required: false, schema: { type: 'string' } },
+            ],
+            responses: {
+              200: {
+                content: {
+                  'application/json': {
+                    schema: { type: 'object', properties: { forecast: { type: 'string' } } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    }));
+
+    const { tools } = OpenAPILoader.load(specPath, { serviceName: 'weather' });
+    await tools[0].call({ city: 'Lisbon', unit: 'metric', 'X-Trace-Id': 'trace-1' });
+
+    expect(axiosSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: 'https://api.example.com/weather/Lisbon?unit=metric',
+        headers: expect.objectContaining({ 'X-Trace-Id': 'trace-1' }),
+      })
+    );
+    axiosSpy.mockRestore();
+  });
+
   test('ApiLoader builds executable tools and routes params to fetch', async () => {
     const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,
@@ -5745,5 +6030,66 @@ describe('Package/module unit tests', () => {
         headers: expect.objectContaining({ Authorization: 'Bearer secret' }),
       })
     );
+  });
+
+  test('CurlLoader converts a curl command into an executable API tool', async () => {
+    const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: () => 'application/json' },
+      json: async () => ({ accepted: true }),
+      text: async () => '',
+    });
+
+    const { tools } = CurlLoader.load(
+      `curl -X POST 'https://api.example.com/messages?channel=ops' -H 'Authorization: Bearer token-123' -H 'X-Trace-Id: trace-9' -d '{"message":"hello"}'`,
+      { serviceName: 'imported' }
+    );
+
+    const result = await tools[0].call({
+      channel: 'ops',
+      'X-Trace-Id': 'trace-9',
+      message: 'hello',
+    });
+
+    expect(result).toEqual({ status: 200, data: { accepted: true } });
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://api.example.com/messages?channel=ops',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          Authorization: 'Bearer token-123',
+          'X-Trace-Id': 'trace-9',
+        }),
+      })
+    );
+  });
+
+  test('MCPDiscoveryLoader preserves remote MCP tool names behind local prefixes', async () => {
+    const { MCPClient } = require('../src/mcp/MCPClient');
+    const listTools = jest.spyOn(MCPClient.prototype, 'listTools').mockResolvedValue([
+      {
+        name: 'search_docs',
+        description: 'Search docs',
+        input_schema: {
+          type: 'object',
+          properties: {
+            query: { type: 'string' },
+          },
+        },
+      },
+    ]);
+    const execute = jest.spyOn(MCPClient.prototype, 'execute').mockResolvedValue({ hits: 3 });
+
+    const { tools } = await require('../src/tools/adapters/MCPDiscoveryLoader').MCPDiscoveryLoader.load({
+      endpoint: 'wss://mcp.example.com',
+      serviceName: 'docs',
+    });
+
+    await tools[0].call({ query: 'routing' });
+    expect(tools[0].name).toBe('docs_search_docs');
+    expect(execute).toHaveBeenCalledWith('search_docs', { query: 'routing' });
+    listTools.mockRestore();
+    execute.mockRestore();
   });
 });

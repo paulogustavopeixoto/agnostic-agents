@@ -120,6 +120,30 @@ describe('Maintained examples', () => {
     expect(stdout).toContain('adaptive-governance-benchmark');
   });
 
+  test('reference capability router example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceCapabilityRouter.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Capability route for coding task');
+    expect(stdout).toContain("id: 'code-model'");
+    expect(stdout).toContain('Capability route for risky action');
+    expect(stdout).toContain("id: 'sandbox-worker'");
+  });
+
+  test('reference curl import example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceCurlImport.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Parsed curl request');
+    expect(stdout).toContain('Generated API spec');
+    expect(stdout).toContain('Imported tools');
+    expect(stdout).toContain('importedImportedCurl');
+  });
+
   test('reference v7 audit example runs', async () => {
     const examplePath = path.join(__dirname, '..', 'examples', 'referenceV7Audit.js');
     const { stdout } = await execFileAsync(process.execPath, [examplePath], {
@@ -573,6 +597,8 @@ describe('Maintained examples', () => {
     expect(stdout).toContain("action: 'halt'");
     expect(stdout).toContain('comparison');
     expect(stdout).toContain('improved: true');
+    expect(stdout).toContain('routeDiagnostics');
+    expect(stdout).toContain('coding-route');
     expect(stdout).toContain('rollbackAdvice');
     expect(stdout).toContain('rollback_recommended');
   });

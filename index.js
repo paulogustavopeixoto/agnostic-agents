@@ -27,6 +27,7 @@ const { MCPTool } = require('./src/mcp/MCPTool');
 const { MCPClient } = require('./src/mcp/MCPClient');
 const { OpenAPILoader } = require('./src/api/OpenAPILoader');
 const { ApiLoader } = require('./src/api/ApiLoader');
+const { CurlLoader } = require('./src/api/CurlLoader');
 const {
   CritiqueProtocol,
   CritiqueSchemaRegistry,
@@ -69,6 +70,7 @@ const {
   ConfidencePolicy,
   AdaptiveRetryPolicy,
   HistoricalRoutingAdvisor,
+  CapabilityRouter,
   AdaptiveDecisionLedger,
   AdaptiveGovernanceGate,
   FleetRolloutPlan,
@@ -77,6 +79,7 @@ const {
   FleetSafetyController,
   FleetImpactComparator,
   FleetRollbackAdvisor,
+  RouteFleetDiagnostics,
   OperatorInterventionPlanner,
   OperatorSummary,
   OperatorTriageWorkflow,
@@ -197,6 +200,7 @@ module.exports = {
   OpenAPILoader,
   MCPDiscoveryLoader,
   ApiLoader,
+  CurlLoader,
   CritiqueProtocol,
   CritiqueSchemaRegistry,
   TrustRegistry,
@@ -236,6 +240,7 @@ module.exports = {
   ConfidencePolicy,
   AdaptiveRetryPolicy,
   HistoricalRoutingAdvisor,
+  CapabilityRouter,
   AdaptiveDecisionLedger,
   AdaptiveGovernanceGate,
   FleetRolloutPlan,
@@ -244,6 +249,7 @@ module.exports = {
   FleetSafetyController,
   FleetImpactComparator,
   FleetRollbackAdvisor,
+  RouteFleetDiagnostics,
   OperatorInterventionPlanner,
   OperatorSummary,
   OperatorTriageWorkflow,

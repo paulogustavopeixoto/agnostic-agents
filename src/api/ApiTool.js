@@ -14,8 +14,11 @@ class ApiTool extends Tool {
     const implementation = async (args, context = {}) => {
       const transformed = spec.transformArgs(endpointId, args);
       const auth = ApiTool.normalizeAuth(authToken);
+      const parameterLocations = Object.fromEntries(
+        Object.entries(action.props || {}).map(([key, value]) => [key, value.location || null])
+      );
 
-      const merged = { ...transformed, ...auth };
+      const merged = { ...transformed, ...auth, __parameterLocations: parameterLocations };
 
       const result = await action.run(merged, {
         authToken: authToken,

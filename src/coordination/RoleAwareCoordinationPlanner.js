@@ -8,6 +8,7 @@ class RoleAwareCoordinationPlanner {
     trustRegistry = null,
     decompositionAdvisor = null,
     roleContracts = [],
+    capabilityRouter = null,
   } = {}) {
     this.trustRegistry =
       trustRegistry instanceof TrustRegistry ? trustRegistry : new TrustRegistry(trustRegistry || {});
@@ -18,6 +19,7 @@ class RoleAwareCoordinationPlanner {
     this.roleContracts = (Array.isArray(roleContracts) ? roleContracts : []).map(contract =>
       contract instanceof CoordinationRoleContract ? contract : new CoordinationRoleContract(contract)
     );
+    this.capabilityRouter = capabilityRouter;
   }
 
   plan(task = {}, { actors = [], context = {} } = {}) {
@@ -31,6 +33,7 @@ class RoleAwareCoordinationPlanner {
     );
     const gaps = assignments.filter(item => !item.actor).map(item => item.role);
     const strategy = this._determineStrategy(task, decomposition, gaps);
+    const routeRecommendations = this._buildRouteRecommendations(task, assignments, context);
     const summary = {
       taskId: task.id || null,
       requiredRoles,
@@ -39,6 +42,12 @@ class RoleAwareCoordinationPlanner {
       decompositionAction: decomposition.action || null,
       primaryExecutor: assignments.find(item => item.role === 'executor')?.actor?.id || null,
       primaryVerifier: assignments.find(item => item.role === 'verifier')?.actor?.id || null,
+      routeTargets: Object.fromEntries(
+        Object.entries(routeRecommendations).map(([key, value]) => [
+          key,
+          value?.candidate?.id || value?.candidate?.candidate?.id || null,
+        ])
+      ),
     };
 
     const plan = {
@@ -46,6 +55,7 @@ class RoleAwareCoordinationPlanner {
       roleContracts: requiredRoles.map(role => this.getRoleContract(role, task)),
       assignments,
       decomposition,
+      routeRecommendations,
       gaps,
       summary,
     };
@@ -205,6 +215,59 @@ class RoleAwareCoordinationPlanner {
       aggregator: ['combine delegated outputs into one decision'],
     };
     return defaults[role] ? [...defaults[role]] : [];
+  }
+
+  _buildRouteRecommendations(task, assignments, context = {}) {
+    if (!this.capabilityRouter?.select) {
+      return {};
+    }
+
+    const candidates = this._buildRouteCandidates(assignments, context);
+    const risk = typeof task.risk === 'number' ? task.risk : 0;
+
+    return {
+      execution: this.capabilityRouter.select(
+        {
+          taskType: task.taskType || task.domain || null,
+          requiredCapabilities: ['execution'],
+          preferredCapabilities: Array.isArray(task.requiredCapabilities) ? task.requiredCapabilities : [],
+          preferredKinds: ['agent', 'model'],
+          trustZone: context.trustZone || null,
+          metadata: { source: 'role_aware_execution' },
+        },
+        candidates
+      ),
+      verification: this.capabilityRouter.select(
+        {
+          taskType: task.taskType || task.domain || null,
+          requiredCapabilities: ['verification'],
+          preferredKinds: risk >= 0.75 ? ['simulator', 'human', 'agent'] : ['agent', 'model'],
+          trustZone: context.trustZone || null,
+          requiresSimulation: risk >= 0.75,
+          metadata: { source: 'role_aware_verification' },
+        },
+        candidates
+      ),
+    };
+  }
+
+  _buildRouteCandidates(assignments = [], context = {}) {
+    const actorCandidates = assignments
+      .filter(item => item.actor)
+      .map(item => ({
+        id: item.actor.id,
+        kind: item.actor.kind || 'agent',
+        capabilities: Array.isArray(item.actor.capabilities) ? item.actor.capabilities : [],
+        profile: {
+          taskTypes: Array.isArray(item.actor.specializations) ? item.actor.specializations : [],
+          trustZones: [...(context.trustZone ? [context.trustZone] : [])],
+          certificationLevel: item.role === 'verifier' || item.role === 'critic' ? 'trusted' : 'supported',
+          reputationScore: typeof item.trustScore === 'number' ? item.trustScore : 0.5,
+          supportsSimulation: item.role === 'verifier' || item.role === 'critic',
+        },
+      }));
+
+    return [...actorCandidates, ...(Array.isArray(context.routeCandidates) ? context.routeCandidates : [])];
   }
 }
 

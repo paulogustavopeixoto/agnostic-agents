@@ -1,16 +1,23 @@
 // src/tools/adapters/MCPTool.js
 const { Tool } = require('../tools/adapters/Tool');
+const { MCPClient } = require('./MCPClient');
 
 class MCPTool extends Tool {
-  constructor({ name, description, parameters, endpoint, apiKey, mcpClient, strict = true }) {
-    if (!mcpClient && (!endpoint || !apiKey)) {
-      throw new Error("MCPTool requires mcpClient or (endpoint+apiKey)");
+  constructor({ name, description, parameters, endpoint, apiKey, mcpClient, remoteName = null, strict = true }) {
+    if (!mcpClient && !endpoint) {
+      throw new Error('MCPTool requires mcpClient or endpoint.');
     }
 
-    const client = mcpClient;
+    const client =
+      mcpClient ||
+      new MCPClient({
+        endpoint,
+        apiKey,
+      });
+    const targetName = remoteName || name;
 
     const implementation = async (args) => {
-      return await client.execute(name, args);
+      return await client.execute(targetName, args);
     };
 
     super({
@@ -27,6 +34,7 @@ class MCPTool extends Tool {
     });
 
     this.mcpClient = client;
+    this.remoteName = targetName;
   }
 
   toAnthropicTool() {
