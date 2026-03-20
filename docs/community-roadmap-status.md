@@ -103,6 +103,7 @@ The remaining themes inside that horizon are:
 - jurisdiction- and tenant-scoped autonomy rules
 - transactional and compensation-aware real-world action handling
 - multi-agent anti-loop, anti-collusion, and scoped shared-context controls
+- public AI operating-layer adoption guidance and maintained enterprise benchmarks
 
 The current `v14` maintained baseline starts with rollout artifacts, fleet
 health summaries, canary halt/rollback evaluation, fleet safety controls, and

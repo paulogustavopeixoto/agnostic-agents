@@ -195,6 +195,12 @@ These examples are intended as reference deployment patterns rather than feature
 - `referenceOperationalScorecard.js`
   - no API key required
   - shows one consolidated operational scorecard across reliability, governance, memory hygiene, routing quality, and operator load
+- `referenceEnterpriseAutonomyBenchmarks.js`
+  - no API key required
+  - shows maintained enterprise benchmarks for long-lived objective execution, supervised autonomy, and rollback discipline
+- `referenceCoordinationSafety.js`
+  - no API key required
+  - shows anti-loop, anti-collusion, delegation-budget, and shared-context safety controls for multi-agent coordination
 - `referenceDurableBackends.js`
   - no API key required
   - shows custom durable run/job/layer store implementations and registry usage

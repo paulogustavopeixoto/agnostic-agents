@@ -193,6 +193,7 @@ export class RoleAwareCoordinationPlanner {
     decompositionAdvisor?: DecompositionAdvisor | JsonObject | null;
     roleContracts?: Array<CoordinationRoleContract | JsonObject>;
     capabilityRouter?: CapabilityRouter | JsonObject | null;
+    safetyGuard?: CoordinationSafetyGuard | JsonObject | null;
   });
   trustRegistry: TrustRegistry;
   decompositionAdvisor: DecompositionAdvisor;
@@ -250,6 +251,42 @@ export class CoordinationDiagnostics {
     plan?: JsonObject | null;
     verification?: JsonObject | null;
     quality?: JsonObject | null;
+  }): JsonObject;
+}
+
+export class DelegationBudget {
+  constructor(options?: { maxTotalDelegations?: number; perActor?: Record<string, number> });
+  maxTotalDelegations: number;
+  perActor: Record<string, number>;
+  usage: JsonObject;
+  canDelegate(options?: { actorId?: string | null; count?: number }): JsonObject;
+  consume(options?: { actorId?: string | null; count?: number }): JsonObject;
+  summarize(): JsonObject;
+}
+
+export class SharedContextScope {
+  constructor(options?: { roleScopes?: Record<string, string[]>; redactedValue?: string });
+  roleScopes: Record<string, string[]>;
+  redactedValue: string;
+  filter(role: string, context?: JsonObject): JsonObject;
+}
+
+export class CoordinationSafetyGuard {
+  constructor(options?: {
+    maxRepeatedActionCount?: number;
+    forbiddenRoleOverlaps?: string[][];
+    delegationBudget?: DelegationBudget | JsonObject | null;
+    sharedContextScope?: SharedContextScope | JsonObject | null;
+  });
+  maxRepeatedActionCount: number;
+  forbiddenRoleOverlaps: string[][];
+  delegationBudget: DelegationBudget;
+  sharedContextScope: SharedContextScope;
+  evaluate(options?: {
+    history?: JsonObject[];
+    assignments?: JsonObject[];
+    sharedContext?: JsonObject;
+    requestedDelegations?: JsonObject[];
   }): JsonObject;
 }
 
@@ -1607,6 +1644,16 @@ export class OperationalScorecard {
     routing?: JsonObject | null;
     operator?: JsonObject | null;
   }): JsonObject;
+}
+
+export class EnterpriseAutonomyBenchmarkSuite {
+  constructor(options?: { evalHarness?: EvalHarness | JsonObject | null });
+  buildScenarios(options?: {
+    longLivedRun?: JsonObject | null;
+    supervision?: JsonObject | null;
+    rollback?: JsonObject | null;
+  }): JsonObject[];
+  run(options?: JsonObject): Promise<JsonObject>;
 }
 
 export class GovernanceRecordLedger {

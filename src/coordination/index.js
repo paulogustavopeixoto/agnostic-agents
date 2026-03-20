@@ -12,6 +12,9 @@ const { VerificationStrategySelector } = require('./VerificationStrategySelector
 const { MultiPassVerificationEngine } = require('./MultiPassVerificationEngine');
 const { CoordinationQualityTracker } = require('./CoordinationQualityTracker');
 const { CoordinationDiagnostics } = require('./CoordinationDiagnostics');
+const { DelegationBudget } = require('./DelegationBudget');
+const { SharedContextScope } = require('./SharedContextScope');
+const { CoordinationSafetyGuard } = require('./CoordinationSafetyGuard');
 
 module.exports = {
   CritiqueProtocol,
@@ -28,4 +31,7 @@ module.exports = {
   MultiPassVerificationEngine,
   CoordinationQualityTracker,
   CoordinationDiagnostics,
+  DelegationBudget,
+  SharedContextScope,
+  CoordinationSafetyGuard,
 };

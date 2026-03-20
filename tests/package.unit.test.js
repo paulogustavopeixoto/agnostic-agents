@@ -102,6 +102,10 @@ const { AutonomyStackConfig } = require('../src/runtime/AutonomyStackConfig');
 const { AutonomyStackComparator } = require('../src/runtime/AutonomyStackComparator');
 const { AutonomyDriftGuard } = require('../src/runtime/AutonomyDriftGuard');
 const { OperationalScorecard } = require('../src/runtime/OperationalScorecard');
+const { EnterpriseAutonomyBenchmarkSuite } = require('../src/runtime/EnterpriseAutonomyBenchmarkSuite');
+const { DelegationBudget } = require('../src/coordination/DelegationBudget');
+const { SharedContextScope } = require('../src/coordination/SharedContextScope');
+const { CoordinationSafetyGuard } = require('../src/coordination/CoordinationSafetyGuard');
 const { GovernanceRecordLedger } = require('../src/runtime/GovernanceRecordLedger');
 const { AuditStitcher } = require('../src/runtime/AuditStitcher');
 const { GovernanceTimeline } = require('../src/runtime/GovernanceTimeline');
@@ -220,6 +224,9 @@ describe('Package/module unit tests', () => {
     expect(pkg.MultiPassVerificationEngine).toBeDefined();
     expect(pkg.CoordinationQualityTracker).toBeDefined();
     expect(pkg.CoordinationDiagnostics).toBeDefined();
+    expect(pkg.DelegationBudget).toBeDefined();
+    expect(pkg.SharedContextScope).toBeDefined();
+    expect(pkg.CoordinationSafetyGuard).toBeDefined();
     expect(pkg.Run).toBeDefined();
     expect(pkg.DistributedRunEnvelope).toBeDefined();
     expect(pkg.ExecutionIdentity).toBeDefined();
@@ -327,6 +334,7 @@ describe('Package/module unit tests', () => {
     expect(pkg.AutonomyStackComparator).toBeDefined();
     expect(pkg.AutonomyDriftGuard).toBeDefined();
     expect(pkg.OperationalScorecard).toBeDefined();
+    expect(pkg.EnterpriseAutonomyBenchmarkSuite).toBeDefined();
     expect(pkg.GovernanceRecordLedger).toBeDefined();
     expect(pkg.AuditStitcher).toBeDefined();
     expect(pkg.GovernanceTimeline).toBeDefined();
@@ -407,6 +415,10 @@ describe('Package/module unit tests', () => {
     expect(declarationSource).toContain('export class AutonomyStackComparator');
     expect(declarationSource).toContain('export class AutonomyDriftGuard');
     expect(declarationSource).toContain('export class OperationalScorecard');
+    expect(declarationSource).toContain('export class EnterpriseAutonomyBenchmarkSuite');
+    expect(declarationSource).toContain('export class DelegationBudget');
+    expect(declarationSource).toContain('export class SharedContextScope');
+    expect(declarationSource).toContain('export class CoordinationSafetyGuard');
   });
 
   test('AutonomyEnvelope combines budgets, supervision thresholds, and reusable delegation contracts', () => {
@@ -929,6 +941,88 @@ describe('Package/module unit tests', () => {
       operatorLoad: { openIncidents: 1, pendingReviews: 1 },
     });
     expect(typeof scorecard.overall).toBe('number');
+  });
+
+  test('EnterpriseAutonomyBenchmarkSuite covers long-lived execution, supervised autonomy, and rollback discipline', async () => {
+    const report = await new EnterpriseAutonomyBenchmarkSuite().run({
+      longLivedRun: {
+        status: 'completed',
+        checkpoints: 4,
+        resumable: true,
+      },
+      supervision: {
+        action: 'review',
+        approvals: 1,
+        checkpoints: 2,
+      },
+      rollback: {
+        action: 'block_rollout',
+        rollbackReady: true,
+      },
+    });
+
+    expect(report).toMatchObject({
+      total: 3,
+      failed: 0,
+    });
+    expect(report.results).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'enterprise-long-lived-objective', passed: true }),
+        expect.objectContaining({ id: 'enterprise-supervised-autonomy', passed: true }),
+        expect.objectContaining({ id: 'enterprise-rollback-discipline', passed: true }),
+      ])
+    );
+  });
+
+  test('CoordinationSafetyGuard detects loops, forbidden role overlap, delegation pressure, and shared-context scoping', () => {
+    const safetyGuard = new CoordinationSafetyGuard({
+      maxRepeatedActionCount: 2,
+      delegationBudget: new DelegationBudget({
+        maxTotalDelegations: 1,
+        perActor: { 'multi-role-alpha': 1 },
+      }),
+      sharedContextScope: new SharedContextScope({
+        roleScopes: {
+          planner: ['ticketId', 'releaseWindow'],
+          executor: ['ticketId'],
+          verifier: ['ticketId'],
+        },
+      }),
+    });
+
+    const evaluation = safetyGuard.evaluate({
+      history: [
+        { resolution: { action: 'branch_and_retry' } },
+        { resolution: { action: 'branch_and_retry' } },
+        { resolution: { action: 'branch_and_retry' } },
+      ],
+      assignments: [
+        { role: 'planner', actor: { id: 'planner-beta' } },
+        { role: 'executor', actor: { id: 'multi-role-alpha' } },
+        { role: 'verifier', actor: { id: 'multi-role-alpha' } },
+      ],
+      sharedContext: {
+        ticketId: 'REL-204',
+        releaseWindow: '2026-03-21T10:00:00Z',
+        secretToken: 'top-secret',
+      },
+      requestedDelegations: [
+        { actorId: 'multi-role-alpha', count: 2 },
+      ],
+    });
+
+    expect(evaluation).toMatchObject({
+      action: 'block',
+      flags: expect.arrayContaining([
+        'anti_loop_triggered',
+        'anti_collusion_triggered',
+        'delegation_budget_exhausted',
+        'scoped_shared_context_enforced',
+      ]),
+    });
+    expect(evaluation.filteredContext.executor).toMatchObject({
+      redactedKeys: ['releaseWindow', 'secretToken'],
+    });
   });
 
   test('Tool exposes unified schema and provider-specific representations', async () => {

@@ -35,6 +35,7 @@ const { MemoryGovernanceBenchmarkSuite } = require('../src/runtime/MemoryGoverna
 const { AutonomyEnvelope } = require('../src/runtime/AutonomyEnvelope');
 const { ApprovalDecisionCache } = require('../src/runtime/ApprovalDecisionCache');
 const { AutonomyBenchmarkSuite } = require('../src/runtime/AutonomyBenchmarkSuite');
+const { EnterpriseAutonomyBenchmarkSuite } = require('../src/runtime/EnterpriseAutonomyBenchmarkSuite');
 
 class ToolEvalAdapter {
   async generateText(messages, { tools = [] } = {}) {
@@ -249,6 +250,30 @@ describe('Eval and benchmark discipline', () => {
         expect.objectContaining({ id: 'supervised-autonomy-cache', passed: true }),
       ])
     );
+  });
+
+  test('EnterpriseAutonomyBenchmarkSuite runs maintained enterprise operating benchmarks', async () => {
+    const report = await new EnterpriseAutonomyBenchmarkSuite().run({
+      longLivedRun: {
+        status: 'completed',
+        checkpoints: 4,
+        resumable: true,
+      },
+      supervision: {
+        action: 'review',
+        approvals: 1,
+        checkpoints: 2,
+      },
+      rollback: {
+        action: 'block_rollout',
+        rollbackReady: true,
+      },
+    });
+
+    expect(report).toMatchObject({
+      total: 3,
+      failed: 0,
+    });
   });
 
   test('EvalHarness can run adaptive-decision benchmark scenarios', async () => {

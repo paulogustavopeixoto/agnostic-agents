@@ -7,6 +7,9 @@ The longer direction is broader than provider agnosticism alone: the package is
 meant to stay agnostic to how intelligence is produced, whether that comes from
 an LLM, tool, workflow, simulator, verifier, or human checkpoint.
 
+For the higher-level public framing of that direction, see
+[`docs/ai-operating-layer.md`](docs/ai-operating-layer.md).
+
 It is designed for projects that need more than a chat wrapper:
 
 - inspectable runs
@@ -26,6 +29,7 @@ The package also includes a separate coordination layer above the runtime for:
 - disagreement resolution
 - task decomposition
 - coordination benchmarks
+- multi-agent safety controls for loops, collusion, delegation budgets, and scoped shared context
 
 It also includes governed learning, fleet rollout, and assurance surfaces for:
 
@@ -648,7 +652,9 @@ Evals and ecosystem:
 - [Autonomy policies](docs/autonomy-policies.md)
 - [Autonomy operations](docs/autonomy-operations.md)
 - [Autonomy config drift](docs/autonomy-config-drift.md)
+- [AI operating layer](docs/ai-operating-layer.md)
 - [Budgeted autonomy](docs/budgeted-autonomy.md)
+- [Coordination safety](docs/coordination-safety.md)
 - [Enterprise autonomy architecture](docs/enterprise-autonomy-architecture.md)
 - [Operational scorecards](docs/operational-scorecards.md)
 - [Progressive autonomy](docs/progressive-autonomy.md)

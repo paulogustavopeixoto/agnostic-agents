@@ -2,6 +2,7 @@ const { TrustRegistry } = require('./TrustRegistry');
 const { DecompositionAdvisor } = require('./DecompositionAdvisor');
 const { CoordinationRoleContract } = require('./CoordinationRoleContract');
 const { CoordinationTrace } = require('./CoordinationTrace');
+const { CoordinationSafetyGuard } = require('./CoordinationSafetyGuard');
 
 class RoleAwareCoordinationPlanner {
   constructor({
@@ -9,6 +10,7 @@ class RoleAwareCoordinationPlanner {
     decompositionAdvisor = null,
     roleContracts = [],
     capabilityRouter = null,
+    safetyGuard = null,
   } = {}) {
     this.trustRegistry =
       trustRegistry instanceof TrustRegistry ? trustRegistry : new TrustRegistry(trustRegistry || {});
@@ -20,6 +22,8 @@ class RoleAwareCoordinationPlanner {
       contract instanceof CoordinationRoleContract ? contract : new CoordinationRoleContract(contract)
     );
     this.capabilityRouter = capabilityRouter;
+    this.safetyGuard =
+      safetyGuard instanceof CoordinationSafetyGuard ? safetyGuard : new CoordinationSafetyGuard(safetyGuard || {});
   }
 
   plan(task = {}, { actors = [], context = {} } = {}) {
@@ -34,6 +38,20 @@ class RoleAwareCoordinationPlanner {
     const gaps = assignments.filter(item => !item.actor).map(item => item.role);
     const strategy = this._determineStrategy(task, decomposition, gaps);
     const routeRecommendations = this._buildRouteRecommendations(task, assignments, context);
+    const requestedDelegations =
+      decomposition.action === 'split_and_delegate'
+        ? (Array.isArray(decomposition.suggestedPlan) ? decomposition.suggestedPlan : []).map(subtask => ({
+            actorId: assignments.find(item => item.role === 'executor')?.actor?.id || null,
+            count: 1,
+            taskId: subtask.id || null,
+          }))
+        : [];
+    const safety = this.safetyGuard.evaluate({
+      history: Array.isArray(context.history) ? context.history : [],
+      assignments,
+      sharedContext: context.sharedContext || {},
+      requestedDelegations,
+    });
     const summary = {
       taskId: task.id || null,
       requiredRoles,
@@ -48,6 +66,8 @@ class RoleAwareCoordinationPlanner {
           value?.candidate?.id || value?.candidate?.candidate?.id || null,
         ])
       ),
+      safetyAction: safety.action,
+      safetyFlags: safety.flags,
     };
 
     const plan = {
@@ -56,6 +76,7 @@ class RoleAwareCoordinationPlanner {
       assignments,
       decomposition,
       routeRecommendations,
+      safety,
       gaps,
       summary,
     };
