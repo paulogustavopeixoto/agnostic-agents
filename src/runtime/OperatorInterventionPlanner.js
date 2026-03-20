@@ -9,7 +9,7 @@ class OperatorInterventionPlanner {
     rollback = null,
     context = {},
   } = {}) {
-    const runSummary = run ? RunInspector.summarize(run) : null;
+    const runSummary = this._normalizeRun(run);
     const actions = [];
     const reasons = [];
 
@@ -28,7 +28,7 @@ class OperatorInterventionPlanner {
       reasons.push(`Incident workflow recommends ${incident.recommendedAction}.`);
     }
 
-    if (assurance?.verdict === 'block') {
+    if (this._getAssuranceVerdict(assurance) === 'block') {
       actions.push('quarantine_candidate');
       reasons.push('Quarantine the candidate because assurance invariants failed.');
     }
@@ -59,6 +59,30 @@ class OperatorInterventionPlanner {
       rollback: rollback || null,
       context,
     };
+  }
+
+  _normalizeRun(run) {
+    if (!run) {
+      return null;
+    }
+    if (this._isRunSummary(run)) {
+      return run;
+    }
+    return RunInspector.summarize(run);
+  }
+
+  _isRunSummary(run) {
+    return (
+      typeof run === 'object' &&
+      !Array.isArray(run) &&
+      typeof run.events === 'number' &&
+      Array.isArray(run.steps) &&
+      Array.isArray(run.checkpoints)
+    );
+  }
+
+  _getAssuranceVerdict(assurance) {
+    return assurance?.verdict || assurance?.summary?.verdict || assurance?.explanation?.verdict || null;
   }
 }
 

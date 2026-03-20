@@ -4832,6 +4832,40 @@ describe('Package/module unit tests', () => {
     expect(decision.recommendedAction).toBe('branch_from_failure_checkpoint');
   });
 
+  test('OperatorInterventionPlanner accepts summarized runs and assurance artifacts', () => {
+    const planner = new OperatorInterventionPlanner();
+    const assurance = new AssuranceReport({
+      invariants: [{ id: 'inv-1', passed: false, surface: 'rollout', severity: 'high' }],
+    }).toJSON();
+    const runSummary = {
+      id: 'run-1',
+      status: 'waiting_for_approval',
+      input: 'input',
+      output: null,
+      events: 3,
+      steps: [],
+      checkpoints: [],
+      metrics: {},
+      childRunAggregate: { count: 0, tokenUsage: { prompt: 0, completion: 0, total: 0 }, cost: 0, timings: {} },
+      lineage: null,
+      assessment: null,
+      evidence: null,
+      pendingApproval: { id: 'approval-1' },
+      pendingPause: null,
+      errors: [],
+    };
+
+    const decision = planner.plan({
+      run: runSummary,
+      assurance,
+    });
+
+    expect(decision.run).toBe(runSummary);
+    expect(decision.actions).toEqual(
+      expect.arrayContaining(['limit_automatic_execution', 'quarantine_candidate'])
+    );
+  });
+
   test('OperatorSummary builds operator-centered highlights', () => {
     const summary = new OperatorSummary().summarize({
       runs: [{ status: 'failed' }, { status: 'completed' }],
@@ -4845,6 +4879,19 @@ describe('Package/module unit tests', () => {
     expect(summary.assurance.blocked).toBe(1);
     expect(summary.rollouts.rollbackRecommendations).toBe(1);
     expect(summary.highlights.join(' ')).toContain('waiting for operator review');
+  });
+
+  test('OperatorSummary counts blocked assurance from AssuranceReport artifacts', () => {
+    const assurance = new AssuranceReport({
+      invariants: [{ id: 'inv-1', passed: false, surface: 'coordination', severity: 'high' }],
+    }).toJSON();
+
+    const summary = new OperatorSummary().summarize({
+      assuranceReports: [assurance],
+    });
+
+    expect(summary.assurance.blocked).toBe(1);
+    expect(summary.highlights.join(' ')).toContain('blocking rollout');
   });
 
   test('OperatorTriageWorkflow builds summary, intervention, and checklist output', () => {

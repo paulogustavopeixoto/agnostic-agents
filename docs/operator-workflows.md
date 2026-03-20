@@ -48,7 +48,7 @@ When the run belongs to a workflow or delegated execution path, inspect the full
 
 Use:
 
-- `RunTreeInspector.getTree(runId)`
+- `RunTreeInspector.build(runStore, { rootRunId: runId })`
 - `RunTreeInspector.render(tree)`
 
 Check:

@@ -3,6 +3,9 @@
 # agnostic-agents
 
 `agnostic-agents` is a Node.js runtime OS for building provider-agnostic agent systems.
+The longer direction is broader than provider agnosticism alone: the package is
+meant to stay agnostic to how intelligence is produced, whether that comes from
+an LLM, tool, workflow, simulator, verifier, or human checkpoint.
 
 It is designed for projects that need more than a chat wrapper:
 
@@ -33,6 +36,8 @@ The maintained architecture is:
 - coordination intelligence above the runtime
 - governed learning above coordination
 - fleet and assurance layers above runtime, coordination, and learning
+- operator control above those layers
+- next-horizon capability routing, governed memory, and budgeted autonomy on top of the current core
 
 ## Install
 
@@ -57,6 +62,9 @@ Use `agnostic-agents` when you want:
 - a package that can benchmark learned changes and halt adaptation when those changes start regressing outcomes
 - a package that can stage, compare, and roll back changes across a fleet of runtimes
 - a package that can block unsafe rollout candidates with explicit invariants and assurance reports
+- a package that can evolve toward capability-aware routing instead of static model/provider defaults
+- a package that treats memory as governed operational knowledge instead of ad hoc retrieval glue
+- a package that treats supervised autonomy as a core operating model rather than an exception path
 
 Do not think of it as only a prompt helper or a chat abstraction. The maintained direction is a runtime control layer for serious agent systems.
 
@@ -624,6 +632,42 @@ This package currently targets:
 - assurance suites and rollout guardrails
 - operator-centered triage and intervention workflows
 - operator dashboard snapshots and control-loop references
+
+## Forward Direction
+
+The current package already covers the runtime, coordination, governed
+learning, fleet, assurance, and operator core program through `v16`.
+
+The next horizon is not "add basic runtime features."
+That substrate already exists.
+The next versions are about turning that substrate into a stronger autonomy
+operating layer:
+
+- `v17` Capability Fabric OS
+  - capability-aware routing across models, tools, methods, simulators, verifiers, budgets, and trust zones
+- `v18` Memory Governance OS
+  - governed memory with provenance, retention, redaction, conflict handling, and operator-visible lifecycle rules
+- `v19` Budgeted Autonomy OS
+  - uncertainty thresholds, reusable human approvals, jurisdiction/tenant-aware policies, and explicit autonomy budgets
+- `v20` Enterprise Autonomy OS
+  - integrated execution graphs, transactional side-effect discipline, multi-agent safety controls, and a coherent AI operating-layer story
+
+The target shape is six layers:
+
+- kernel
+- policy
+- workflow
+- intelligence
+- memory
+- operator
+
+The governing rule stays the same:
+
+- reliability over demo complexity
+- observability over abstraction hype
+- supervised autonomy over blind automation
+- governed memory over ad hoc retrieval
+- policy and evaluation over hidden self-modification
 
 It does not try to be:
 

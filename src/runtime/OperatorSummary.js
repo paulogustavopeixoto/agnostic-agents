@@ -12,7 +12,7 @@ class OperatorSummary {
       return accumulator;
     }, {});
 
-    const blockedAssurance = assuranceReports.filter(item => item?.verdict === 'block').length;
+    const blockedAssurance = assuranceReports.filter(item => this._getAssuranceVerdict(item) === 'block').length;
     const rollbackRecommendations = rollouts.filter(item => item?.action === 'rollback_recommended').length;
 
     return {
@@ -30,7 +30,7 @@ class OperatorSummary {
       },
       assurance: {
         blocked: blockedAssurance,
-        allowed: assuranceReports.filter(item => item?.verdict === 'allow').length,
+        allowed: assuranceReports.filter(item => this._getAssuranceVerdict(item) === 'allow').length,
       },
       learning: {
         pendingReview: learnedChanges.filter(item => item?.status === 'pending_review').length,
@@ -70,6 +70,10 @@ class OperatorSummary {
     }
 
     return highlights;
+  }
+
+  _getAssuranceVerdict(item) {
+    return item?.verdict || item?.summary?.verdict || item?.explanation?.verdict || null;
   }
 }
 

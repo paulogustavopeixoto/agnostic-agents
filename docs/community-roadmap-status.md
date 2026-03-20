@@ -63,13 +63,40 @@ The current package already covers the `v11` through `v16` core program:
 - `v15` Assurance OS
 - `v16` Operator OS
 
-The next direction is refinement, hardening, and broader ecosystem uptake:
+The next direction is no longer just generic hardening.
+It is a more explicit autonomy-operating-layer program built on top of the
+completed core:
+
+- `v17` Capability Fabric OS
+- `v18` Memory Governance OS
+- `v19` Budgeted Autonomy OS
+- `v20` Enterprise Autonomy OS
+
+That program should still include refinement, hardening, and broader ecosystem
+uptake, but with a clearer systems goal:
 
 - deeper external interoperability and certification depth
 - stronger operator and ecosystem surfaces above the completed core
 - governed-learning refinement instead of opaque self-modification
+- capability-aware routing instead of static provider defaults
+- governed memory instead of ad hoc retrieval/storage glue
+- supervised autonomy instead of blind automation
+- intelligence-source agnosticism across models, tools, simulators, verifiers, and humans
 
-After the current `v16` core, the next roadmap horizon is refinement and hardening across fleet, assurance, operator, and ecosystem depth rather than another brand-new top-level layer.
+After the current `v16` core, the roadmap moves toward a fuller AI operating
+layer:
+
+1. make routing capability-aware and explainable
+2. make memory governed and provenance-rich
+3. make autonomy budgeted and supervised by default
+4. converge those layers into one coherent operator-facing system
+
+The remaining themes inside that horizon are:
+
+- tool reputation, certification, and simulation before risky execution
+- jurisdiction- and tenant-scoped autonomy rules
+- transactional and compensation-aware real-world action handling
+- multi-agent anti-loop, anti-collusion, and scoped shared-context controls
 
 The current `v14` maintained baseline starts with rollout artifacts, fleet
 health summaries, canary halt/rollback evaluation, fleet safety controls, and
@@ -83,26 +110,20 @@ The important architectural rule is:
 - runtime remains the execution/control substrate
 - coordination remains a separate intelligence layer above it
 - learning remains governed and reversible rather than hidden self-modification
+- memory and autonomy should become more governed, not more opaque
 
 ## Recommended execution order
 
-The intended sequence across the forward path is:
+The intended sequence across the next horizon is:
 
-1. strengthen governance and policy first
-2. strengthen state portability and restoration next
-3. publish those contracts through stronger interoperability
-4. deepen coordination quality on top of that substrate
-5. only then close the loop with governed learning
-
-In shorter form, the maintained sequence that got the package here was:
-
-- `v11`: make those contracts public and interoperable
-- `v12`: strengthen coordination intelligence above the runtime
-- `v13`: turn evidence into governed learning loops
+1. `v17`: capability-aware routing and route governance
+2. `v18`: memory provenance, retention, and trust boundaries
+3. `v19`: autonomy budgets, uncertainty thresholds, and reusable supervision
+4. `v20`: integrated operating-layer control across those surfaces
 
 That order is intentional.
-It keeps the package from becoming smarter in ways that are harder to govern,
-restore, inspect, or validate.
+It keeps the package from becoming more autonomous in ways that are harder to
+govern, inspect, or roll back.
 
 ## Highest-signal near-term open items outside `v8+`
 
