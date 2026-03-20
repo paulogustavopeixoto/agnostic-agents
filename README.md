@@ -581,6 +581,7 @@ Local/no-key examples:
 - `npm run example:reference-deployment-split`
 - `npm run example:reference-distributed-recovery`
 - `npm run example:reference-deployment-pattern-certification`
+- `npm run example:reference-enterprise-boundaries`
 
 Provider-backed examples:
 
@@ -723,12 +724,12 @@ This package currently targets:
 ## Forward Direction
 
 The current package already covers the runtime, coordination, governed
-learning, fleet, assurance, and operator core program through `v16`.
+learning, fleet, assurance, operator, and autonomy-operating-layer core program
+through `v20`.
 
-The next horizon is not "add basic runtime features."
+The package is no longer at the stage of "add basic runtime features."
 That substrate already exists.
-The next versions are about turning that substrate into a stronger autonomy
-operating layer:
+The current maintained autonomy-operating-layer horizon is:
 
 - `v17` Capability Fabric OS
   - capability-aware routing across models, tools, methods, simulators, verifiers, budgets, and trust zones
@@ -738,6 +739,13 @@ operating layer:
   - uncertainty thresholds, reusable human approvals, jurisdiction/tenant-aware policies, and explicit autonomy budgets
 - `v20` Enterprise Autonomy OS
   - integrated execution graphs, transactional side-effect discipline, multi-agent safety controls, and a coherent AI operating-layer story
+
+At this point, the highest-signal work is refinement and hardening inside those
+completed phases rather than inventing a new baseline:
+
+- route-governance refinement inside `v17`
+- broader ecosystem and deployment uptake around the `v20` operating-layer story
+- continued operational hardening, benchmarks, and real-world certification depth
 
 The target shape is six layers:
 
@@ -756,9 +764,8 @@ The governing rule stays the same:
 - governed memory over ad hoc retrieval
 - policy and evaluation over hidden self-modification
 
-The first maintained `v17` surface is `CapabilityRouter`, which adds
-explainable capability-aware ranking above raw provider fallback.
-That routing surface now also plugs into decomposition, role-aware coordination,
+The maintained `CapabilityRouter` surface anchors `v17`, and that routing layer
+now also plugs into decomposition, role-aware coordination, fleet diagnostics,
 and verification strategy selection.
 
 It does not try to be:

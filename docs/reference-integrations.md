@@ -150,6 +150,10 @@ For the higher-level supervised-autonomy operating model that ties API, worker,
 storage, control plane, incident handling, recovery, and rollback into one
 reference architecture, see
 [`docs/enterprise-autonomy-architecture.md`](enterprise-autonomy-architecture.md).
+For explicit environment, approval-organization, external-system, and
+transactional side-effect references, see
+[`docs/enterprise-boundaries.md`](enterprise-boundaries.md) and
+[`docs/transactional-execution.md`](transactional-execution.md).
 
 ## 6. Storage recommendation
 

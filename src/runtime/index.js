@@ -120,6 +120,8 @@ const { AutonomyStackComparator } = require('./AutonomyStackComparator');
 const { AutonomyDriftGuard } = require('./AutonomyDriftGuard');
 const { OperationalScorecard } = require('./OperationalScorecard');
 const { EnterpriseAutonomyBenchmarkSuite } = require('./EnterpriseAutonomyBenchmarkSuite');
+const { EnterpriseBoundaryProfile } = require('./EnterpriseBoundaryProfile');
+const { TransactionalExecutionPlan } = require('./TransactionalExecutionPlan');
 const { StateBundle } = require('./StateBundle');
 const { StateDiff } = require('./StateDiff');
 const { StateBundleSerializer } = require('./StateBundleSerializer');
@@ -277,6 +279,8 @@ module.exports = {
   AutonomyDriftGuard,
   OperationalScorecard,
   EnterpriseAutonomyBenchmarkSuite,
+  EnterpriseBoundaryProfile,
+  TransactionalExecutionPlan,
   StateBundle,
   StateDiff,
   StateBundleSerializer,

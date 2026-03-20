@@ -93,17 +93,10 @@ layer:
 
 Current progress inside that next horizon:
 
-- `v17` has started with a maintained `CapabilityRouter` surface for explainable
-  capability-aware route ranking across models, simulators, and human-review paths
-- `v17` also now includes route-aware coordination hooks and fleet-facing route diagnostics
-
-The remaining themes inside that horizon are:
-
-- tool reputation, certification, and simulation before risky execution
-- jurisdiction- and tenant-scoped autonomy rules
-- transactional and compensation-aware real-world action handling
-- multi-agent anti-loop, anti-collusion, and scoped shared-context controls
-- public AI operating-layer adoption guidance and maintained enterprise benchmarks
+- `v17` core is in: capability-aware routing, route-aware coordination hooks, and fleet-facing route diagnostics
+- `v18` core is in: governed memory provenance, retention, access contracts, diagnostics, and review workflows
+- `v19` core is in: autonomy budgets, uncertainty supervision, autonomy policies, progressive autonomy, and autonomy operations
+- `v20` core is in: unified operating-layer views, enterprise references, deployment-pattern certification, operational scorecards, and multi-agent safety controls
 
 The current `v14` maintained baseline starts with rollout artifacts, fleet
 health summaries, canary halt/rollback evaluation, fleet safety controls, and
@@ -147,7 +140,7 @@ The remaining work is now mostly:
 
 - ecosystem clarity
 - operational hardening
-- broader enterprise references and transactional execution depth
+- route-governance refinement inside `v17`
 - interop, coordination, and learning refinement on top of the completed core
 
 That is a healthier pre-release state than having major unresolved core
@@ -160,3 +153,5 @@ architecture work.
 - [Reference integrations](reference-integrations.md)
 - [Ecosystem certification guidance](ecosystem-certification.md)
 - [Deployment pattern certification](deployment-pattern-certification.md)
+- [Enterprise boundaries](enterprise-boundaries.md)
+- [Transactional execution](transactional-execution.md)

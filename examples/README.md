@@ -153,6 +153,9 @@ These examples are intended as reference deployment patterns rather than feature
 - `referenceDeploymentPatternCertification.js`
   - no API key required
   - shows operational certification for supervised-autonomy and public-control-plane deployment patterns
+- `referenceEnterpriseBoundaries.js`
+  - no API key required
+  - shows enterprise boundary profiling plus transactional execution/compensation references for external systems
 - `referenceInteropRegistry.js`
   - no API key required
   - shows one public import/export registry across tool, trace, policy, eval, and manifest artifacts

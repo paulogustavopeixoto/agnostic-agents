@@ -1676,6 +1676,27 @@ export class EnterpriseAutonomyBenchmarkSuite {
   run(options?: JsonObject): Promise<JsonObject>;
 }
 
+export class EnterpriseBoundaryProfile {
+  constructor(input?: {
+    environments?: Array<string | JsonObject>;
+    approvalOrganizations?: Array<string | JsonObject>;
+    externalSystems?: Array<string | JsonObject>;
+    tenantBoundaries?: Array<string | JsonObject>;
+  });
+  validate(): JsonObject;
+  toJSON(): JsonObject;
+}
+
+export class TransactionalExecutionPlan {
+  static build(
+    actions?: JsonObject[],
+    options?: {
+      defaultEnvironment?: string | null;
+      requireVerification?: boolean;
+    }
+  ): JsonObject;
+}
+
 export class GovernanceRecordLedger {
   constructor(options?: { records?: JsonObject[] });
   records: JsonObject[];

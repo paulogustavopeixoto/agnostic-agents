@@ -103,6 +103,8 @@ const { AutonomyStackComparator } = require('../src/runtime/AutonomyStackCompara
 const { AutonomyDriftGuard } = require('../src/runtime/AutonomyDriftGuard');
 const { OperationalScorecard } = require('../src/runtime/OperationalScorecard');
 const { EnterpriseAutonomyBenchmarkSuite } = require('../src/runtime/EnterpriseAutonomyBenchmarkSuite');
+const { EnterpriseBoundaryProfile } = require('../src/runtime/EnterpriseBoundaryProfile');
+const { TransactionalExecutionPlan } = require('../src/runtime/TransactionalExecutionPlan');
 const { DelegationBudget } = require('../src/coordination/DelegationBudget');
 const { SharedContextScope } = require('../src/coordination/SharedContextScope');
 const { CoordinationSafetyGuard } = require('../src/coordination/CoordinationSafetyGuard');
@@ -337,6 +339,8 @@ describe('Package/module unit tests', () => {
     expect(pkg.AutonomyDriftGuard).toBeDefined();
     expect(pkg.OperationalScorecard).toBeDefined();
     expect(pkg.EnterpriseAutonomyBenchmarkSuite).toBeDefined();
+    expect(pkg.EnterpriseBoundaryProfile).toBeDefined();
+    expect(pkg.TransactionalExecutionPlan).toBeDefined();
     expect(pkg.GovernanceRecordLedger).toBeDefined();
     expect(pkg.AuditStitcher).toBeDefined();
     expect(pkg.GovernanceTimeline).toBeDefined();
@@ -418,6 +422,8 @@ describe('Package/module unit tests', () => {
     expect(declarationSource).toContain('export class AutonomyDriftGuard');
     expect(declarationSource).toContain('export class OperationalScorecard');
     expect(declarationSource).toContain('export class EnterpriseAutonomyBenchmarkSuite');
+    expect(declarationSource).toContain('export class EnterpriseBoundaryProfile');
+    expect(declarationSource).toContain('export class TransactionalExecutionPlan');
     expect(declarationSource).toContain('export class DeploymentPatternCertificationKit');
     expect(declarationSource).toContain('export class DelegationBudget');
     expect(declarationSource).toContain('export class SharedContextScope');
@@ -1399,6 +1405,47 @@ describe('Package/module unit tests', () => {
         operationally_certified: 2,
       },
     });
+  });
+
+  test('EnterpriseBoundaryProfile and TransactionalExecutionPlan make enterprise boundaries and side effects explicit', () => {
+    const profile = new EnterpriseBoundaryProfile({
+      environments: ['staging', 'prod'],
+      approvalOrganizations: ['ops', 'compliance'],
+      externalSystems: ['crm', 'billing'],
+      tenantBoundaries: ['tenant_id'],
+    });
+    const validation = profile.validate();
+    const transaction = TransactionalExecutionPlan.build([
+      {
+        id: 'update_crm',
+        system: 'crm',
+        operation: 'patch_contact_record',
+        environment: 'prod',
+        requiresApproval: true,
+        compensation: { operation: 'restore_contact_snapshot' },
+      },
+      {
+        id: 'queue_billing_sync',
+        system: 'billing',
+        operation: 'enqueue_sync_job',
+        environment: 'prod',
+        idempotent: true,
+      },
+    ]);
+
+    expect(validation).toMatchObject({
+      valid: true,
+      errors: [],
+    });
+    expect(transaction).toMatchObject({
+      kind: 'agnostic-agents/transactional-execution-plan',
+      summary: {
+        totalActions: 2,
+        approvalRequired: 1,
+        compensatable: 1,
+      },
+    });
+    expect(transaction.steps.some(step => step.phase === 'compensate')).toBe(true);
   });
 
   test('ToolSchemaArtifact and InteropArtifactRegistry import and export maintained artifact families', () => {

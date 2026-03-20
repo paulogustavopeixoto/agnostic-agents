@@ -8,15 +8,17 @@ The format is intentionally simple:
 
 ### Added
 
-- none yet
+- `v19` Budgeted Autonomy OS maintained surfaces including `AutonomyBudget`, `AutonomyBudgetLedger`, `UncertaintySupervisionPolicy`, `ApprovalDelegationContract`, `AutonomyEnvelope`, `AutonomyPolicyRegistry`, `InterventionPolicyRegistry`, `ApprovalDecisionCache`, `WorkflowSupervisionCheckpoint`, `ProgressiveAutonomyController`, `AutonomyBenchmarkSuite`, `AutonomyFleetSummary`, and `AutonomyRolloutGuard`
+- `v20` Enterprise Autonomy OS maintained surfaces including `UnifiedExecutionGraph`, `EnterpriseAutonomyArchitecture`, `EnterpriseOperatingModel`, `AutonomyStackConfig`, `AutonomyStackComparator`, `AutonomyDriftGuard`, `OperationalScorecard`, `EnterpriseAutonomyBenchmarkSuite`, `DeploymentPatternCertificationKit`, `EnterpriseBoundaryProfile`, and `TransactionalExecutionPlan`
+- maintained enterprise-operating-layer examples and docs including deployment-pattern certification, enterprise boundaries, transactional execution, enterprise autonomy architectures, operational scorecards, coordination safety, and AI operating-layer guidance
 
 ### Changed
 
-- none yet
+- updated the README, roadmap status, and reference integration docs so the current package state reflects maintained autonomy-operating-layer surfaces through `v20` core instead of describing that horizon as purely future work
 
 ### Fixed
 
-- none yet
+- public maturity guidance now distinguishes completed `v20` operating-layer core from the remaining refinement work, reducing roadmap/status drift in release-facing docs
 
 ### Removed
 

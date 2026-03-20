@@ -642,6 +642,17 @@ describe('Maintained examples', () => {
     expect(stdout).toContain("operationally_certified: 2");
   });
 
+  test('reference enterprise boundaries example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceEnterpriseBoundaries.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Enterprise boundary summary');
+    expect(stdout).toContain("kind: 'agnostic-agents/enterprise-boundary-profile'");
+    expect(stdout).toContain("kind: 'agnostic-agents/transactional-execution-plan'");
+  });
+
   test('reference interop registry example runs', async () => {
     const examplePath = path.join(__dirname, '..', 'examples', 'referenceInteropRegistry.js');
     const { stdout } = await execFileAsync(process.execPath, [examplePath], {
