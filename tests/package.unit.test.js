@@ -95,6 +95,13 @@ const { ProgressiveAutonomyController } = require('../src/runtime/ProgressiveAut
 const { AutonomyBenchmarkSuite } = require('../src/runtime/AutonomyBenchmarkSuite');
 const { AutonomyFleetSummary } = require('../src/runtime/AutonomyFleetSummary');
 const { AutonomyRolloutGuard } = require('../src/runtime/AutonomyRolloutGuard');
+const { UnifiedExecutionGraph } = require('../src/runtime/UnifiedExecutionGraph');
+const { EnterpriseAutonomyArchitecture } = require('../src/runtime/EnterpriseAutonomyArchitecture');
+const { EnterpriseOperatingModel } = require('../src/runtime/EnterpriseOperatingModel');
+const { AutonomyStackConfig } = require('../src/runtime/AutonomyStackConfig');
+const { AutonomyStackComparator } = require('../src/runtime/AutonomyStackComparator');
+const { AutonomyDriftGuard } = require('../src/runtime/AutonomyDriftGuard');
+const { OperationalScorecard } = require('../src/runtime/OperationalScorecard');
 const { GovernanceRecordLedger } = require('../src/runtime/GovernanceRecordLedger');
 const { AuditStitcher } = require('../src/runtime/AuditStitcher');
 const { GovernanceTimeline } = require('../src/runtime/GovernanceTimeline');
@@ -313,6 +320,13 @@ describe('Package/module unit tests', () => {
     expect(pkg.AutonomyBenchmarkSuite).toBeDefined();
     expect(pkg.AutonomyFleetSummary).toBeDefined();
     expect(pkg.AutonomyRolloutGuard).toBeDefined();
+    expect(pkg.UnifiedExecutionGraph).toBeDefined();
+    expect(pkg.EnterpriseAutonomyArchitecture).toBeDefined();
+    expect(pkg.EnterpriseOperatingModel).toBeDefined();
+    expect(pkg.AutonomyStackConfig).toBeDefined();
+    expect(pkg.AutonomyStackComparator).toBeDefined();
+    expect(pkg.AutonomyDriftGuard).toBeDefined();
+    expect(pkg.OperationalScorecard).toBeDefined();
     expect(pkg.GovernanceRecordLedger).toBeDefined();
     expect(pkg.AuditStitcher).toBeDefined();
     expect(pkg.GovernanceTimeline).toBeDefined();
@@ -386,6 +400,13 @@ describe('Package/module unit tests', () => {
     expect(declarationSource).toContain('export class AutonomyBenchmarkSuite');
     expect(declarationSource).toContain('export class AutonomyFleetSummary');
     expect(declarationSource).toContain('export class AutonomyRolloutGuard');
+    expect(declarationSource).toContain('export class UnifiedExecutionGraph');
+    expect(declarationSource).toContain('export class EnterpriseAutonomyArchitecture');
+    expect(declarationSource).toContain('export class EnterpriseOperatingModel');
+    expect(declarationSource).toContain('export class AutonomyStackConfig');
+    expect(declarationSource).toContain('export class AutonomyStackComparator');
+    expect(declarationSource).toContain('export class AutonomyDriftGuard');
+    expect(declarationSource).toContain('export class OperationalScorecard');
   });
 
   test('AutonomyEnvelope combines budgets, supervision thresholds, and reusable delegation contracts', () => {
@@ -710,6 +731,204 @@ describe('Package/module unit tests', () => {
     expect(guard).toMatchObject({
       action: 'block_rollout',
     });
+  });
+
+  test('UnifiedExecutionGraph stitches runtime, policy, memory, coordination, learning, and fleet signals', () => {
+    const run = new Run({
+      id: 'run-enterprise-1',
+      input: 'Review the production release path and status update.',
+    });
+    run.setStatus('completed');
+    run.addStep({
+      id: 'run-enterprise-1:step:1',
+      type: 'tool',
+      status: 'completed',
+      output: { delivered: true },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    const graph = new UnifiedExecutionGraph().build({
+      run,
+      policyDecisions: [
+        {
+          id: 'policy:approval',
+          action: 'require_approval',
+          toolName: 'send_status_update',
+        },
+      ],
+      memoryAudit: [
+        {
+          id: 'memory:write:1',
+          type: 'memory_write',
+          key: 'release_summary',
+          layer: 'episodic',
+        },
+      ],
+      coordination: {
+        id: 'coordination:1',
+        action: 'review',
+      },
+      learnedChanges: [
+        {
+          id: 'learning:1',
+          summary: 'Increase release-review verification depth',
+          action: 'adjust_verification',
+        },
+      ],
+      fleet: {
+        id: 'fleet:prod',
+        action: 'allow_rollout',
+        environment: 'prod',
+      },
+    });
+
+    expect(graph.summarize()).toMatchObject({
+      nodes: 7,
+      edges: 6,
+      nodeTypes: expect.arrayContaining([
+        'run',
+        'runtime_step',
+        'policy_decision',
+        'memory_event',
+        'coordination',
+        'learned_change',
+        'fleet',
+      ]),
+    });
+  });
+
+  test('Enterprise autonomy architecture and operating model describe one supervised-autonomy operating pattern', () => {
+    const architecture = new EnterpriseAutonomyArchitecture({
+      services: [
+        { id: 'api-service', role: 'request_ingress' },
+        { id: 'worker-service', role: 'execution' },
+        { id: 'control-plane', role: 'operator_surface' },
+      ],
+      storage: [
+        { id: 'run-store', type: 'durable_runs' },
+        { id: 'memory-store', type: 'governed_memory' },
+      ],
+      operators: [
+        { id: 'ops-oncall', role: 'incident_response' },
+      ],
+      environments: [
+        { id: 'prod', tenants: ['acme'] },
+      ],
+    }).build();
+
+    const operatingModel = new EnterpriseOperatingModel().build({
+      incident: {
+        action: 'inspect_failed_run',
+      },
+      approvals: [{ id: 'approval-1' }],
+      checkpoints: [{ id: 'checkpoint-1' }],
+      recovery: {
+        action: 'partial_replay',
+      },
+      rollback: {
+        action: 'rollback_rollout',
+      },
+      fleet: {
+        action: 'halt_rollout',
+      },
+    });
+
+    expect(architecture).toMatchObject({
+      summary: {
+        services: 3,
+        storageBackends: 2,
+        operators: 1,
+        environments: 1,
+      },
+    });
+    expect(operatingModel).toMatchObject({
+      summary: {
+        hasIncident: true,
+        hasRecovery: true,
+        hasRollback: true,
+      },
+    });
+    expect(operatingModel.phases.map(phase => phase.phase)).toEqual(
+      expect.arrayContaining(['incident', 'approval', 'checkpoint', 'recovery', 'rollback', 'fleet'])
+    );
+  });
+
+  test('Autonomy stack comparison and drift guard detect blocked config drift', () => {
+    const baseline = new AutonomyStackConfig({
+      id: 'prod-baseline',
+      environment: 'prod',
+      tenant: 'acme',
+      routing: { primaryModel: 'code-model', fallbackModel: 'cheap-model' },
+      policy: { approvalMode: 'required', maxRisk: 'medium' },
+      memory: { retentionDays: 30, trustZone: 'private' },
+      autonomy: { maxSpend: 5, reviewThreshold: 0.7 },
+      fleet: { canaryPercent: 10 },
+      operator: { reviewDashboard: 'v2' },
+    });
+    const candidate = new AutonomyStackConfig({
+      id: 'prod-candidate',
+      environment: 'prod',
+      tenant: 'acme',
+      routing: { primaryModel: 'code-model-v2', fallbackModel: 'cheap-model' },
+      policy: { approvalMode: 'auto', maxRisk: 'high' },
+      memory: { retentionDays: 30, trustZone: 'private' },
+      autonomy: { maxSpend: 8, reviewThreshold: 0.6 },
+      fleet: { canaryPercent: 25 },
+      operator: { reviewDashboard: 'v2' },
+    });
+
+    const comparison = new AutonomyStackComparator().compare(baseline, candidate);
+    const driftGuard = new AutonomyDriftGuard().evaluate(comparison, {
+      blockedSections: ['policy'],
+      maxChanges: 5,
+    });
+
+    expect(comparison.summary).toMatchObject({
+      totalChanges: 6,
+      sectionsChanged: expect.arrayContaining(['routing', 'policy', 'autonomy', 'fleet']),
+    });
+    expect(driftGuard).toMatchObject({
+      action: 'block_deploy',
+      reasons: expect.arrayContaining([expect.stringContaining('blocked section "policy"')]),
+    });
+  });
+
+  test('OperationalScorecard summarizes reliability, governance, memory, routing, and operator load', () => {
+    const scorecard = new OperationalScorecard().evaluate({
+      runs: [
+        { id: 'run-1', status: 'completed' },
+        { id: 'run-2', status: 'failed' },
+        { id: 'run-3', status: 'waiting_for_approval' },
+      ],
+      governance: {
+        blocked: 1,
+        rollbackRecommendations: 1,
+      },
+      memory: {
+        flags: ['memory_access_blocked', 'memory_conflicts_detected'],
+        summary: {
+          benchmarkFailures: 1,
+        },
+      },
+      routing: {
+        degraded: 1,
+        drifted: 2,
+      },
+      operator: {
+        totals: { incidents: 1 },
+        learning: { pendingReview: 1 },
+      },
+    });
+
+    expect(scorecard).toMatchObject({
+      reliability: { failedRuns: 1, pausedRuns: 1 },
+      governance: { blocked: 1, rollbackRecommendations: 1 },
+      memoryHygiene: { flags: 2, benchmarkFailures: 1 },
+      routingQuality: { degraded: 1, drifted: 2 },
+      operatorLoad: { openIncidents: 1, pendingReviews: 1 },
+    });
+    expect(typeof scorecard.overall).toBe('number');
   });
 
   test('Tool exposes unified schema and provider-specific representations', async () => {

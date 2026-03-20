@@ -483,6 +483,13 @@ Use:
 - `AutonomyBenchmarkSuite` for maintained eval coverage of budget exhaustion, approval latency, escalation quality, and supervised-autonomy behavior
 - `AutonomyFleetSummary` for fleet summaries of autonomy budget usage and escalation hot spots
 - `AutonomyRolloutGuard` for blocking rollout when autonomy-envelope widening lacks evidence or benchmark support
+- `UnifiedExecutionGraph` for one stitched graph across runtime, policy, memory, coordination, learning, and fleet signals
+- `EnterpriseAutonomyArchitecture` for a public API/worker/storage/control-plane reference architecture
+- `EnterpriseOperatingModel` for one cross-surface incident, approval, checkpoint, recovery, rollback, and fleet workflow
+- `AutonomyStackConfig` for one portable autonomy-stack config artifact
+- `AutonomyStackComparator` for structured config comparison across environments and candidates
+- `AutonomyDriftGuard` for blocking deployment when sensitive autonomy sections drift
+- `OperationalScorecard` for one operator-readable scorecard across reliability, governance, memory hygiene, routing quality, and operator load
 
 ### State and Replay
 
@@ -640,8 +647,12 @@ Evals and ecosystem:
 - [Benchmark fixtures](docs/benchmark-fixtures.md)
 - [Autonomy policies](docs/autonomy-policies.md)
 - [Autonomy operations](docs/autonomy-operations.md)
+- [Autonomy config drift](docs/autonomy-config-drift.md)
 - [Budgeted autonomy](docs/budgeted-autonomy.md)
+- [Enterprise autonomy architecture](docs/enterprise-autonomy-architecture.md)
+- [Operational scorecards](docs/operational-scorecards.md)
 - [Progressive autonomy](docs/progressive-autonomy.md)
+- [Unified execution graph](docs/unified-execution-graph.md)
 - [Capability fabric](docs/capability-fabric.md)
 - [Community summaries](docs/community-summaries.md)
 - [Community roadmap status](docs/community-roadmap-status.md)

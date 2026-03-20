@@ -235,6 +235,54 @@ describe('Maintained examples', () => {
     expect(stdout).toContain('rolloutGuard');
   });
 
+  test('reference unified execution graph example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceUnifiedExecutionGraph.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Unified execution graph summary');
+    expect(stdout).toContain('summary');
+    expect(stdout).toContain('nodes');
+    expect(stdout).toContain('edges');
+  });
+
+  test('reference enterprise autonomy architecture example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceEnterpriseAutonomyArchitecture.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Enterprise autonomy architecture');
+    expect(stdout).toContain('architecture');
+    expect(stdout).toContain('operatingModel');
+    expect(stdout).toContain('unifiedGraph');
+  });
+
+  test('reference autonomy config drift example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceAutonomyConfigDrift.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Autonomy config drift summary');
+    expect(stdout).toContain('comparison');
+    expect(stdout).toContain('driftGuard');
+    expect(stdout).toContain('block_deploy');
+  });
+
+  test('reference operational scorecard example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceOperationalScorecard.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Operational scorecard summary');
+    expect(stdout).toContain('operatorSummary');
+    expect(stdout).toContain('memoryDiagnostics');
+    expect(stdout).toContain('scorecard');
+  });
+
   test('reference everything smoke example runs', async () => {
     const examplePath = path.join(__dirname, '..', 'examples', 'referenceEverythingSmoke.js');
     const { stdout } = await execFileAsync(process.execPath, [examplePath], {

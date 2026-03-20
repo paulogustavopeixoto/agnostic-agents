@@ -111,6 +111,13 @@ const { ProgressiveAutonomyController } = require('./ProgressiveAutonomyControll
 const { AutonomyBenchmarkSuite } = require('./AutonomyBenchmarkSuite');
 const { AutonomyFleetSummary } = require('./AutonomyFleetSummary');
 const { AutonomyRolloutGuard } = require('./AutonomyRolloutGuard');
+const { UnifiedExecutionGraph } = require('./UnifiedExecutionGraph');
+const { EnterpriseAutonomyArchitecture } = require('./EnterpriseAutonomyArchitecture');
+const { EnterpriseOperatingModel } = require('./EnterpriseOperatingModel');
+const { AutonomyStackConfig } = require('./AutonomyStackConfig');
+const { AutonomyStackComparator } = require('./AutonomyStackComparator');
+const { AutonomyDriftGuard } = require('./AutonomyDriftGuard');
+const { OperationalScorecard } = require('./OperationalScorecard');
 const { StateBundle } = require('./StateBundle');
 const { StateDiff } = require('./StateDiff');
 const { StateBundleSerializer } = require('./StateBundleSerializer');
@@ -259,6 +266,13 @@ module.exports = {
   AutonomyBenchmarkSuite,
   AutonomyFleetSummary,
   AutonomyRolloutGuard,
+  UnifiedExecutionGraph,
+  EnterpriseAutonomyArchitecture,
+  EnterpriseOperatingModel,
+  AutonomyStackConfig,
+  AutonomyStackComparator,
+  AutonomyDriftGuard,
+  OperationalScorecard,
   StateBundle,
   StateDiff,
   StateBundleSerializer,

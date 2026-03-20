@@ -144,6 +144,12 @@ For fleet rollout and multi-runtime control guidance, see [`docs/multi-runtime-o
 Maintained split reference:
 
 - [`examples/referenceDeploymentSplit.js`](../examples/referenceDeploymentSplit.js)
+- [`examples/referenceEnterpriseAutonomyArchitecture.js`](../examples/referenceEnterpriseAutonomyArchitecture.js)
+
+For the higher-level supervised-autonomy operating model that ties API, worker,
+storage, control plane, incident handling, recovery, and rollback into one
+reference architecture, see
+[`docs/enterprise-autonomy-architecture.md`](enterprise-autonomy-architecture.md).
 
 ## 6. Storage recommendation
 

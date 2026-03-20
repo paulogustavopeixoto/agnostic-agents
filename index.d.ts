@@ -1527,6 +1527,88 @@ export class AutonomyRolloutGuard {
   }): JsonObject;
 }
 
+export class UnifiedExecutionGraph {
+  constructor(options?: { graph?: EvidenceGraph | JsonObject | null });
+  graph: EvidenceGraph;
+  build(options?: {
+    run?: Run | JsonObject | null;
+    policyDecisions?: JsonObject[];
+    memoryAudit?: JsonObject[];
+    coordination?: JsonObject | null;
+    learnedChanges?: JsonObject[];
+    fleet?: JsonObject | null;
+  }): EvidenceGraph;
+  summarize(): JsonObject;
+}
+
+export class EnterpriseAutonomyArchitecture {
+  constructor(options?: {
+    services?: JsonObject[];
+    storage?: JsonObject[];
+    operators?: JsonObject[];
+    environments?: JsonObject[];
+    metadata?: JsonObject;
+  });
+  services: JsonObject[];
+  storage: JsonObject[];
+  operators: JsonObject[];
+  environments: JsonObject[];
+  metadata: JsonObject;
+  build(): JsonObject;
+}
+
+export class EnterpriseOperatingModel {
+  build(options?: {
+    incident?: JsonObject | null;
+    recovery?: JsonObject | null;
+    rollback?: JsonObject | null;
+    approvals?: JsonObject[];
+    checkpoints?: JsonObject[];
+    fleet?: JsonObject | null;
+  }): JsonObject;
+}
+
+export class AutonomyStackConfig {
+  constructor(options?: {
+    id?: string | null;
+    environment?: string | null;
+    tenant?: string | null;
+    routing?: JsonObject;
+    policy?: JsonObject;
+    memory?: JsonObject;
+    autonomy?: JsonObject;
+    fleet?: JsonObject;
+    operator?: JsonObject;
+    metadata?: JsonObject;
+  });
+  toJSON(): JsonObject;
+  static fromJSON(payload?: JsonObject): AutonomyStackConfig;
+}
+
+export class AutonomyStackComparator {
+  compare(
+    leftConfig?: AutonomyStackConfig | JsonObject | null,
+    rightConfig?: AutonomyStackConfig | JsonObject | null
+  ): JsonObject;
+}
+
+export class AutonomyDriftGuard {
+  evaluate(
+    comparison?: JsonObject,
+    options?: { blockedSections?: string[]; maxChanges?: number | null }
+  ): JsonObject;
+}
+
+export class OperationalScorecard {
+  evaluate(options?: {
+    runs?: JsonObject[];
+    governance?: JsonObject | null;
+    memory?: JsonObject | null;
+    routing?: JsonObject | null;
+    operator?: JsonObject | null;
+  }): JsonObject;
+}
+
 export class GovernanceRecordLedger {
   constructor(options?: { records?: JsonObject[] });
   records: JsonObject[];

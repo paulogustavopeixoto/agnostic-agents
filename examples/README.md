@@ -183,6 +183,18 @@ These examples are intended as reference deployment patterns rather than feature
 - `referenceAutonomyOperations.js`
   - no API key required
   - shows autonomy benchmark coverage, fleet summaries for budget/escalation hot spots, and rollout blocking for unsafe envelope widening
+- `referenceUnifiedExecutionGraph.js`
+  - no API key required
+  - shows one stitched graph view across runtime, policy, memory, coordination, learning, and fleet signals
+- `referenceEnterpriseAutonomyArchitecture.js`
+  - no API key required
+  - shows one API/worker/control-plane reference architecture and one cross-surface operating model for incident, approval, recovery, rollback, and fleet control
+- `referenceAutonomyConfigDrift.js`
+  - no API key required
+  - shows autonomy-stack config comparison and blocked deployment on sensitive drift
+- `referenceOperationalScorecard.js`
+  - no API key required
+  - shows one consolidated operational scorecard across reliability, governance, memory hygiene, routing quality, and operator load
 - `referenceDurableBackends.js`
   - no API key required
   - shows custom durable run/job/layer store implementations and registry usage
