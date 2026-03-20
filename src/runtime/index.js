@@ -33,9 +33,21 @@ const { FleetSafetyController } = require('./FleetSafetyController');
 const { FleetImpactComparator } = require('./FleetImpactComparator');
 const { FleetRollbackAdvisor } = require('./FleetRollbackAdvisor');
 const { RouteFleetDiagnostics } = require('./RouteFleetDiagnostics');
+const { SecretResolver } = require('./SecretResolver');
+const { SchemaNormalizer } = require('./SchemaNormalizer');
+const { ToolRecorder } = require('./ToolRecorder');
+const { ToolMockBuilder } = require('./ToolMockBuilder');
+const { ToolSandboxRunner } = require('./ToolSandboxRunner');
 const { OperatorInterventionPlanner } = require('./OperatorInterventionPlanner');
 const { OperatorSummary } = require('./OperatorSummary');
 const { OperatorTriageWorkflow } = require('./OperatorTriageWorkflow');
+const { PromptArtifact } = require('./PromptArtifact');
+const { PromptRegistry } = require('./PromptRegistry');
+const { RunRecipe } = require('./RunRecipe');
+const { WorkflowPreset } = require('./WorkflowPreset');
+const { IncidentBundleExporter } = require('./IncidentBundleExporter');
+const { CredentialDelegationKit } = require('./CredentialDelegationKit');
+const { RoutePolicySimulator } = require('./RoutePolicySimulator');
 const { LearnedAdaptationArtifact } = require('./LearnedAdaptationArtifact');
 const { ImprovementProposalEngine } = require('./ImprovementProposalEngine');
 const { GovernedImprovementLoop } = require('./GovernedImprovementLoop');
@@ -147,9 +159,21 @@ module.exports = {
   FleetImpactComparator,
   FleetRollbackAdvisor,
   RouteFleetDiagnostics,
+  SecretResolver,
+  SchemaNormalizer,
+  ToolRecorder,
+  ToolMockBuilder,
+  ToolSandboxRunner,
   OperatorInterventionPlanner,
   OperatorSummary,
   OperatorTriageWorkflow,
+  PromptArtifact,
+  PromptRegistry,
+  RunRecipe,
+  WorkflowPreset,
+  IncidentBundleExporter,
+  CredentialDelegationKit,
+  RoutePolicySimulator,
   LearnedAdaptationArtifact,
   ImprovementProposalEngine,
   GovernedImprovementLoop,

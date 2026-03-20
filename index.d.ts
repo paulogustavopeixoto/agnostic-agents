@@ -1213,6 +1213,38 @@ export class RouteFleetDiagnostics {
   analyze(summary?: JsonObject | null): JsonObject;
 }
 
+export class SecretResolver {
+  constructor(options?: { providers?: Record<string, Function>; env?: Record<string, string | undefined> });
+  resolve(value: JsonValue, context?: JsonObject): JsonValue;
+  redact(value: JsonValue): JsonValue;
+}
+
+export class SchemaNormalizer {
+  static normalizeToolSchema(schema?: JsonObject): JsonObject;
+  static normalizeApiProperty(property?: JsonObject): JsonObject;
+  static normalizeSchema(schema?: JsonObject): JsonObject;
+}
+
+export class ToolRecorder {
+  constructor(options?: { records?: JsonObject[] });
+  wrap(tool: Tool, metadata?: JsonObject): Tool;
+  export(): JsonObject;
+}
+
+export class ToolMockBuilder {
+  static build(options?: {
+    toolName?: string;
+    records?: JsonObject[];
+    description?: string;
+    fallback?: Function | null;
+  }): Tool;
+}
+
+export class ToolSandboxRunner {
+  constructor(options?: { simulator?: Function | null });
+  run(tool: Tool, args?: JsonObject, options?: { mode?: string; context?: JsonObject }): Promise<JsonObject>;
+}
+
 export class OperatorInterventionPlanner {
   plan(options?: {
     run?: Run | JsonObject | null;
@@ -1334,6 +1366,80 @@ export class OperatorControlLoop {
     primaryRollback?: JsonObject | null;
     context?: JsonObject;
   }): JsonObject;
+}
+
+export class PromptArtifact {
+  constructor(options?: {
+    id?: string;
+    role?: string;
+    content?: string;
+    version?: string;
+    metadata?: JsonObject;
+  });
+  id: string;
+  role: string;
+  content: string;
+  version: string;
+  metadata: JsonObject;
+  toJSON(): JsonObject;
+  static fromJSON(payload?: JsonObject): PromptArtifact;
+}
+
+export class PromptRegistry {
+  constructor(options?: { prompts?: Array<PromptArtifact | JsonObject> });
+  register(prompt: PromptArtifact | JsonObject): PromptArtifact;
+  get(id: string): PromptArtifact | null;
+  list(): JsonObject[];
+}
+
+export class RunRecipe {
+  constructor(options?: {
+    id?: string;
+    tools?: Tool[];
+    policy?: ToolPolicy | JsonObject | null;
+    routing?: CapabilityRouter | JsonObject | null;
+    memory?: Memory | JsonObject | null;
+    approvals?: ApprovalInbox | JsonObject | null;
+    metadata?: JsonObject;
+  });
+  buildAgentOptions(overrides?: JsonObject): JsonObject;
+}
+
+export class WorkflowPreset {
+  constructor(options?: {
+    id?: string;
+    workflow?: Workflow | JsonObject | null;
+    defaults?: JsonObject;
+    metadata?: JsonObject;
+  });
+  instantiate(overrides?: JsonObject): JsonObject;
+}
+
+export class IncidentBundleExporter {
+  export(options?: {
+    run?: Run | JsonObject | null;
+    traceBundle?: JsonObject | null;
+    stateBundle?: JsonObject | null;
+    policyEvaluation?: JsonObject | null;
+    coordinationDiagnostics?: JsonObject | null;
+    assuranceReport?: JsonObject | null;
+    metadata?: JsonObject;
+  }): JsonObject;
+}
+
+export class CredentialDelegationKit {
+  issue(options?: {
+    principal?: string;
+    scope?: string[];
+    expiresAt?: string | null;
+    metadata?: JsonObject;
+  }): JsonObject;
+  validate(credential?: JsonObject, options?: { now?: Date }): JsonObject;
+}
+
+export class RoutePolicySimulator {
+  constructor(options?: { router?: CapabilityRouter | JsonObject | null });
+  simulate(scenarios?: JsonObject[]): Promise<JsonObject>;
 }
 
 export class LearnedAdaptationArtifact {
@@ -1599,6 +1705,13 @@ export class CurlLoader {
   static load(curlCommand: string, options?: { serviceName?: string; authToken?: string | null }): JsonObject;
   static parse(curlCommand: string): JsonObject;
   static toApiSpec(parsed?: JsonObject): JsonObject;
+}
+export class PostmanLoader {
+  static load(
+    input: string | JsonObject,
+    options?: { serviceName?: string; authToken?: string | null; variables?: JsonObject }
+  ): JsonObject;
+  static toApiSpec(collection: JsonObject, options?: { variables?: JsonObject }): JsonObject;
 }
 export class PineconeManager {}
 

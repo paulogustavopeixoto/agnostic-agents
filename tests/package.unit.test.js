@@ -17,6 +17,7 @@ const { MCPClient } = require('../src/mcp/MCPClient');
 const { OpenAPILoader } = require('../src/api/OpenAPILoader');
 const { ApiLoader } = require('../src/api/ApiLoader');
 const { CurlLoader } = require('../src/api/CurlLoader');
+const { PostmanLoader } = require('../src/api/PostmanLoader');
 const { CritiqueProtocol } = require('../src/coordination/CritiqueProtocol');
 const { CritiqueSchemaRegistry } = require('../src/coordination/CritiqueSchemaRegistry');
 const { TrustRegistry } = require('../src/coordination/TrustRegistry');
@@ -57,9 +58,21 @@ const { FleetSafetyController } = require('../src/runtime/FleetSafetyController'
 const { FleetImpactComparator } = require('../src/runtime/FleetImpactComparator');
 const { FleetRollbackAdvisor } = require('../src/runtime/FleetRollbackAdvisor');
 const { RouteFleetDiagnostics } = require('../src/runtime/RouteFleetDiagnostics');
+const { SecretResolver } = require('../src/runtime/SecretResolver');
+const { SchemaNormalizer } = require('../src/runtime/SchemaNormalizer');
+const { ToolRecorder } = require('../src/runtime/ToolRecorder');
+const { ToolMockBuilder } = require('../src/runtime/ToolMockBuilder');
+const { ToolSandboxRunner } = require('../src/runtime/ToolSandboxRunner');
 const { OperatorInterventionPlanner } = require('../src/runtime/OperatorInterventionPlanner');
 const { OperatorSummary } = require('../src/runtime/OperatorSummary');
 const { OperatorTriageWorkflow } = require('../src/runtime/OperatorTriageWorkflow');
+const { PromptArtifact } = require('../src/runtime/PromptArtifact');
+const { PromptRegistry } = require('../src/runtime/PromptRegistry');
+const { RunRecipe } = require('../src/runtime/RunRecipe');
+const { WorkflowPreset } = require('../src/runtime/WorkflowPreset');
+const { IncidentBundleExporter } = require('../src/runtime/IncidentBundleExporter');
+const { CredentialDelegationKit } = require('../src/runtime/CredentialDelegationKit');
+const { RoutePolicySimulator } = require('../src/runtime/RoutePolicySimulator');
 const { GovernanceRecordLedger } = require('../src/runtime/GovernanceRecordLedger');
 const { AuditStitcher } = require('../src/runtime/AuditStitcher');
 const { GovernanceTimeline } = require('../src/runtime/GovernanceTimeline');
@@ -163,6 +176,7 @@ describe('Package/module unit tests', () => {
     expect(pkg.OpenAPILoader).toBeDefined();
     expect(pkg.ApiLoader).toBeDefined();
     expect(pkg.CurlLoader).toBeDefined();
+    expect(pkg.PostmanLoader).toBeDefined();
     expect(pkg.CritiqueProtocol).toBeDefined();
     expect(pkg.CritiqueSchemaRegistry).toBeDefined();
     expect(pkg.TrustRegistry).toBeDefined();
@@ -240,9 +254,21 @@ describe('Package/module unit tests', () => {
     expect(pkg.FleetImpactComparator).toBeDefined();
     expect(pkg.FleetRollbackAdvisor).toBeDefined();
     expect(pkg.RouteFleetDiagnostics).toBeDefined();
+    expect(pkg.SecretResolver).toBeDefined();
+    expect(pkg.SchemaNormalizer).toBeDefined();
+    expect(pkg.ToolRecorder).toBeDefined();
+    expect(pkg.ToolMockBuilder).toBeDefined();
+    expect(pkg.ToolSandboxRunner).toBeDefined();
     expect(pkg.OperatorInterventionPlanner).toBeDefined();
     expect(pkg.OperatorSummary).toBeDefined();
     expect(pkg.OperatorTriageWorkflow).toBeDefined();
+    expect(pkg.PromptArtifact).toBeDefined();
+    expect(pkg.PromptRegistry).toBeDefined();
+    expect(pkg.RunRecipe).toBeDefined();
+    expect(pkg.WorkflowPreset).toBeDefined();
+    expect(pkg.IncidentBundleExporter).toBeDefined();
+    expect(pkg.CredentialDelegationKit).toBeDefined();
+    expect(pkg.RoutePolicySimulator).toBeDefined();
     expect(pkg.GovernanceRecordLedger).toBeDefined();
     expect(pkg.AuditStitcher).toBeDefined();
     expect(pkg.GovernanceTimeline).toBeDefined();
@@ -6063,6 +6089,154 @@ describe('Package/module unit tests', () => {
         }),
       })
     );
+  });
+
+  test('PostmanLoader converts a collection item into executable API tools', async () => {
+    const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: () => 'application/json' },
+      json: async () => ({ created: true }),
+      text: async () => '',
+    });
+
+    const { tools } = PostmanLoader.load({
+      variable: [{ key: 'baseUrl', value: 'https://api.example.com' }],
+      item: [
+        {
+          name: 'CreateMessage',
+          request: {
+            method: 'POST',
+            url: { raw: '{{baseUrl}}/messages?channel=ops' },
+            body: {
+              mode: 'raw',
+              raw: JSON.stringify({ message: 'hello' }),
+            },
+          },
+        },
+      ],
+    }, { serviceName: 'postman' });
+
+    const result = await tools[0].call({ channel: 'ops', message: 'hello' });
+    expect(result).toEqual({ status: 200, data: { created: true } });
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://api.example.com/messages?channel=ops',
+      expect.objectContaining({ method: 'POST' })
+    );
+  });
+
+  test('SecretResolver and SchemaNormalizer normalize runtime-facing config', () => {
+    const resolver = new SecretResolver({
+      env: { API_TOKEN: 'token-123' },
+    });
+
+    expect(
+      resolver.resolve({ authorization: 'Bearer ${API_TOKEN}' })
+    ).toEqual({ authorization: 'Bearer token-123' });
+
+    expect(
+      SchemaNormalizer.normalizeToolSchema({
+        properties: {
+          message: {},
+        },
+      })
+    ).toEqual({
+      type: 'object',
+      properties: {
+        message: {
+          type: 'string',
+          description: '',
+        },
+      },
+      required: [],
+      description: '',
+    });
+  });
+
+  test('ToolRecorder, ToolMockBuilder, and ToolSandboxRunner support replayable tool workflows', async () => {
+    const baseTool = new Tool({
+      name: 'send_update',
+      parameters: {
+        type: 'object',
+        properties: {
+          message: { type: 'string' },
+        },
+      },
+      implementation: async ({ message }) => ({ delivered: true, message }),
+    });
+
+    const recorder = new ToolRecorder();
+    const recorded = recorder.wrap(baseTool);
+    expect(await recorded.call({ message: 'hello' })).toEqual({ delivered: true, message: 'hello' });
+
+    const mock = ToolMockBuilder.build({
+      toolName: 'send_update',
+      records: recorder.export().records,
+    });
+    expect(await mock.call({ message: 'hello' })).toEqual({ delivered: true, message: 'hello' });
+
+    const sandbox = new ToolSandboxRunner({
+      simulator: async (_tool, args) => ({ preview: true, args }),
+    });
+    expect(
+      await sandbox.run(baseTool, { message: 'preview' }, { mode: 'simulate' })
+    ).toEqual(
+      expect.objectContaining({
+        simulated: true,
+        result: { preview: true, args: { message: 'preview' } },
+      })
+    );
+  });
+
+  test('PromptRegistry, RunRecipe, WorkflowPreset, IncidentBundleExporter, CredentialDelegationKit, and RoutePolicySimulator compose utility artifacts', async () => {
+    const registry = new PromptRegistry();
+    registry.register(new PromptArtifact({ id: 'ops-summary', content: 'Summarize ops.' }));
+    expect(registry.get('ops-summary').content).toBe('Summarize ops.');
+
+    const tool = new Tool({
+      name: 'noop',
+      implementation: async () => ({ ok: true }),
+    });
+    const recipe = new RunRecipe({ id: 'ops-recipe', tools: [tool] });
+    expect(recipe.buildAgentOptions().tools).toHaveLength(1);
+
+    const preset = new WorkflowPreset({ id: 'ops-workflow', defaults: { retries: 1 } });
+    expect(preset.instantiate({ retries: 3 }).defaults.retries).toBe(3);
+
+    const incidentBundle = new IncidentBundleExporter().export({
+      assuranceReport: { summary: { verdict: 'allow' } },
+    });
+    expect(incidentBundle.kind).toBe('agnostic-agents/incident-bundle');
+
+    const delegated = new CredentialDelegationKit().issue({
+      principal: 'worker-a',
+      scope: ['tool:send_update'],
+    });
+    expect(new CredentialDelegationKit().validate(delegated)).toEqual({ valid: true, reason: null });
+
+    const router = new CapabilityRouter({
+      candidates: [
+        {
+          id: 'cheap-model',
+          kind: 'model',
+          capabilities: ['summarization'],
+          profile: {
+            taskTypes: ['ops_summary'],
+            costTier: 'low',
+            riskTier: 'low',
+            latencyTier: 'low',
+          },
+        },
+      ],
+    });
+    const simulation = await new RoutePolicySimulator({ router }).simulate([
+      {
+        id: 'ops-summary',
+        task: { taskType: 'ops_summary', requiredCapabilities: ['summarization'] },
+      },
+    ]);
+    expect(simulation.summary.total).toBe(1);
+    expect(simulation.scenarios[0].route.candidate.id).toBe('cheap-model');
   });
 
   test('MCPDiscoveryLoader preserves remote MCP tool names behind local prefixes', async () => {

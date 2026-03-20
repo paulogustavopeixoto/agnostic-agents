@@ -144,6 +144,34 @@ describe('Maintained examples', () => {
     expect(stdout).toContain('importedImportedCurl');
   });
 
+  test('reference utility toolkit example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceUtilityToolkit.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Postman API spec');
+    expect(stdout).toContain('Resolved secret config');
+    expect(stdout).toContain('Recorded tool result');
+    expect(stdout).toContain('Prompt registry');
+    expect(stdout).toContain('Route policy simulation');
+    expect(stdout).toContain('Incident bundle');
+  });
+
+  test('reference everything smoke example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceEverythingSmoke.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Everything smoke summary');
+    expect(stdout).toContain('openApiTools');
+    expect(stdout).toContain('curlTools');
+    expect(stdout).toContain('postmanTools');
+    expect(stdout).toContain('resolvedSecret');
+    expect(stdout).toContain('routeSimulation');
+  });
+
   test('reference v7 audit example runs', async () => {
     const examplePath = path.join(__dirname, '..', 'examples', 'referenceV7Audit.js');
     const { stdout } = await execFileAsync(process.execPath, [examplePath], {

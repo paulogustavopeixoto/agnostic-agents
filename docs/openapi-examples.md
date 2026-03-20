@@ -6,6 +6,7 @@ The package currently focuses on:
 
 - importing an OpenAPI spec into runtime tools
 - importing a `curl` command into the same API-tool path as a bootstrap step
+- importing a Postman collection into the same API-tool path as a bootstrap step
 - executing those tools through the normal agent/runtime path
 
 It does not currently ship a maintained OpenAPI exporter.
@@ -14,6 +15,7 @@ So the practical maintained story today is:
 
 - OpenAPI import: yes
 - curl import: yes
+- Postman import: yes
 - OpenAPI export: not yet a maintained package feature
 
 ## 1. Import an OpenAPI spec into tools
@@ -101,12 +103,28 @@ const { tools } = CurlLoader.load(
 
 This is best treated as a bootstrap/import path, not a perfect contract source. When a real OpenAPI spec exists, `OpenAPILoader` remains the stronger maintained source of truth.
 
-## 6. Current boundary
+## 6. Use Postman as a bootstrap path
+
+Use `PostmanLoader` when the starting point is a Postman collection instead of a curl command or OpenAPI file.
+
+```js
+const { PostmanLoader } = require('agnostic-agents');
+
+const { tools } = PostmanLoader.load(collectionJson, {
+  serviceName: 'imported',
+  authToken: process.env.API_TOKEN,
+});
+```
+
+This is best treated as a bootstrap/import path. If a real OpenAPI spec exists, `OpenAPILoader` remains the stronger maintained contract source.
+
+## 7. Current boundary
 
 Today, the maintained OpenAPI path is:
 
 - OpenAPI file -> `OpenAPILoader` -> runtime tools
 - curl command -> `CurlLoader` -> `ApiLoader` spec -> runtime tools
+- Postman collection -> `PostmanLoader` -> `ApiLoader` spec -> runtime tools
 
 What is not yet maintained:
 

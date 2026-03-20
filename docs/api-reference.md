@@ -545,6 +545,7 @@ Key methods:
 - `OpenAPILoader`
 - `ApiLoader`
 - `CurlLoader`
+- `PostmanLoader`
 
 ## Utilities and errors
 

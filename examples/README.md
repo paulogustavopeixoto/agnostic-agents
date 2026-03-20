@@ -159,6 +159,12 @@ These examples are intended as reference deployment patterns rather than feature
 - `referenceCurlImport.js`
   - no API key required
   - shows importing a `curl` command into an API spec and executable runtime tools
+- `referenceUtilityToolkit.js`
+  - no API key required
+  - shows Postman import, secret resolution, tool recording/mocking, sandboxing, prompt artifacts, run recipes, incident bundling, and route simulation
+- `referenceEverythingSmoke.js`
+  - no API key required
+  - runs one smoke check across OpenAPI import, curl import, Postman import, secret resolution, tool recording/mocking, sandboxing, recipes, and route simulation
 - `referenceDurableBackends.js`
   - no API key required
   - shows custom durable run/job/layer store implementations and registry usage

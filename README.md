@@ -17,6 +17,7 @@ It is designed for projects that need more than a chat wrapper:
 - distributed handoff across processes or services
 - evals, benchmarks, and incident analysis
 - API and protocol tools imported from OpenAPI, curl, and MCP discovery
+- import, sandbox, record, and simulate external tools before production use
 
 The package also includes a separate coordination layer above the runtime for:
 
@@ -67,6 +68,7 @@ Use `agnostic-agents` when you want:
 - a package that treats memory as governed operational knowledge instead of ad hoc retrieval glue
 - a package that treats supervised autonomy as a core operating model rather than an exception path
 - a package that can turn OpenAPI files, curl commands, and MCP discovery into governed executable tools
+- a package that can bootstrap tools from Postman collections, record real tool I/O, mock them offline, and resolve secrets outside prompts and code
 
 Do not think of it as only a prompt helper or a chat abstraction. The maintained direction is a runtime control layer for serious agent systems.
 
@@ -189,6 +191,7 @@ The maintained import surfaces are:
 - `OpenAPILoader`
 - `ApiLoader`
 - `CurlLoader`
+- `PostmanLoader`
 - `MCPDiscoveryLoader`
 
 Use them when you want to:
@@ -196,7 +199,23 @@ Use them when you want to:
 - turn an OpenAPI file into executable runtime tools
 - normalize a custom API spec into runtime tools
 - bootstrap a tool from a working curl command
+- bootstrap tools from Postman collections and variables
 - discover remote MCP tools and expose them through the normal tool/runtime path
+
+The maintained utility surfaces above the runtime also include:
+
+- `SecretResolver`
+- `SchemaNormalizer`
+- `ToolRecorder`
+- `ToolMockBuilder`
+- `ToolSandboxRunner`
+- `PromptArtifact`
+- `PromptRegistry`
+- `RunRecipe`
+- `WorkflowPreset`
+- `IncidentBundleExporter`
+- `CredentialDelegationKit`
+- `RoutePolicySimulator`
 
 ### Workflow and Delegation
 
