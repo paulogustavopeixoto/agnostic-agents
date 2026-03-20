@@ -630,6 +630,18 @@ describe('Maintained examples', () => {
     expect(stdout).toContain("contract_verified: 2");
   });
 
+  test('reference deployment pattern certification example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceDeploymentPatternCertification.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Deployment pattern certification summary');
+    expect(stdout).toContain("kind: 'deployment_pattern'");
+    expect(stdout).toContain("pattern: 'supervised_autonomy_stack'");
+    expect(stdout).toContain("operationally_certified: 2");
+  });
+
   test('reference interop registry example runs', async () => {
     const examplePath = path.join(__dirname, '..', 'examples', 'referenceInteropRegistry.js');
     const { stdout } = await execFileAsync(process.execPath, [examplePath], {

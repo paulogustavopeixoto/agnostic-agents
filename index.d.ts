@@ -700,6 +700,26 @@ export class CertificationKit {
   ): JsonObject;
 }
 
+export class DeploymentPatternCertificationKit {
+  constructor(options?: {
+    certificationKit?: CertificationKit;
+  });
+  certify(
+    deployment?: JsonObject,
+    options?: {
+      pattern?: string;
+      name?: string | null;
+    }
+  ): JsonObject;
+  certifyMany(
+    entries?: Array<{
+      pattern: string;
+      name?: string | null;
+      deployment: JsonObject;
+    }>
+  ): JsonObject[];
+}
+
 export class CompatibilitySummary {
   static build(entries?: JsonObject[]): JsonObject;
 }

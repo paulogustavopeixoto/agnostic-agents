@@ -580,6 +580,7 @@ Local/no-key examples:
 - `npm run example:reference-remote-control-plane`
 - `npm run example:reference-deployment-split`
 - `npm run example:reference-distributed-recovery`
+- `npm run example:reference-deployment-pattern-certification`
 
 Provider-backed examples:
 

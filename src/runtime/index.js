@@ -87,6 +87,7 @@ const { ConformanceKit } = require('./ConformanceKit');
 const { ArtifactCompatibilitySuite } = require('./ArtifactCompatibilitySuite');
 const { InteropContractValidator } = require('./InteropContractValidator');
 const { CertificationKit } = require('./CertificationKit');
+const { DeploymentPatternCertificationKit } = require('./DeploymentPatternCertificationKit');
 const { CompatibilitySummary } = require('./CompatibilitySummary');
 const { PolicyPack } = require('./PolicyPack');
 const { PolicyDecisionReport } = require('./PolicyDecisionReport');
@@ -243,6 +244,7 @@ module.exports = {
   ArtifactCompatibilitySuite,
   InteropContractValidator,
   CertificationKit,
+  DeploymentPatternCertificationKit,
   CompatibilitySummary,
   PolicyPack,
   PolicyDecisionReport,

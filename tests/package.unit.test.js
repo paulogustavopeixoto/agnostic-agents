@@ -147,6 +147,7 @@ const { ConformanceKit } = require('../src/runtime/ConformanceKit');
 const { ArtifactCompatibilitySuite } = require('../src/runtime/ArtifactCompatibilitySuite');
 const { InteropContractValidator } = require('../src/runtime/InteropContractValidator');
 const { CertificationKit } = require('../src/runtime/CertificationKit');
+const { DeploymentPatternCertificationKit } = require('../src/runtime/DeploymentPatternCertificationKit');
 const { CompatibilitySummary } = require('../src/runtime/CompatibilitySummary');
 const { InteropArtifactRegistry } = require('../src/runtime/InteropArtifactRegistry');
 const { PolicyPack } = require('../src/runtime/PolicyPack');
@@ -244,6 +245,7 @@ describe('Package/module unit tests', () => {
     expect(pkg.ArtifactCompatibilitySuite).toBeDefined();
     expect(pkg.InteropContractValidator).toBeDefined();
     expect(pkg.CertificationKit).toBeDefined();
+    expect(pkg.DeploymentPatternCertificationKit).toBeDefined();
     expect(pkg.CompatibilitySummary).toBeDefined();
     expect(pkg.PolicyPack).toBeDefined();
     expect(pkg.PolicyDecisionReport).toBeDefined();
@@ -416,6 +418,7 @@ describe('Package/module unit tests', () => {
     expect(declarationSource).toContain('export class AutonomyDriftGuard');
     expect(declarationSource).toContain('export class OperationalScorecard');
     expect(declarationSource).toContain('export class EnterpriseAutonomyBenchmarkSuite');
+    expect(declarationSource).toContain('export class DeploymentPatternCertificationKit');
     expect(declarationSource).toContain('export class DelegationBudget');
     expect(declarationSource).toContain('export class SharedContextScope');
     expect(declarationSource).toContain('export class CoordinationSafetyGuard');
@@ -1325,6 +1328,75 @@ describe('Package/module unit tests', () => {
       invalid: 0,
       byLevel: {
         contract_verified: 2,
+      },
+    });
+  });
+
+  test('DeploymentPatternCertificationKit certifies maintained deployment patterns with operational checks', () => {
+    const kit = new DeploymentPatternCertificationKit();
+    const results = kit.certifyMany([
+      {
+        pattern: 'supervised_autonomy_stack',
+        name: 'reference-supervised-stack',
+        deployment: {
+          services: ['runtime', 'policy', 'operator', 'assurance', 'fleet'],
+          capabilities: ['approvalWorkflows', 'humanReview', 'rollback', 'memoryGovernance'],
+          environmentScopes: ['staging', 'prod'],
+          approvalOrganizations: ['ops'],
+          stores: {
+            run: new InMemoryRunStore(),
+            job: new InMemoryJobStore(),
+          },
+          providers: [
+            {
+              name: 'reference-provider',
+              adapter: {
+                getCapabilities: () => ({ generateText: true }),
+                supports: capability => capability === 'generateText',
+                generateText: async () => ({ message: 'ok' }),
+              },
+            },
+          ],
+        },
+      },
+      {
+        pattern: 'public_control_plane',
+        name: 'reference-public-control-plane',
+        deployment: {
+          services: ['control_plane', 'operator', 'policy'],
+          capabilities: ['auditExport', 'tenantIsolation', 'approvalWorkflows'],
+          environmentScopes: ['prod'],
+          approvalOrganizations: ['ops', 'compliance'],
+          tenantBoundaries: ['tenant_id'],
+          stores: {
+            run: new InMemoryRunStore(),
+          },
+        },
+      },
+    ]);
+
+    const summary = CompatibilitySummary.build(results);
+
+    expect(results[0]).toMatchObject({
+      target: 'reference-supervised-stack',
+      kind: 'deployment_pattern',
+      pattern: 'supervised_autonomy_stack',
+      level: 'operationally_certified',
+      valid: true,
+    });
+    expect(results[1]).toMatchObject({
+      target: 'reference-public-control-plane',
+      kind: 'deployment_pattern',
+      pattern: 'public_control_plane',
+      level: 'operationally_certified',
+      valid: true,
+    });
+    expect(summary).toMatchObject({
+      total: 2,
+      valid: 2,
+      invalid: 0,
+      byLevel: {
+        operationally_certified: 2,
       },
     });
   });

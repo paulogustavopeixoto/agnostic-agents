@@ -147,7 +147,7 @@ The remaining work is now mostly:
 
 - ecosystem clarity
 - operational hardening
-- public certification depth
+- broader enterprise references and transactional execution depth
 - interop, coordination, and learning refinement on top of the completed core
 
 That is a healthier pre-release state than having major unresolved core
@@ -159,3 +159,4 @@ architecture work.
 - [Support matrix](support-matrix.md)
 - [Reference integrations](reference-integrations.md)
 - [Ecosystem certification guidance](ecosystem-certification.md)
+- [Deployment pattern certification](deployment-pattern-certification.md)

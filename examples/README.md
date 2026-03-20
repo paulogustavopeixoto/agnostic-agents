@@ -150,6 +150,9 @@ These examples are intended as reference deployment patterns rather than feature
 - `referenceCertificationKit.js`
   - no API key required
   - shows public certification results for a provider adapter and backend store plus a compatibility rollup summary
+- `referenceDeploymentPatternCertification.js`
+  - no API key required
+  - shows operational certification for supervised-autonomy and public-control-plane deployment patterns
 - `referenceInteropRegistry.js`
   - no API key required
   - shows one public import/export registry across tool, trace, policy, eval, and manifest artifacts
