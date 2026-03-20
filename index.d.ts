@@ -1759,6 +1759,22 @@ export class ExternalControlPlaneCertificationKit {
   }): JsonObject;
 }
 
+export class WorkflowOutcomeContract {
+  constructor(input?: JsonObject);
+  evaluate(result?: JsonObject): JsonObject;
+  toJSON(): JsonObject;
+}
+
+export class OutcomeScorecard {
+  constructor(input?: JsonObject);
+  evaluate(input?: JsonObject): JsonObject;
+}
+
+export class GovernedOutcomeOptimizationLoop {
+  constructor(input?: JsonObject);
+  review(input?: JsonObject): JsonObject;
+}
+
 export class GovernanceRecordLedger {
   constructor(options?: { records?: JsonObject[] });
   records: JsonObject[];

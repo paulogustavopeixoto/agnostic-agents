@@ -133,6 +133,9 @@ const { FederatedAuditStitcher } = require('./FederatedAuditStitcher');
 const { FederatedPromotionBoundaryAdvisor } = require('./FederatedPromotionBoundaryAdvisor');
 const { TrustCertificationExchange } = require('./TrustCertificationExchange');
 const { ExternalControlPlaneCertificationKit } = require('./ExternalControlPlaneCertificationKit');
+const { WorkflowOutcomeContract } = require('./WorkflowOutcomeContract');
+const { OutcomeScorecard } = require('./OutcomeScorecard');
+const { GovernedOutcomeOptimizationLoop } = require('./GovernedOutcomeOptimizationLoop');
 const { StateBundle } = require('./StateBundle');
 const { StateDiff } = require('./StateDiff');
 const { StateBundleSerializer } = require('./StateBundleSerializer');
@@ -303,6 +306,9 @@ module.exports = {
   FederatedPromotionBoundaryAdvisor,
   TrustCertificationExchange,
   ExternalControlPlaneCertificationKit,
+  WorkflowOutcomeContract,
+  OutcomeScorecard,
+  GovernedOutcomeOptimizationLoop,
   StateBundle,
   StateDiff,
   StateBundleSerializer,

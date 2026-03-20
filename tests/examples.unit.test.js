@@ -712,6 +712,18 @@ describe('Maintained examples', () => {
     expect(stdout).toContain("kind: 'agnostic-agents/trust-certification-exchange'");
   });
 
+  test('reference outcome contracts example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceOutcomeContracts.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Outcome contract summary');
+    expect(stdout).toContain("kind: 'agnostic-agents/workflow-outcome-contract'");
+    expect(stdout).toContain('optimizationReview');
+    expect(stdout).toContain("recommendation: 'promote'");
+  });
+
   test('reference interop registry example runs', async () => {
     const examplePath = path.join(__dirname, '..', 'examples', 'referenceInteropRegistry.js');
     const { stdout } = await execFileAsync(process.execPath, [examplePath], {

@@ -173,3 +173,4 @@ architecture work.
 - [Transactional execution](transactional-execution.md)
 - [Proof OS](proof-os.md)
 - [Federation OS](federation-os.md)
+- [Outcome OS](outcome-os.md)

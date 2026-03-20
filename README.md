@@ -587,6 +587,7 @@ Local/no-key examples:
 - `npm run example:reference-federated-governance`
 - `npm run example:reference-federated-boundaries`
 - `npm run example:reference-federated-control-plane`
+- `npm run example:reference-outcome-contracts`
 
 Provider-backed examples:
 

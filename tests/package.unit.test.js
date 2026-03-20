@@ -116,6 +116,9 @@ const { FederatedAuditStitcher } = require('../src/runtime/FederatedAuditStitche
 const { FederatedPromotionBoundaryAdvisor } = require('../src/runtime/FederatedPromotionBoundaryAdvisor');
 const { TrustCertificationExchange } = require('../src/runtime/TrustCertificationExchange');
 const { ExternalControlPlaneCertificationKit } = require('../src/runtime/ExternalControlPlaneCertificationKit');
+const { WorkflowOutcomeContract } = require('../src/runtime/WorkflowOutcomeContract');
+const { OutcomeScorecard } = require('../src/runtime/OutcomeScorecard');
+const { GovernedOutcomeOptimizationLoop } = require('../src/runtime/GovernedOutcomeOptimizationLoop');
 const { DelegationBudget } = require('../src/coordination/DelegationBudget');
 const { SharedContextScope } = require('../src/coordination/SharedContextScope');
 const { CoordinationSafetyGuard } = require('../src/coordination/CoordinationSafetyGuard');
@@ -363,6 +366,9 @@ describe('Package/module unit tests', () => {
     expect(pkg.FederatedPromotionBoundaryAdvisor).toBeDefined();
     expect(pkg.TrustCertificationExchange).toBeDefined();
     expect(pkg.ExternalControlPlaneCertificationKit).toBeDefined();
+    expect(pkg.WorkflowOutcomeContract).toBeDefined();
+    expect(pkg.OutcomeScorecard).toBeDefined();
+    expect(pkg.GovernedOutcomeOptimizationLoop).toBeDefined();
     expect(pkg.GovernanceRecordLedger).toBeDefined();
     expect(pkg.AuditStitcher).toBeDefined();
     expect(pkg.GovernanceTimeline).toBeDefined();
@@ -457,6 +463,9 @@ describe('Package/module unit tests', () => {
     expect(declarationSource).toContain('export class FederatedPromotionBoundaryAdvisor');
     expect(declarationSource).toContain('export class TrustCertificationExchange');
     expect(declarationSource).toContain('export class ExternalControlPlaneCertificationKit');
+    expect(declarationSource).toContain('export class WorkflowOutcomeContract');
+    expect(declarationSource).toContain('export class OutcomeScorecard');
+    expect(declarationSource).toContain('export class GovernedOutcomeOptimizationLoop');
     expect(declarationSource).toContain('export class DeploymentPatternCertificationKit');
     expect(declarationSource).toContain('export class DelegationBudget');
     expect(declarationSource).toContain('export class SharedContextScope');
@@ -1755,6 +1764,50 @@ describe('Package/module unit tests', () => {
       level: 'federation_ready',
       valid: true,
     });
+  });
+
+  test('WorkflowOutcomeContract, OutcomeScorecard, and GovernedOutcomeOptimizationLoop make outcomes explicit and govern optimization', () => {
+    const contract = new WorkflowOutcomeContract({
+      id: 'support-resolution-contract',
+      objective: 'Resolve support requests quickly without degrading policy compliance.',
+      acceptanceCriteria: [
+        { key: 'businessOutcomeMet', expected: true },
+        { key: 'serviceOutcomeMet', expected: true },
+        { key: 'overallScore', expected: value => value >= 80 },
+      ],
+      operatorReviewPoints: ['route_change'],
+      metrics: ['resolution_rate'],
+    });
+
+    const scorecardInput = {
+      runs: [{ status: 'completed' }, { status: 'completed' }],
+      outcomes: {
+        businessTarget: 0.9,
+        businessActual: 0.94,
+        serviceSla: 0.95,
+        serviceActual: 0.97,
+      },
+    };
+    const scorecard = new OutcomeScorecard().evaluate(scorecardInput);
+    const review = new GovernedOutcomeOptimizationLoop().review({
+      contract,
+      scorecardInput,
+      proposalInput: {
+        evalFindings: [
+          {
+            scenarioId: 'support-latency',
+            passed: false,
+            summary: 'Resolution latency could improve.',
+            metrics: { averageConfidence: 0.7 },
+          },
+        ],
+      },
+    });
+
+    expect(scorecard.outcomes.business.met).toBe(true);
+    expect(scorecard.outcomes.service.met).toBe(true);
+    expect(review.contractEvaluation.passed).toBe(true);
+    expect(review.recommendation).toBe('promote');
   });
 
   test('ToolSchemaArtifact and InteropArtifactRegistry import and export maintained artifact families', () => {

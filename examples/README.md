@@ -171,6 +171,9 @@ These examples are intended as reference deployment patterns rather than feature
 - `referenceFederatedControlPlane.js`
   - no API key required
   - shows federated remote-control-plane stitching plus certification for partner dashboards and runtimes
+- `referenceOutcomeContracts.js`
+  - no API key required
+  - shows workflow outcome contracts, outcome-aware scorecards, and governed outcome optimization review
 - `referenceInteropRegistry.js`
   - no API key required
   - shows one public import/export registry across tool, trace, policy, eval, and manifest artifacts
