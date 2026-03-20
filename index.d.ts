@@ -1355,6 +1355,178 @@ export class OperatorTriageWorkflow {
   }): JsonObject;
 }
 
+export class AutonomyBudget {
+  constructor(options?: {
+    spend?: number | null;
+    retries?: number | null;
+    toolCalls?: number | null;
+    wallClockMs?: number | null;
+    externalActions?: number | null;
+    tokens?: number | null;
+    metadata?: JsonObject;
+  });
+  limits: JsonObject;
+  usage: JsonObject;
+  metadata: JsonObject;
+  record(delta?: JsonObject): JsonObject;
+  snapshot(): JsonObject;
+  exhausted(): boolean;
+  violations(): JsonObject[];
+}
+
+export class AutonomyBudgetLedger {
+  constructor(options?: { records?: JsonObject[] });
+  records: JsonObject[];
+  record(entry?: JsonObject): JsonObject;
+  list(): JsonObject[];
+  summarize(): JsonObject;
+}
+
+export class UncertaintySupervisionPolicy {
+  constructor(options?: {
+    reviewThreshold?: number;
+    escalateThreshold?: number;
+    fallbackAction?: string;
+    metadata?: JsonObject;
+  });
+  reviewThreshold: number;
+  escalateThreshold: number;
+  fallbackAction: string;
+  metadata: JsonObject;
+  evaluate(assessment?: JsonObject): JsonObject;
+}
+
+export class ApprovalDelegationContract {
+  constructor(options?: {
+    id?: string | null;
+    approver?: string | null;
+    delegate?: string | null;
+    scope?: JsonObject[];
+    metadata?: JsonObject;
+  });
+  id: string | null;
+  approver: string | null;
+  delegate: string | null;
+  scope: JsonObject[];
+  metadata: JsonObject;
+  appliesTo(request?: JsonObject): boolean;
+  toJSON(): JsonObject;
+}
+
+export class AutonomyEnvelope {
+  constructor(options?: {
+    budget?: AutonomyBudget | JsonObject | null;
+    supervisionPolicy?: UncertaintySupervisionPolicy | JsonObject | null;
+    environment?: string | null;
+    tenant?: string | null;
+    metadata?: JsonObject;
+  });
+  budget: AutonomyBudget;
+  supervisionPolicy: UncertaintySupervisionPolicy;
+  environment: string | null;
+  tenant: string | null;
+  metadata: JsonObject;
+  evaluate(options?: { usage?: JsonObject; assessment?: JsonObject; riskClass?: string }): JsonObject;
+}
+
+export class AutonomyPolicyRegistry {
+  constructor(options?: { policies?: JsonObject[] });
+  policies: JsonObject[];
+  register(policy?: JsonObject): JsonObject;
+  list(): JsonObject[];
+  resolve(request?: JsonObject): JsonObject;
+  evaluate(request?: JsonObject): JsonObject;
+}
+
+export class InterventionPolicyRegistry {
+  constructor(options?: { policies?: JsonObject[] });
+  policies: JsonObject[];
+  register(policy?: JsonObject): JsonObject;
+  select(context?: JsonObject): JsonObject;
+}
+
+export class ApprovalDecisionCache {
+  constructor(options?: { entries?: JsonObject[] });
+  entries: Map<string, JsonObject>;
+  cache(entry?: JsonObject): JsonObject;
+  find(request?: JsonObject): JsonObject | null;
+  revoke(id: string, options?: { reason?: string; revokedBy?: string | null }): JsonObject | null;
+  list(): JsonObject[];
+  summarize(): JsonObject;
+}
+
+export class WorkflowSupervisionCheckpoint {
+  constructor(options?: {
+    requireReviewBelowConfidence?: number;
+    escalateBelowConfidence?: number;
+    metadata?: JsonObject;
+  });
+  requireReviewBelowConfidence: number;
+  escalateBelowConfidence: number;
+  metadata: JsonObject;
+  evaluate(options?: {
+    workflowId?: string | null;
+    stepId?: string | null;
+    taskFamily?: string | null;
+    riskClass?: string;
+    confidence?: number;
+    rationale?: string;
+    alternatives?: string[];
+    context?: JsonObject;
+  }): JsonObject;
+}
+
+export class ProgressiveAutonomyController {
+  constructor(options?: {
+    minimumEvidenceScore?: number;
+    widenIncrement?: JsonObject;
+    tightenIncrement?: JsonObject;
+    reviewThresholdDelta?: number;
+    escalateThresholdDelta?: number;
+  });
+  minimumEvidenceScore: number;
+  widenIncrement: JsonObject;
+  tightenIncrement: JsonObject;
+  reviewThresholdDelta: number;
+  escalateThresholdDelta: number;
+  adjust(
+    envelope?: AutonomyEnvelope | JsonObject | null,
+    options?: {
+      evidenceScore?: number;
+      environment?: string | null;
+      tenant?: string | null;
+      reason?: string | null;
+    }
+  ): JsonObject;
+}
+
+export class AutonomyBenchmarkSuite {
+  constructor(options?: { evalHarness?: EvalHarness | JsonObject | null });
+  buildScenarios(options?: {
+    envelope?: AutonomyEnvelope | JsonObject | null;
+    approvalCache?: ApprovalDecisionCache | JsonObject | null;
+    approvalLatencyMs?: number;
+    escalation?: JsonObject | null;
+  }): JsonObject[];
+  run(options?: JsonObject): Promise<JsonObject>;
+}
+
+export class AutonomyFleetSummary {
+  constructor(options?: {
+    monitor?: FleetHealthMonitor | JsonObject | null;
+    budgetLedger?: AutonomyBudgetLedger | JsonObject | null;
+  });
+  summarize(options?: { escalations?: JsonObject[] }): JsonObject;
+}
+
+export class AutonomyRolloutGuard {
+  evaluate(options?: {
+    adjustment?: JsonObject | null;
+    benchmarkReport?: JsonObject | null;
+    minimumEvidenceScore?: number;
+  }): JsonObject;
+}
+
 export class GovernanceRecordLedger {
   constructor(options?: { records?: JsonObject[] });
   records: JsonObject[];

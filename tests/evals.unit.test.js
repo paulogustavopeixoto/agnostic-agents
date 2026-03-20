@@ -32,6 +32,9 @@ const { StateBundle } = require('../src/runtime/StateBundle');
 const { MemoryProvenanceLedger } = require('../src/runtime/MemoryProvenanceLedger');
 const { MemoryAccessContractRegistry } = require('../src/runtime/MemoryAccessContractRegistry');
 const { MemoryGovernanceBenchmarkSuite } = require('../src/runtime/MemoryGovernanceBenchmarkSuite');
+const { AutonomyEnvelope } = require('../src/runtime/AutonomyEnvelope');
+const { ApprovalDecisionCache } = require('../src/runtime/ApprovalDecisionCache');
+const { AutonomyBenchmarkSuite } = require('../src/runtime/AutonomyBenchmarkSuite');
 
 class ToolEvalAdapter {
   async generateText(messages, { tools = [] } = {}) {
@@ -208,6 +211,44 @@ describe('Eval and benchmark discipline', () => {
         passed: true,
       }),
     ]);
+  });
+
+  test('AutonomyBenchmarkSuite covers budget, approval latency, escalation quality, and supervised autonomy behavior', async () => {
+    const report = await new AutonomyBenchmarkSuite().run({
+      envelope: new AutonomyEnvelope({
+        budget: { spend: 3, toolCalls: 1, tokens: 500 },
+        supervisionPolicy: { reviewThreshold: 0.7, escalateThreshold: 0.5 },
+      }),
+      approvalCache: new ApprovalDecisionCache({
+        entries: [
+          {
+            id: 'approval-1',
+            action: 'send_status_update',
+            environment: 'prod',
+            tenant: 'acme',
+            decision: 'approved',
+          },
+        ],
+      }),
+      approvalLatencyMs: 1400,
+      escalation: {
+        action: 'review',
+        rationale: 'Confidence dropped after a retry.',
+      },
+    });
+
+    expect(report).toMatchObject({
+      total: 4,
+      failed: 0,
+    });
+    expect(report.results).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'autonomy-budget-exhaustion', passed: true }),
+        expect.objectContaining({ id: 'approval-latency', passed: true }),
+        expect.objectContaining({ id: 'escalation-quality', passed: true }),
+        expect.objectContaining({ id: 'supervised-autonomy-cache', passed: true }),
+      ])
+    );
   });
 
   test('EvalHarness can run adaptive-decision benchmark scenarios', async () => {

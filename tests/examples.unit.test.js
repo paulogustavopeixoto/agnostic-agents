@@ -183,6 +183,58 @@ describe('Maintained examples', () => {
     expect(stdout).toContain('checklist');
   });
 
+  test('reference budgeted autonomy example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceBudgetedAutonomy.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Budgeted autonomy summary');
+    expect(stdout).toContain('firstDecision');
+    expect(stdout).toContain('secondDecision');
+    expect(stdout).toContain('approvalDelegationApplies');
+    expect(stdout).toContain('budgetLedger');
+  });
+
+  test('reference autonomy policies example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceAutonomyPolicies.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Autonomy policy summary');
+    expect(stdout).toContain('autonomyDecision');
+    expect(stdout).toContain('blockedDecision');
+    expect(stdout).toContain('interventionPlan');
+    expect(stdout).toContain('approvalCache');
+  });
+
+  test('reference progressive autonomy example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceProgressiveAutonomy.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Progressive autonomy summary');
+    expect(stdout).toContain('pausedRunStatus');
+    expect(stdout).toContain('pendingPause');
+    expect(stdout).toContain('widened');
+    expect(stdout).toContain('tightened');
+  });
+
+  test('reference autonomy operations example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceAutonomyOperations.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Autonomy operations summary');
+    expect(stdout).toContain('benchmarkReport');
+    expect(stdout).toContain('fleetSummary');
+    expect(stdout).toContain('adjustment');
+    expect(stdout).toContain('rolloutGuard');
+  });
+
   test('reference everything smoke example runs', async () => {
     const examplePath = path.join(__dirname, '..', 'examples', 'referenceEverythingSmoke.js');
     const { stdout } = await execFileAsync(process.execPath, [examplePath], {

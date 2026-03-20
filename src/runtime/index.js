@@ -98,6 +98,19 @@ const { PolicyLifecycleManager } = require('./PolicyLifecycleManager');
 const { ApprovalEscalationPolicySuite } = require('./ApprovalEscalationPolicySuite');
 const { RecoveryPolicyGate } = require('./RecoveryPolicyGate');
 const { CompensationPolicyPlanner } = require('./CompensationPolicyPlanner');
+const { AutonomyBudget } = require('./AutonomyBudget');
+const { AutonomyBudgetLedger } = require('./AutonomyBudgetLedger');
+const { UncertaintySupervisionPolicy } = require('./UncertaintySupervisionPolicy');
+const { ApprovalDelegationContract } = require('./ApprovalDelegationContract');
+const { AutonomyEnvelope } = require('./AutonomyEnvelope');
+const { AutonomyPolicyRegistry } = require('./AutonomyPolicyRegistry');
+const { InterventionPolicyRegistry } = require('./InterventionPolicyRegistry');
+const { ApprovalDecisionCache } = require('./ApprovalDecisionCache');
+const { WorkflowSupervisionCheckpoint } = require('./WorkflowSupervisionCheckpoint');
+const { ProgressiveAutonomyController } = require('./ProgressiveAutonomyController');
+const { AutonomyBenchmarkSuite } = require('./AutonomyBenchmarkSuite');
+const { AutonomyFleetSummary } = require('./AutonomyFleetSummary');
+const { AutonomyRolloutGuard } = require('./AutonomyRolloutGuard');
 const { StateBundle } = require('./StateBundle');
 const { StateDiff } = require('./StateDiff');
 const { StateBundleSerializer } = require('./StateBundleSerializer');
@@ -233,6 +246,19 @@ module.exports = {
   ApprovalEscalationPolicySuite,
   RecoveryPolicyGate,
   CompensationPolicyPlanner,
+  AutonomyBudget,
+  AutonomyBudgetLedger,
+  UncertaintySupervisionPolicy,
+  ApprovalDelegationContract,
+  AutonomyEnvelope,
+  AutonomyPolicyRegistry,
+  InterventionPolicyRegistry,
+  ApprovalDecisionCache,
+  WorkflowSupervisionCheckpoint,
+  ProgressiveAutonomyController,
+  AutonomyBenchmarkSuite,
+  AutonomyFleetSummary,
+  AutonomyRolloutGuard,
   StateBundle,
   StateDiff,
   StateBundleSerializer,

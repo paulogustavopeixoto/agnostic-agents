@@ -1,6 +1,14 @@
 const { RunInspector } = require('./RunInspector');
+const { InterventionPolicyRegistry } = require('./InterventionPolicyRegistry');
 
 class OperatorInterventionPlanner {
+  constructor({ interventionPolicies = null } = {}) {
+    this.interventionPolicies =
+      interventionPolicies instanceof InterventionPolicyRegistry
+        ? interventionPolicies
+        : new InterventionPolicyRegistry({ policies: interventionPolicies || [] });
+  }
+
   plan({
     run = null,
     incident = null,
@@ -12,6 +20,12 @@ class OperatorInterventionPlanner {
     const runSummary = this._normalizeRun(run);
     const actions = [];
     const reasons = [];
+    const intervention = this.interventionPolicies.select({
+      environment: context.environment || rollout?.environment || null,
+      taskFamily: context.taskFamily || incident?.taskFamily || null,
+      riskClass: context.riskClass || incident?.riskClass || null,
+      incidentType: context.incidentType || incident?.type || null,
+    });
 
     if (runSummary?.status === 'running') {
       actions.push('pause_runtime');
@@ -43,6 +57,14 @@ class OperatorInterventionPlanner {
       reasons.push('Halt the rollout because the fleet safety controller reported unsafe conditions.');
     }
 
+    if (intervention.recommendedAction) {
+      actions.push(intervention.recommendedAction);
+      reasons.push(
+        intervention.rationale ||
+          `Intervention policy "${intervention.selectedPolicy.id}" recommends ${intervention.recommendedAction}.`
+      );
+    }
+
     if (!actions.length) {
       actions.push('monitor_only');
       reasons.push('No intervention is required yet; continue operator monitoring.');
@@ -57,6 +79,7 @@ class OperatorInterventionPlanner {
       assurance: assurance || null,
       rollout: rollout || null,
       rollback: rollback || null,
+      intervention,
       context,
     };
   }

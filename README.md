@@ -471,6 +471,18 @@ Use:
 - `ExtensionHost` for contributed policy and governance behavior
 - `ProductionPolicyPack` for a maintained production-oriented preset
 - `ApprovalInbox` and `GovernanceHooks` for operator-facing control
+- `AutonomyBudget` for one explicit budget surface across spend, retries, tool calls, wall-clock runtime, external actions, and tokens
+- `UncertaintySupervisionPolicy` for shifting execution into review, escalation, or safer fallback when confidence drops
+- `ApprovalDelegationContract` for reusable human approval and delegation boundaries on repeated operational actions
+- `AutonomyEnvelope` for a combined autonomy decision that merges budget pressure with supervision thresholds
+- `AutonomyPolicyRegistry` for tenant-, jurisdiction-, and environment-scoped autonomy rules around tool access, review requirements, and data-handling constraints
+- `InterventionPolicyRegistry` for operator-defined intervention policies by task family, risk class, and environment
+- `ApprovalDecisionCache` for reusable approval caching and revocation with audit-friendly summaries
+- `WorkflowSupervisionCheckpoint` for workflow review gates that surface rationale, alternatives, confidence, and task/risk context before execution continues
+- `ProgressiveAutonomyController` for widening or tightening autonomy envelopes by evidence, tenant, and environment
+- `AutonomyBenchmarkSuite` for maintained eval coverage of budget exhaustion, approval latency, escalation quality, and supervised-autonomy behavior
+- `AutonomyFleetSummary` for fleet summaries of autonomy budget usage and escalation hot spots
+- `AutonomyRolloutGuard` for blocking rollout when autonomy-envelope widening lacks evidence or benchmark support
 
 ### State and Replay
 
@@ -626,6 +638,10 @@ Evals and ecosystem:
 
 - [Benchmarking](docs/benchmarking.md)
 - [Benchmark fixtures](docs/benchmark-fixtures.md)
+- [Autonomy policies](docs/autonomy-policies.md)
+- [Autonomy operations](docs/autonomy-operations.md)
+- [Budgeted autonomy](docs/budgeted-autonomy.md)
+- [Progressive autonomy](docs/progressive-autonomy.md)
 - [Capability fabric](docs/capability-fabric.md)
 - [Community summaries](docs/community-summaries.md)
 - [Community roadmap status](docs/community-roadmap-status.md)

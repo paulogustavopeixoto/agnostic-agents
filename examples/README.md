@@ -171,6 +171,18 @@ These examples are intended as reference deployment patterns rather than feature
 - `referenceMemoryGovernanceReview.js`
   - no API key required
   - shows memory audit summaries, provenance/contract benchmark checks, diagnostics, and an operator review checklist
+- `referenceBudgetedAutonomy.js`
+  - no API key required
+  - shows unified autonomy budgets, uncertainty-driven review and halt decisions, reusable approval delegation contracts, and budget-ledger summaries
+- `referenceAutonomyPolicies.js`
+  - no API key required
+  - shows tenant- and jurisdiction-scoped autonomy policies, operator-defined intervention rules, and approval caching with revocation
+- `referenceProgressiveAutonomy.js`
+  - no API key required
+  - shows workflow supervision checkpoints with rationale/alternatives/confidence and evidence-based widening or tightening of autonomy envelopes
+- `referenceAutonomyOperations.js`
+  - no API key required
+  - shows autonomy benchmark coverage, fleet summaries for budget/escalation hot spots, and rollout blocking for unsafe envelope widening
 - `referenceDurableBackends.js`
   - no API key required
   - shows custom durable run/job/layer store implementations and registry usage

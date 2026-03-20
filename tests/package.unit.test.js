@@ -82,6 +82,19 @@ const { MemoryAuditView } = require('../src/runtime/MemoryAuditView');
 const { MemoryGovernanceBenchmarkSuite } = require('../src/runtime/MemoryGovernanceBenchmarkSuite');
 const { MemoryGovernanceDiagnostics } = require('../src/runtime/MemoryGovernanceDiagnostics');
 const { MemoryGovernanceReviewWorkflow } = require('../src/runtime/MemoryGovernanceReviewWorkflow');
+const { AutonomyBudget } = require('../src/runtime/AutonomyBudget');
+const { AutonomyBudgetLedger } = require('../src/runtime/AutonomyBudgetLedger');
+const { UncertaintySupervisionPolicy } = require('../src/runtime/UncertaintySupervisionPolicy');
+const { ApprovalDelegationContract } = require('../src/runtime/ApprovalDelegationContract');
+const { AutonomyEnvelope } = require('../src/runtime/AutonomyEnvelope');
+const { AutonomyPolicyRegistry } = require('../src/runtime/AutonomyPolicyRegistry');
+const { InterventionPolicyRegistry } = require('../src/runtime/InterventionPolicyRegistry');
+const { ApprovalDecisionCache } = require('../src/runtime/ApprovalDecisionCache');
+const { WorkflowSupervisionCheckpoint } = require('../src/runtime/WorkflowSupervisionCheckpoint');
+const { ProgressiveAutonomyController } = require('../src/runtime/ProgressiveAutonomyController');
+const { AutonomyBenchmarkSuite } = require('../src/runtime/AutonomyBenchmarkSuite');
+const { AutonomyFleetSummary } = require('../src/runtime/AutonomyFleetSummary');
+const { AutonomyRolloutGuard } = require('../src/runtime/AutonomyRolloutGuard');
 const { GovernanceRecordLedger } = require('../src/runtime/GovernanceRecordLedger');
 const { AuditStitcher } = require('../src/runtime/AuditStitcher');
 const { GovernanceTimeline } = require('../src/runtime/GovernanceTimeline');
@@ -287,6 +300,19 @@ describe('Package/module unit tests', () => {
     expect(pkg.MemoryGovernanceBenchmarkSuite).toBeDefined();
     expect(pkg.MemoryGovernanceDiagnostics).toBeDefined();
     expect(pkg.MemoryGovernanceReviewWorkflow).toBeDefined();
+    expect(pkg.AutonomyBudget).toBeDefined();
+    expect(pkg.AutonomyBudgetLedger).toBeDefined();
+    expect(pkg.UncertaintySupervisionPolicy).toBeDefined();
+    expect(pkg.ApprovalDelegationContract).toBeDefined();
+    expect(pkg.AutonomyEnvelope).toBeDefined();
+    expect(pkg.AutonomyPolicyRegistry).toBeDefined();
+    expect(pkg.InterventionPolicyRegistry).toBeDefined();
+    expect(pkg.ApprovalDecisionCache).toBeDefined();
+    expect(pkg.WorkflowSupervisionCheckpoint).toBeDefined();
+    expect(pkg.ProgressiveAutonomyController).toBeDefined();
+    expect(pkg.AutonomyBenchmarkSuite).toBeDefined();
+    expect(pkg.AutonomyFleetSummary).toBeDefined();
+    expect(pkg.AutonomyRolloutGuard).toBeDefined();
     expect(pkg.GovernanceRecordLedger).toBeDefined();
     expect(pkg.AuditStitcher).toBeDefined();
     expect(pkg.GovernanceTimeline).toBeDefined();
@@ -350,6 +376,340 @@ describe('Package/module unit tests', () => {
     expect(declarationSource).toContain('export class Run');
     expect(declarationSource).toContain('export class TraceSerializer');
     expect(declarationSource).toContain('export class StorageBackendRegistry');
+    expect(declarationSource).toContain('export class AutonomyBudget');
+    expect(declarationSource).toContain('export class AutonomyEnvelope');
+    expect(declarationSource).toContain('export class AutonomyPolicyRegistry');
+    expect(declarationSource).toContain('export class InterventionPolicyRegistry');
+    expect(declarationSource).toContain('export class ApprovalDecisionCache');
+    expect(declarationSource).toContain('export class WorkflowSupervisionCheckpoint');
+    expect(declarationSource).toContain('export class ProgressiveAutonomyController');
+    expect(declarationSource).toContain('export class AutonomyBenchmarkSuite');
+    expect(declarationSource).toContain('export class AutonomyFleetSummary');
+    expect(declarationSource).toContain('export class AutonomyRolloutGuard');
+  });
+
+  test('AutonomyEnvelope combines budgets, supervision thresholds, and reusable delegation contracts', () => {
+    const budget = new AutonomyBudget({
+      spend: 5,
+      retries: 2,
+      toolCalls: 3,
+      externalActions: 1,
+      tokens: 1000,
+    });
+    const supervisionPolicy = new UncertaintySupervisionPolicy({
+      reviewThreshold: 0.7,
+      escalateThreshold: 0.5,
+    });
+    const delegation = new ApprovalDelegationContract({
+      id: 'ops-delegation',
+      approver: 'ops-lead',
+      delegate: 'oncall-operator',
+      scope: [{ action: 'send_status_update', environment: 'prod', tenant: 'acme' }],
+    });
+    const envelope = new AutonomyEnvelope({
+      budget,
+      supervisionPolicy,
+      environment: 'prod',
+      tenant: 'acme',
+    });
+    const ledger = new AutonomyBudgetLedger();
+
+    const firstDecision = envelope.evaluate({
+      usage: { toolCalls: 1, externalActions: 1, spend: 1.5, tokens: 250 },
+      assessment: { confidence: 0.62 },
+      riskClass: 'high',
+    });
+    ledger.record({
+      runId: 'budgeted-run-1',
+      action: firstDecision.action,
+      snapshot: firstDecision.budget,
+    });
+
+    const secondDecision = envelope.evaluate({
+      usage: { toolCalls: 3, spend: 4, tokens: 900 },
+      assessment: { confidence: 0.9 },
+      riskClass: 'medium',
+    });
+    ledger.record({
+      runId: 'budgeted-run-1',
+      action: secondDecision.action,
+      snapshot: secondDecision.budget,
+    });
+
+    expect(firstDecision.action).toBe('review');
+    expect(secondDecision.action).toBe('halt');
+    expect(secondDecision.budget.exhausted).toBe(true);
+    expect(secondDecision.budget.remaining.spend).toBe(-0.5);
+    expect(delegation.appliesTo({ action: 'send_status_update', environment: 'prod', tenant: 'acme' })).toBe(true);
+    expect(ledger.summarize()).toMatchObject({
+      total: 2,
+      exhausted: 1,
+    });
+  });
+
+  test('Autonomy policy and intervention registries support supervised autonomy by tenant and environment', () => {
+    const autonomyPolicies = new AutonomyPolicyRegistry({
+      policies: [
+        {
+          id: 'eu-prod-review',
+          environment: 'prod',
+          tenant: 'acme',
+          jurisdiction: 'eu',
+          riskClass: 'high',
+          reviewRequired: true,
+          escalationAction: 'escalate',
+          dataHandling: ['redact_pii'],
+          disallowedTools: ['bulk_export_contacts'],
+        },
+      ],
+    });
+    const interventionPolicies = new InterventionPolicyRegistry({
+      policies: [
+        {
+          id: 'release-highrisk-prod',
+          environment: 'prod',
+          taskFamily: 'release_review',
+          riskClass: 'high',
+          recommendedAction: 'require_operator_review',
+          checklist: ['review_rationale'],
+          rationaleTemplate:
+            'Apply operator review for {taskFamily} because {riskClass} risk work is running in {environment}.',
+        },
+      ],
+    });
+    const approvalCache = new ApprovalDecisionCache();
+
+    approvalCache.cache({
+      id: 'approval-1',
+      action: 'send_status_update',
+      environment: 'prod',
+      tenant: 'acme',
+      approver: 'ops-lead',
+    });
+
+    expect(
+      autonomyPolicies.evaluate({
+        environment: 'prod',
+        tenant: 'acme',
+        jurisdiction: 'eu',
+        riskClass: 'high',
+        toolName: 'send_status_update',
+      })
+    ).toMatchObject({
+      action: 'escalate',
+      policy: expect.objectContaining({
+        matchedPolicyIds: ['eu-prod-review'],
+      }),
+    });
+
+    expect(
+      autonomyPolicies.evaluate({
+        environment: 'prod',
+        tenant: 'acme',
+        jurisdiction: 'eu',
+        riskClass: 'high',
+        toolName: 'bulk_export_contacts',
+      })
+    ).toMatchObject({
+      action: 'deny',
+    });
+
+    expect(
+      interventionPolicies.select({
+        environment: 'prod',
+        taskFamily: 'release_review',
+        riskClass: 'high',
+      })
+    ).toMatchObject({
+      recommendedAction: 'require_operator_review',
+      matchedPolicyIds: ['release-highrisk-prod'],
+    });
+
+    expect(
+      approvalCache.find({
+        action: 'send_status_update',
+        environment: 'prod',
+        tenant: 'acme',
+      })
+    ).toMatchObject({
+      id: 'approval-1',
+      approver: 'ops-lead',
+    });
+
+    approvalCache.revoke('approval-1', {
+      reason: 'policy_changed',
+      revokedBy: 'ops-lead',
+    });
+
+    expect(approvalCache.summarize()).toMatchObject({
+      total: 1,
+      active: 0,
+      revoked: 1,
+    });
+  });
+
+  test('Workflow supervision checkpoints and progressive autonomy controls support review pauses and evidence-based envelope changes', async () => {
+    const checkpoint = new WorkflowSupervisionCheckpoint({
+      requireReviewBelowConfidence: 0.75,
+      escalateBelowConfidence: 0.55,
+    });
+    const decision = checkpoint.evaluate({
+      workflowId: 'supervised-release-workflow',
+      stepId: 'draft_release_note',
+      taskFamily: 'release_review',
+      riskClass: 'high',
+      confidence: 0.61,
+      rationale: 'The release summary mentions a production config change without explicit rollback notes.',
+      alternatives: ['Request operator review.', 'Regenerate with rollback instructions.'],
+    });
+
+    const baseEnvelope = new AutonomyEnvelope({
+      budget: { spend: 4, toolCalls: 2, tokens: 800 },
+      supervisionPolicy: { reviewThreshold: 0.7, escalateThreshold: 0.5 },
+      environment: 'prod',
+      tenant: 'acme',
+    });
+    const controller = new ProgressiveAutonomyController({
+      minimumEvidenceScore: 0.8,
+      widenIncrement: { spend: 2, toolCalls: 1, tokens: 400 },
+      tightenIncrement: { spend: 1, toolCalls: 1, tokens: 200 },
+    });
+
+    const widened = controller.adjust(baseEnvelope, {
+      evidenceScore: 0.91,
+      environment: 'prod',
+      tenant: 'acme',
+      reason: 'three successful supervised runs',
+    });
+    const tightened = controller.adjust(baseEnvelope, {
+      evidenceScore: 0.42,
+      environment: 'prod',
+      tenant: 'acme',
+      reason: 'recent escalation and budget overrun',
+    });
+
+    expect(decision).toMatchObject({
+      action: 'review',
+      requiresPause: true,
+      checkpoint: expect.objectContaining({
+        workflowId: 'supervised-release-workflow',
+        stepId: 'draft_release_note',
+        confidence: 0.61,
+      }),
+    });
+    expect(widened).toMatchObject({
+      action: 'widen',
+      summary: {
+        limits: expect.objectContaining({
+          spend: 6,
+          toolCalls: 3,
+          tokens: 1200,
+        }),
+      },
+    });
+    expect(tightened).toMatchObject({
+      action: 'tighten',
+      summary: {
+        limits: expect.objectContaining({
+          spend: 3,
+          toolCalls: 1,
+          tokens: 600,
+        }),
+      },
+    });
+  });
+
+  test('Autonomy operations surfaces cover evaluation, fleet summaries, and rollout safeguards', async () => {
+    const envelope = new AutonomyEnvelope({
+      budget: { spend: 4, toolCalls: 2, tokens: 800 },
+      supervisionPolicy: { reviewThreshold: 0.7, escalateThreshold: 0.5 },
+      environment: 'prod',
+      tenant: 'acme',
+    });
+    const approvalCache = new ApprovalDecisionCache({
+      entries: [
+        {
+          id: 'approval-1',
+          action: 'send_status_update',
+          environment: 'prod',
+          tenant: 'acme',
+          decision: 'approved',
+        },
+      ],
+    });
+
+    const benchmarkReport = await new AutonomyBenchmarkSuite().run({
+      envelope,
+      approvalCache,
+      approvalLatencyMs: 1200,
+      escalation: {
+        action: 'review',
+        rationale: 'Confidence dipped after a tool retry.',
+        confidence: 0.63,
+      },
+    });
+
+    const ledger = new AutonomyBudgetLedger();
+    ledger.record({
+      runId: 'autonomy-run-1',
+      action: 'review',
+      snapshot: envelope.evaluate({
+        usage: { spend: 1, toolCalls: 1, tokens: 200 },
+        assessment: { confidence: 0.66 },
+        riskClass: 'high',
+      }).budget,
+    });
+    const monitor = new FleetHealthMonitor();
+    monitor.record({
+      environmentId: 'prod',
+      tenantId: 'acme',
+      runs: 12,
+      pausedRuns: 2,
+      failedRuns: 1,
+      schedulerBacklog: 3,
+      saturation: 0.68,
+    });
+
+    const fleetSummary = new AutonomyFleetSummary({
+      monitor,
+      budgetLedger: ledger,
+    }).summarize({
+      escalations: [
+        { environment: 'prod', tenant: 'acme', taskFamily: 'release_review' },
+        { environment: 'prod', tenant: 'acme', taskFamily: 'release_review' },
+      ],
+    });
+
+    const adjustment = new ProgressiveAutonomyController({
+      minimumEvidenceScore: 0.8,
+    }).adjust(envelope, {
+      evidenceScore: 0.91,
+      environment: 'prod',
+      tenant: 'acme',
+      reason: 'attempted autonomy widening before enough evidence',
+    });
+
+    const guard = new AutonomyRolloutGuard().evaluate({
+      adjustment,
+      benchmarkReport,
+      minimumEvidenceScore: 0.95,
+    });
+
+    expect(benchmarkReport).toMatchObject({
+      total: 4,
+      failed: 0,
+    });
+    expect(fleetSummary).toMatchObject({
+      budgets: {
+        total: 1,
+      },
+      escalationHotspots: {
+        prod: 2,
+      },
+    });
+    expect(guard).toMatchObject({
+      action: 'block_rollout',
+    });
   });
 
   test('Tool exposes unified schema and provider-specific representations', async () => {
