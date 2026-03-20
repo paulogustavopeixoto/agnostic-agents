@@ -71,6 +71,9 @@ completed core:
 - `v18` Memory Governance OS
 - `v19` Budgeted Autonomy OS
 - `v20` Enterprise Autonomy OS
+- `v21` Proof OS
+- `v22` Federation OS
+- `v23` Outcome OS
 
 That program should still include refinement, hardening, and broader ecosystem
 uptake, but with a clearer systems goal:
@@ -98,6 +101,15 @@ Current progress inside that next horizon:
 - `v19` core is in: autonomy budgets, uncertainty supervision, autonomy policies, progressive autonomy, and autonomy operations
 - `v20` core is in: unified operating-layer views, enterprise references, deployment-pattern certification, operational scorecards, and multi-agent safety controls
 
+The post-`v20` direction is now clearer too:
+
+- `v21` Proof OS
+  - release-evidence bundles, stronger rehearsal, and proof-driven promotion gates
+- `v22` Federation OS
+  - federated policy, approvals, audit stitching, and multi-control-plane governance
+- `v23` Outcome OS
+  - governed optimization against declared technical and business outcomes
+
 The current `v14` maintained baseline starts with rollout artifacts, fleet
 health summaries, canary halt/rollback evaluation, fleet safety controls, and
 before/after rollout impact comparison, plus rollback advice for broader fleet regressions.
@@ -120,6 +132,9 @@ The intended sequence across the next horizon is:
 2. `v18`: memory provenance, retention, and trust boundaries
 3. `v19`: autonomy budgets, uncertainty thresholds, and reusable supervision
 4. `v20`: integrated operating-layer control across those surfaces
+5. `v21`: proof-driven promotion and release confidence
+6. `v22`: federated governance across organizations and control planes
+7. `v23`: bounded optimization against declared outcomes
 
 That order is intentional.
 It keeps the package from becoming more autonomous in ways that are harder to
@@ -142,6 +157,7 @@ The remaining work is now mostly:
 - operational hardening
 - route-governance refinement inside `v17`
 - interop, coordination, and learning refinement on top of the completed core
+- proof, federation, and outcome-control work above the completed `v20` layer
 
 That is a healthier pre-release state than having major unresolved core
 architecture work.
@@ -155,3 +171,5 @@ architecture work.
 - [Deployment pattern certification](deployment-pattern-certification.md)
 - [Enterprise boundaries](enterprise-boundaries.md)
 - [Transactional execution](transactional-execution.md)
+- [Proof OS](proof-os.md)
+- [Federation OS](federation-os.md)

@@ -105,6 +105,17 @@ const { OperationalScorecard } = require('../src/runtime/OperationalScorecard');
 const { EnterpriseAutonomyBenchmarkSuite } = require('../src/runtime/EnterpriseAutonomyBenchmarkSuite');
 const { EnterpriseBoundaryProfile } = require('../src/runtime/EnterpriseBoundaryProfile');
 const { TransactionalExecutionPlan } = require('../src/runtime/TransactionalExecutionPlan');
+const { ReleaseEvidenceBundle } = require('../src/runtime/ReleaseEvidenceBundle');
+const { RoutePromotionProof } = require('../src/runtime/RoutePromotionProof');
+const { PolicyAutonomyAttestation } = require('../src/runtime/PolicyAutonomyAttestation');
+const { PreReleaseSimulationSuite } = require('../src/runtime/PreReleaseSimulationSuite');
+const { FailureInjectionSuite } = require('../src/runtime/FailureInjectionSuite');
+const { ProofPromotionGate } = require('../src/runtime/ProofPromotionGate');
+const { FederatedDelegationLedger } = require('../src/runtime/FederatedDelegationLedger');
+const { FederatedAuditStitcher } = require('../src/runtime/FederatedAuditStitcher');
+const { FederatedPromotionBoundaryAdvisor } = require('../src/runtime/FederatedPromotionBoundaryAdvisor');
+const { TrustCertificationExchange } = require('../src/runtime/TrustCertificationExchange');
+const { ExternalControlPlaneCertificationKit } = require('../src/runtime/ExternalControlPlaneCertificationKit');
 const { DelegationBudget } = require('../src/coordination/DelegationBudget');
 const { SharedContextScope } = require('../src/coordination/SharedContextScope');
 const { CoordinationSafetyGuard } = require('../src/coordination/CoordinationSafetyGuard');
@@ -341,6 +352,17 @@ describe('Package/module unit tests', () => {
     expect(pkg.EnterpriseAutonomyBenchmarkSuite).toBeDefined();
     expect(pkg.EnterpriseBoundaryProfile).toBeDefined();
     expect(pkg.TransactionalExecutionPlan).toBeDefined();
+    expect(pkg.ReleaseEvidenceBundle).toBeDefined();
+    expect(pkg.RoutePromotionProof).toBeDefined();
+    expect(pkg.PolicyAutonomyAttestation).toBeDefined();
+    expect(pkg.PreReleaseSimulationSuite).toBeDefined();
+    expect(pkg.FailureInjectionSuite).toBeDefined();
+    expect(pkg.ProofPromotionGate).toBeDefined();
+    expect(pkg.FederatedDelegationLedger).toBeDefined();
+    expect(pkg.FederatedAuditStitcher).toBeDefined();
+    expect(pkg.FederatedPromotionBoundaryAdvisor).toBeDefined();
+    expect(pkg.TrustCertificationExchange).toBeDefined();
+    expect(pkg.ExternalControlPlaneCertificationKit).toBeDefined();
     expect(pkg.GovernanceRecordLedger).toBeDefined();
     expect(pkg.AuditStitcher).toBeDefined();
     expect(pkg.GovernanceTimeline).toBeDefined();
@@ -424,6 +446,17 @@ describe('Package/module unit tests', () => {
     expect(declarationSource).toContain('export class EnterpriseAutonomyBenchmarkSuite');
     expect(declarationSource).toContain('export class EnterpriseBoundaryProfile');
     expect(declarationSource).toContain('export class TransactionalExecutionPlan');
+    expect(declarationSource).toContain('export class ReleaseEvidenceBundle');
+    expect(declarationSource).toContain('export class RoutePromotionProof');
+    expect(declarationSource).toContain('export class PolicyAutonomyAttestation');
+    expect(declarationSource).toContain('export class PreReleaseSimulationSuite');
+    expect(declarationSource).toContain('export class FailureInjectionSuite');
+    expect(declarationSource).toContain('export class ProofPromotionGate');
+    expect(declarationSource).toContain('export class FederatedDelegationLedger');
+    expect(declarationSource).toContain('export class FederatedAuditStitcher');
+    expect(declarationSource).toContain('export class FederatedPromotionBoundaryAdvisor');
+    expect(declarationSource).toContain('export class TrustCertificationExchange');
+    expect(declarationSource).toContain('export class ExternalControlPlaneCertificationKit');
     expect(declarationSource).toContain('export class DeploymentPatternCertificationKit');
     expect(declarationSource).toContain('export class DelegationBudget');
     expect(declarationSource).toContain('export class SharedContextScope');
@@ -1446,6 +1479,282 @@ describe('Package/module unit tests', () => {
       },
     });
     expect(transaction.steps.some(step => step.phase === 'compensate')).toBe(true);
+  });
+
+  test('ReleaseEvidenceBundle, RoutePromotionProof, and PolicyAutonomyAttestation build proof artifacts for risky promotions', () => {
+    const routeProof = RoutePromotionProof.build({
+      routeId: 'primary-route',
+      shadowReport: {
+        summary: {
+          beforeSuccessRate: 0.91,
+          afterSuccessRate: 0.96,
+          beforeLatency: 1100,
+          afterLatency: 950,
+          beforeCost: 0.15,
+          afterCost: 0.12,
+        },
+      },
+      rollbackTarget: { routeId: 'primary-route-prev' },
+      approvals: ['ops'],
+    });
+    const attestation = PolicyAutonomyAttestation.issue({
+      candidateId: 'candidate-v21',
+      policyPack: { id: 'policy-pack-7', version: '7.0.0' },
+      autonomyEnvelope: { id: 'envelope-3', budget: { spend: 25 } },
+      jurisdictions: ['eu', 'us'],
+      approvedBy: ['ops', 'compliance'],
+    });
+    const evidence = ReleaseEvidenceBundle.build({
+      candidateId: 'candidate-v21',
+      assurance: {
+        invariants: [{ id: 'policy_gate', passed: true }],
+        scenarios: [{ id: 'shadow_route', passed: true }],
+      },
+      benchmarkReport: { total: 4, passed: 4, failed: 0 },
+      governance: {
+        records: [{ surface: 'operator', type: 'approval', candidateId: 'candidate-v21' }],
+      },
+      rolloutGuard: { action: 'allow_rollout' },
+      routeProofs: [routeProof],
+      attestations: [attestation],
+    });
+
+    expect(routeProof.summary.decision).toBe('promote');
+    expect(attestation.summary.valid).toBe(true);
+    expect(evidence).toMatchObject({
+      kind: 'agnostic-agents/release-evidence-bundle',
+      summary: {
+        candidateId: 'candidate-v21',
+        assuranceVerdict: 'allow',
+        promotionAction: 'promote',
+      },
+    });
+  });
+
+  test('PreReleaseSimulationSuite, FailureInjectionSuite, and ProofPromotionGate rehearse and gate risky promotions', async () => {
+    const router = new CapabilityRouter({
+      candidates: [
+        {
+          id: 'primary-model',
+          kind: 'model',
+          capabilities: ['summarization'],
+          profile: {
+            taskTypes: ['ops_summary'],
+            reputationScore: 0.9,
+          },
+        },
+      ],
+    });
+
+    const simulationReport = await new PreReleaseSimulationSuite({ router }).run({
+      routeScenarios: [
+        {
+          id: 'ops-summary',
+          task: {
+            taskType: 'ops_summary',
+            requiredCapabilities: ['summarization'],
+          },
+        },
+      ],
+      memoryAudit: [
+        { type: 'write', outcome: 'stored', key: 'customer:1', layer: 'episodic' },
+      ],
+      stateBundle: {
+        summary: {
+          memoryContractSurfaces: ['runtime', 'workflow', 'coordination', 'learning', 'operator'],
+        },
+      },
+      autonomy: {
+        envelope: {
+          budget: { spend: 5 },
+        },
+        approvalLatencyMs: 1000,
+        escalation: { action: 'review', rationale: 'fallback' },
+      },
+    });
+
+    const failureInjectionReport = await new FailureInjectionSuite().run({
+      worker: { recovered: true, checkpointed: true },
+      fleet: { halted: true, rollbackReady: true },
+      controlPlane: { auditPreserved: true, operatorFallback: true },
+    });
+
+    const evidenceBundle = ReleaseEvidenceBundle.build({
+      candidateId: 'candidate-v21-rehearsed',
+      assurance: {
+        invariants: [{ id: 'policy_gate', passed: true }],
+        scenarios: [{ id: 'shadow_route', passed: true }],
+      },
+      benchmarkReport: { total: 2, passed: 2, failed: 0 },
+      governance: {
+        records: [{ surface: 'operator', action: 'approval', candidateId: 'candidate-v21-rehearsed' }],
+      },
+      rolloutGuard: { action: 'allow_rollout' },
+      routeProofs: [
+        RoutePromotionProof.build({
+          routeId: 'primary-route',
+          shadowReport: {
+            summary: {
+              beforeSuccessRate: 0.91,
+              afterSuccessRate: 0.95,
+              beforeLatency: 1000,
+              afterLatency: 930,
+              beforeCost: 0.13,
+              afterCost: 0.12,
+            },
+          },
+          rollbackTarget: { routeId: 'primary-route-prev' },
+          approvals: ['ops'],
+        }),
+      ],
+      attestations: [
+        PolicyAutonomyAttestation.issue({
+          candidateId: 'candidate-v21-rehearsed',
+          policyPack: { id: 'policy-pack-8' },
+          autonomyEnvelope: { id: 'envelope-4' },
+          approvedBy: ['ops'],
+        }),
+      ],
+    });
+
+    const decision = new ProofPromotionGate().evaluate({
+      evidenceBundle,
+      simulationReport,
+      failureInjectionReport,
+    });
+
+    expect(simulationReport.failed).toBe(0);
+    expect(failureInjectionReport.failed).toBe(0);
+    expect(decision.action).toBe('promote');
+  });
+
+  test('FederatedDelegationLedger and FederatedAuditStitcher retain cross-organization delegation and audit context', () => {
+    const localLedger = new GovernanceRecordLedger({
+      records: [
+        {
+          id: 'local-1',
+          timestamp: '2026-03-20T10:00:00.000Z',
+          surface: 'operator',
+          action: 'approval',
+          candidateId: 'candidate-v22',
+        },
+      ],
+    });
+    const externalLedger = new GovernanceRecordLedger({
+      records: [
+        {
+          id: 'external-1',
+          timestamp: '2026-03-20T10:01:00.000Z',
+          surface: 'policy',
+          action: 'review',
+          candidateId: 'candidate-v22',
+        },
+      ],
+    });
+    const delegationLedger = new FederatedDelegationLedger();
+    delegationLedger.record({
+      timestamp: '2026-03-20T09:59:00.000Z',
+      organizationId: 'local-org',
+      delegateOrganizationId: 'partner-org',
+      candidateId: 'candidate-v22',
+      jurisdictions: ['eu'],
+      contract: new ApprovalDelegationContract({
+        id: 'delegation-1',
+        approver: 'ops-local',
+        delegate: 'partner-compliance',
+        scope: [{ action: 'promote_route', environment: 'prod' }],
+      }),
+    });
+
+    const stitched = new FederatedAuditStitcher({
+      ledgers: [
+        { source: 'local', ledger: localLedger },
+        { source: 'partner', ledger: externalLedger },
+      ],
+      delegationLedger,
+    }).stitch({ candidateId: 'candidate-v22' });
+
+    expect(delegationLedger.summarize()).toMatchObject({
+      total: 1,
+      byOrganization: { 'local-org': 1 },
+    });
+    expect(stitched.records).toHaveLength(3);
+    expect(stitched.sources).toEqual(['federation', 'local', 'partner']);
+    expect(stitched.jurisdictions).toEqual(['eu']);
+  });
+
+  test('FederatedPromotionBoundaryAdvisor and TrustCertificationExchange manage boundary-aware promotion and shared trust signals', () => {
+    const rollback = new FleetRollbackAdvisor().advise({
+      plan: {
+        target: { id: 'eu-prod', version: '2026.03.20' },
+      },
+      comparison: {
+        impact: { regressed: false },
+        delta: { failedRuns: 0, adaptiveRegressions: 0, schedulerBacklog: 0 },
+      },
+      safetyDecision: { action: 'continue' },
+    });
+
+    const boundaryDecision = new FederatedPromotionBoundaryAdvisor().evaluate({
+      candidateId: 'candidate-v22-boundary',
+      targetRegion: 'eu-west',
+      targetJurisdiction: 'eu',
+      fleetRollback: rollback,
+      boundaries: [
+        { id: 'eu-prod-boundary', region: 'eu-west', jurisdiction: 'eu', promotion: 'allow' },
+      ],
+    });
+
+    const exchange = TrustCertificationExchange.publish({
+      source: 'partner-control-plane',
+      certifications: [
+        { target: 'partner-public-control-plane', kind: 'deployment_pattern', level: 'operationally_certified' },
+      ],
+      trustSignals: [
+        { target: 'partner-control-plane', signal: 'operator_review_consistent', score: 0.93 },
+      ],
+    });
+
+    expect(boundaryDecision.action).toBe('promote_within_boundary');
+    expect(exchange).toMatchObject({
+      kind: 'agnostic-agents/trust-certification-exchange',
+      summary: {
+        source: 'partner-control-plane',
+        certificationCount: 1,
+        trustSignalCount: 1,
+      },
+    });
+  });
+
+  test('ExternalControlPlaneCertificationKit certifies partner dashboards and runtimes for federation use', () => {
+    const kit = new ExternalControlPlaneCertificationKit();
+    const dashboard = kit.certify({
+      name: 'partner-dashboard',
+      capabilities: ['runRead', 'incidentView', 'approvalState', 'traceDiff'],
+    }, {
+      type: 'dashboard',
+    });
+    const runtime = kit.certify({
+      name: 'partner-runtime',
+      capabilities: ['governanceWebhook', 'eventForwarding', 'runExport', 'approvalResolution'],
+    }, {
+      type: 'partner_runtime',
+    });
+
+    expect(dashboard).toMatchObject({
+      target: 'partner-dashboard',
+      kind: 'external_control_plane_target',
+      type: 'dashboard',
+      level: 'federation_ready',
+      valid: true,
+    });
+    expect(runtime).toMatchObject({
+      target: 'partner-runtime',
+      kind: 'external_control_plane_target',
+      type: 'partner_runtime',
+      level: 'federation_ready',
+      valid: true,
+    });
   });
 
   test('ToolSchemaArtifact and InteropArtifactRegistry import and export maintained artifact families', () => {

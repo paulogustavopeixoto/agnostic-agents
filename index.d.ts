@@ -1697,6 +1697,68 @@ export class TransactionalExecutionPlan {
   ): JsonObject;
 }
 
+export class ReleaseEvidenceBundle {
+  static build(input?: JsonObject): JsonObject;
+}
+
+export class RoutePromotionProof {
+  static build(input?: JsonObject): JsonObject;
+}
+
+export class PolicyAutonomyAttestation {
+  static issue(input?: JsonObject): JsonObject;
+}
+
+export class PreReleaseSimulationSuite {
+  constructor(input?: JsonObject);
+  buildScenarios(input?: JsonObject): JsonObject[];
+  run(input?: JsonObject): Promise<JsonObject>;
+}
+
+export class FailureInjectionSuite {
+  constructor(input?: JsonObject);
+  buildScenarios(input?: JsonObject): JsonObject[];
+  run(input?: JsonObject): Promise<JsonObject>;
+}
+
+export class ProofPromotionGate {
+  evaluate(input?: JsonObject): JsonObject;
+}
+
+export class FederatedDelegationLedger {
+  constructor(input?: { records?: JsonObject[] });
+  record(input?: JsonObject): JsonObject;
+  list(filters?: JsonObject): JsonObject[];
+  summarize(): JsonObject;
+}
+
+export class FederatedAuditStitcher {
+  constructor(input?: {
+    ledgers?: Array<{
+      source?: string;
+      ledger?: GovernanceRecordLedger | JsonObject | null;
+    }>;
+    delegationLedger?: FederatedDelegationLedger | JsonObject | null;
+  });
+  stitch(filters?: JsonObject): JsonObject;
+}
+
+export class FederatedPromotionBoundaryAdvisor {
+  evaluate(input?: JsonObject): JsonObject;
+}
+
+export class TrustCertificationExchange {
+  static publish(input?: JsonObject): JsonObject;
+  static merge(exchanges?: JsonObject[]): JsonObject;
+}
+
+export class ExternalControlPlaneCertificationKit {
+  certify(target?: JsonObject, options?: {
+    type?: string;
+    name?: string | null;
+  }): JsonObject;
+}
+
 export class GovernanceRecordLedger {
   constructor(options?: { records?: JsonObject[] });
   records: JsonObject[];

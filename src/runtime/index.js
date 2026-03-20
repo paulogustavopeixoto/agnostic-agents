@@ -122,6 +122,17 @@ const { OperationalScorecard } = require('./OperationalScorecard');
 const { EnterpriseAutonomyBenchmarkSuite } = require('./EnterpriseAutonomyBenchmarkSuite');
 const { EnterpriseBoundaryProfile } = require('./EnterpriseBoundaryProfile');
 const { TransactionalExecutionPlan } = require('./TransactionalExecutionPlan');
+const { ReleaseEvidenceBundle } = require('./ReleaseEvidenceBundle');
+const { RoutePromotionProof } = require('./RoutePromotionProof');
+const { PolicyAutonomyAttestation } = require('./PolicyAutonomyAttestation');
+const { PreReleaseSimulationSuite } = require('./PreReleaseSimulationSuite');
+const { FailureInjectionSuite } = require('./FailureInjectionSuite');
+const { ProofPromotionGate } = require('./ProofPromotionGate');
+const { FederatedDelegationLedger } = require('./FederatedDelegationLedger');
+const { FederatedAuditStitcher } = require('./FederatedAuditStitcher');
+const { FederatedPromotionBoundaryAdvisor } = require('./FederatedPromotionBoundaryAdvisor');
+const { TrustCertificationExchange } = require('./TrustCertificationExchange');
+const { ExternalControlPlaneCertificationKit } = require('./ExternalControlPlaneCertificationKit');
 const { StateBundle } = require('./StateBundle');
 const { StateDiff } = require('./StateDiff');
 const { StateBundleSerializer } = require('./StateBundleSerializer');
@@ -281,6 +292,17 @@ module.exports = {
   EnterpriseAutonomyBenchmarkSuite,
   EnterpriseBoundaryProfile,
   TransactionalExecutionPlan,
+  ReleaseEvidenceBundle,
+  RoutePromotionProof,
+  PolicyAutonomyAttestation,
+  PreReleaseSimulationSuite,
+  FailureInjectionSuite,
+  ProofPromotionGate,
+  FederatedDelegationLedger,
+  FederatedAuditStitcher,
+  FederatedPromotionBoundaryAdvisor,
+  TrustCertificationExchange,
+  ExternalControlPlaneCertificationKit,
   StateBundle,
   StateDiff,
   StateBundleSerializer,

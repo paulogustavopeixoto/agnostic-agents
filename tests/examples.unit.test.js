@@ -653,6 +653,65 @@ describe('Maintained examples', () => {
     expect(stdout).toContain("kind: 'agnostic-agents/transactional-execution-plan'");
   });
 
+  test('reference proof artifacts example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceProofArtifacts.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Proof artifact summary');
+    expect(stdout).toContain("kind: 'agnostic-agents/release-evidence-bundle'");
+    expect(stdout).toContain("kind: 'agnostic-agents/route-promotion-proof'");
+    expect(stdout).toContain("kind: 'agnostic-agents/policy-autonomy-attestation'");
+  });
+
+  test('reference proof rehearsal example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceProofRehearsal.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Proof rehearsal summary');
+    expect(stdout).toContain("action: 'promote'");
+    expect(stdout).toContain('simulationReport');
+    expect(stdout).toContain('failureInjectionReport');
+  });
+
+  test('reference federated governance example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceFederatedGovernance.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Federated governance summary');
+    expect(stdout).toContain('delegationSummary');
+    expect(stdout).toContain("recordKind: 'delegation'");
+    expect(stdout).toContain("source: 'partner'");
+  });
+
+  test('reference federated boundaries example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceFederatedBoundaries.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Federated boundary summary');
+    expect(stdout).toContain("action: 'promote_within_boundary'");
+    expect(stdout).toContain("kind: 'agnostic-agents/trust-certification-exchange'");
+  });
+
+  test('reference federated control plane example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceFederatedControlPlane.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Federated control-plane summary');
+    expect(stdout).toContain("kind: 'external_control_plane_target'");
+    expect(stdout).toContain("source: 'partner-runtime'");
+    expect(stdout).toContain("kind: 'agnostic-agents/trust-certification-exchange'");
+  });
+
   test('reference interop registry example runs', async () => {
     const examplePath = path.join(__dirname, '..', 'examples', 'referenceInteropRegistry.js');
     const { stdout } = await execFileAsync(process.execPath, [examplePath], {

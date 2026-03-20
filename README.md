@@ -582,6 +582,11 @@ Local/no-key examples:
 - `npm run example:reference-distributed-recovery`
 - `npm run example:reference-deployment-pattern-certification`
 - `npm run example:reference-enterprise-boundaries`
+- `npm run example:reference-proof-artifacts`
+- `npm run example:reference-proof-rehearsal`
+- `npm run example:reference-federated-governance`
+- `npm run example:reference-federated-boundaries`
+- `npm run example:reference-federated-control-plane`
 
 Provider-backed examples:
 
@@ -740,12 +745,22 @@ The current maintained autonomy-operating-layer horizon is:
 - `v20` Enterprise Autonomy OS
   - integrated execution graphs, transactional side-effect discipline, multi-agent safety controls, and a coherent AI operating-layer story
 
+The next horizon after that is:
+
+- `v21` Proof OS
+  - release-evidence bundles, route-promotion proofs, stronger rehearsal, and proof-driven promotion gates
+- `v22` Federation OS
+  - federated policy, approvals, audit stitching, and multi-control-plane governance
+- `v23` Outcome OS
+  - governed optimization against declared technical and business outcomes
+
 At this point, the highest-signal work is refinement and hardening inside those
 completed phases rather than inventing a new baseline:
 
 - route-governance refinement inside `v17`
 - broader ecosystem and deployment uptake around the `v20` operating-layer story
 - continued operational hardening, benchmarks, and real-world certification depth
+- stronger proof, federation, and outcome control above the completed `v20` core
 
 The target shape is six layers:
 

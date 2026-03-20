@@ -156,6 +156,21 @@ These examples are intended as reference deployment patterns rather than feature
 - `referenceEnterpriseBoundaries.js`
   - no API key required
   - shows enterprise boundary profiling plus transactional execution/compensation references for external systems
+- `referenceProofArtifacts.js`
+  - no API key required
+  - shows release-evidence bundles, route-promotion proofs, and policy/autonomy attestation artifacts
+- `referenceProofRehearsal.js`
+  - no API key required
+  - shows pre-release simulation, failure injection, and proof-gated promotion decisions
+- `referenceFederatedGovernance.js`
+  - no API key required
+  - shows federated delegation records and cross-ledger audit stitching across local and external governance planes
+- `referenceFederatedBoundaries.js`
+  - no API key required
+  - shows federated promotion boundaries plus trust/certification exchange across control planes
+- `referenceFederatedControlPlane.js`
+  - no API key required
+  - shows federated remote-control-plane stitching plus certification for partner dashboards and runtimes
 - `referenceInteropRegistry.js`
   - no API key required
   - shows one public import/export registry across tool, trace, policy, eval, and manifest artifacts
