@@ -5,12 +5,15 @@ class StateConsistencyChecker {
     const stateBundle = bundle instanceof StateBundle ? bundle : StateBundle.fromJSON(bundle || {});
     const run = stateBundle.run;
     const memory = stateBundle.memory || {};
+    const memoryGovernance = stateBundle.memoryGovernance || {};
     const metadata = stateBundle.metadata || {};
     const errors = [];
     const warnings = [];
 
     const workingMemory = memory.working || {};
     const semanticMemory = memory.semantic || {};
+    const accessContracts = memoryGovernance.accessContracts || null;
+    const memoryAudit = Array.isArray(memoryGovernance.audit) ? memoryGovernance.audit : [];
     const jobs = this._normalizeJobs(metadata.jobs, warnings);
     const referencedJobIds = this._collectReferencedJobIds(run);
     const resolvedJobs = referencedJobIds
@@ -22,6 +25,14 @@ class StateConsistencyChecker {
       warnings.push('Run is active but the portable state bundle has no working-memory context.');
     }
 
+    if (Object.keys(memory).length > 0 && memoryAudit.length === 0) {
+      warnings.push('Portable state bundle includes memory layers but no memory governance audit trail.');
+    }
+
+    if (accessContracts && !this._hasCoreMemorySurfaces(accessContracts)) {
+      warnings.push('memoryGovernance.accessContracts does not cover all core surfaces: runtime, workflow, coordination, learning, operator.');
+    }
+
     if (run?.state?.recovery?.required && !semanticMemory.last_incident) {
       warnings.push('Run requires recovery but semantic memory does not record the last incident context.');
     }
@@ -31,6 +42,19 @@ class StateConsistencyChecker {
       const normalizedTask = String(workingMemory.active_task).toLowerCase();
       if (!normalizedInput.includes(normalizedTask) && !normalizedTask.includes(normalizedInput)) {
         warnings.push('working.active_task does not appear to align with the current run input.');
+      }
+    }
+
+    const auditKeys = new Set(memoryAudit.map(entry => entry.key).filter(Boolean));
+    const bundleKeys = new Set([
+      ...Object.keys(memory.working || {}),
+      ...Object.keys(memory.profile || {}),
+      ...Object.keys(memory.policy || {}),
+    ]);
+
+    for (const key of bundleKeys) {
+      if (memoryAudit.length > 0 && !auditKeys.has(key)) {
+        warnings.push(`Memory key "${key}" exists in the bundle without a matching governance audit record.`);
       }
     }
 
@@ -62,10 +86,17 @@ class StateConsistencyChecker {
         runId: run?.id || null,
         runStatus: run?.status || null,
         memoryLayers: Object.keys(memory),
+        memoryGovernanceEvents: memoryAudit.length,
+        memoryContractSurfaces: accessContracts ? Object.keys(accessContracts) : [],
         referencedJobIds,
         resolvedJobIds: resolvedJobs.map(job => job.id),
       },
     };
+  }
+
+  _hasCoreMemorySurfaces(accessContracts) {
+    const required = ['runtime', 'workflow', 'coordination', 'learning', 'operator'];
+    return required.every(surface => accessContracts[surface]);
   }
 
   _normalizeJobs(jobs, warnings) {

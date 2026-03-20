@@ -48,6 +48,15 @@ const { WorkflowPreset } = require('./WorkflowPreset');
 const { IncidentBundleExporter } = require('./IncidentBundleExporter');
 const { CredentialDelegationKit } = require('./CredentialDelegationKit');
 const { RoutePolicySimulator } = require('./RoutePolicySimulator');
+const { MemoryProvenanceLedger } = require('./MemoryProvenanceLedger');
+const { MemoryRetentionPolicy } = require('./MemoryRetentionPolicy');
+const { MemoryAccessController } = require('./MemoryAccessController');
+const { MemoryConflictResolver } = require('./MemoryConflictResolver');
+const { MemoryAccessContractRegistry } = require('./MemoryAccessContractRegistry');
+const { MemoryAuditView } = require('./MemoryAuditView');
+const { MemoryGovernanceBenchmarkSuite } = require('./MemoryGovernanceBenchmarkSuite');
+const { MemoryGovernanceDiagnostics } = require('./MemoryGovernanceDiagnostics');
+const { MemoryGovernanceReviewWorkflow } = require('./MemoryGovernanceReviewWorkflow');
 const { LearnedAdaptationArtifact } = require('./LearnedAdaptationArtifact');
 const { ImprovementProposalEngine } = require('./ImprovementProposalEngine');
 const { GovernedImprovementLoop } = require('./GovernedImprovementLoop');
@@ -174,6 +183,15 @@ module.exports = {
   IncidentBundleExporter,
   CredentialDelegationKit,
   RoutePolicySimulator,
+  MemoryProvenanceLedger,
+  MemoryRetentionPolicy,
+  MemoryAccessController,
+  MemoryConflictResolver,
+  MemoryAccessContractRegistry,
+  MemoryAuditView,
+  MemoryGovernanceBenchmarkSuite,
+  MemoryGovernanceDiagnostics,
+  MemoryGovernanceReviewWorkflow,
   LearnedAdaptationArtifact,
   ImprovementProposalEngine,
   GovernedImprovementLoop,

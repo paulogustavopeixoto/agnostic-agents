@@ -1,6 +1,10 @@
 const { EventEmitter } = require('events');
 const { InMemoryLayerStore } = require('./memory/InMemoryLayerStore');
 const { BaseLayerStore } = require('./memory/BaseLayerStore');
+const { MemoryProvenanceLedger } = require('../runtime/MemoryProvenanceLedger');
+const { MemoryRetentionPolicy } = require('../runtime/MemoryRetentionPolicy');
+const { MemoryAccessController } = require('../runtime/MemoryAccessController');
+const { MemoryConflictResolver } = require('../runtime/MemoryConflictResolver');
 
 class Memory extends EventEmitter {
   constructor({
@@ -8,6 +12,7 @@ class Memory extends EventEmitter {
     adapter = null,
     stores = {},
     policies = {},
+    governance = {},
   } = {}) {
     super();
     this.vectorStore = vectorStore;
@@ -28,6 +33,24 @@ class Memory extends EventEmitter {
       workingLimit: policies.workingLimit || null,
       profileLimit: policies.profileLimit || null,
       policyLimit: policies.policyLimit || null,
+    };
+    this.governance = {
+      provenanceLedger:
+        governance.provenanceLedger instanceof MemoryProvenanceLedger
+          ? governance.provenanceLedger
+          : new MemoryProvenanceLedger(governance.provenanceLedger || {}),
+      retentionPolicy:
+        governance.retentionPolicy instanceof MemoryRetentionPolicy
+          ? governance.retentionPolicy
+          : new MemoryRetentionPolicy(governance.retentionPolicy || {}),
+      accessController:
+        governance.accessController instanceof MemoryAccessController
+          ? governance.accessController
+          : new MemoryAccessController(governance.accessController || {}),
+      conflictResolver:
+        governance.conflictResolver instanceof MemoryConflictResolver
+          ? governance.conflictResolver
+          : new MemoryConflictResolver(governance.conflictResolver || {}),
     };
 
     this.layers = {
@@ -53,23 +76,73 @@ class Memory extends EventEmitter {
     };
   }
 
-  async _setLayerValue(layerName, key, value, ttlMs = null, metadata = {}) {
+  async _setLayerValue(layerName, key, value, ttlMs = null, metadata = {}, context = {}) {
     const normalizedKey = key.toLowerCase();
-    const record = this._createRecord(value, ttlMs, metadata);
-    this.layers[layerName][normalizedKey] = record;
-    if (this.stores[layerName]) {
-      await this.stores[layerName].set(normalizedKey, record);
+    const writeDecision = this.governance.accessController.canWrite({
+      layer: layerName,
+      key: normalizedKey,
+      metadata,
+      context,
+    });
+
+    if (!writeDecision.allowed) {
+      this.governance.provenanceLedger.record({
+        type: 'write_blocked',
+        layer: layerName,
+        key: normalizedKey,
+        outcome: 'blocked',
+        actor: context.actor || null,
+        trustZone: context.trustZone || null,
+        metadata: { reason: writeDecision.reason, attemptedMetadata: metadata },
+      });
+      return null;
     }
+
+    const record = this._createRecord(value, ttlMs, metadata);
+    const existing = this.layers[layerName][normalizedKey] || null;
+    const conflict = this.governance.conflictResolver.detect(existing, record);
+    const resolution = this.governance.conflictResolver.resolve(existing, record);
+
+    if (conflict.conflict) {
+      this.governance.provenanceLedger.record({
+        type: 'conflict_detected',
+        layer: layerName,
+        key: normalizedKey,
+        outcome: resolution.action,
+        actor: context.actor || null,
+        trustZone: context.trustZone || null,
+        metadata: {
+          reason: resolution.reason,
+          existingValue: existing?.value,
+          incomingValue: record.value,
+        },
+      });
+    }
+
+    this.layers[layerName][normalizedKey] = resolution.record;
+    if (this.stores[layerName]) {
+      await this.stores[layerName].set(normalizedKey, resolution.record);
+    }
+    this.governance.provenanceLedger.record({
+      type: 'write',
+      layer: layerName,
+      key: normalizedKey,
+      outcome: resolution.action === 'reject' ? 'rejected' : 'stored',
+      actor: context.actor || null,
+      trustZone: context.trustZone || null,
+      metadata,
+    });
     this.emit('memoryUpdate', {
       type: layerName,
       key,
       value,
-      expiresAt: record.expiresAt,
+      expiresAt: resolution.record?.expiresAt || null,
       metadata,
     });
+    return resolution.record;
   }
 
-  _getLayerValue(layerName, key) {
+  _getLayerValue(layerName, key, context = {}) {
     const normalizedKey = key.toLowerCase();
     const record = this.layers[layerName][normalizedKey];
 
@@ -82,23 +155,58 @@ class Memory extends EventEmitter {
       if (this.stores[layerName]) {
         void this.stores[layerName].delete(normalizedKey);
       }
+      this.governance.provenanceLedger.record({
+        type: 'expire',
+        layer: layerName,
+        key: normalizedKey,
+        outcome: 'expired',
+      });
       this.emit('memoryExpire', { type: layerName, key });
       return null;
     }
+    const readDecision = this.governance.accessController.canRead({
+      layer: layerName,
+      key: normalizedKey,
+      metadata: record.metadata,
+      context,
+    });
+    if (!readDecision.allowed) {
+      this.governance.provenanceLedger.record({
+        type: 'read_blocked',
+        layer: layerName,
+        key: normalizedKey,
+        outcome: 'blocked',
+        actor: context.actor || null,
+        trustZone: context.trustZone || null,
+        metadata: { reason: readDecision.reason },
+      });
+      return null;
+    }
 
-    return record.value;
+    this.governance.provenanceLedger.record({
+      type: 'read',
+      layer: layerName,
+      key: normalizedKey,
+      outcome: 'returned',
+      actor: context.actor || null,
+      trustZone: context.trustZone || null,
+      metadata: record.metadata,
+    });
+
+    return this.governance.accessController.redact(record, context).value;
   }
 
-  _listLayer(layerName) {
+  _listLayer(layerName, context = {}) {
     const entries = [];
 
     for (const [key, record] of Object.entries(this.layers[layerName])) {
-      const value = this._getLayerValue(layerName, key);
+      const value = this._getLayerValue(layerName, key, context);
       if (value !== null) {
+        const visibleRecord = this.governance.accessController.redact(record, context);
         entries.push({
           key,
           value,
-          metadata: record.metadata,
+          metadata: visibleRecord.metadata,
           createdAt: record.createdAt,
           updatedAt: record.updatedAt,
           expiresAt: record.expiresAt,
@@ -196,17 +304,17 @@ class Memory extends EventEmitter {
       .join('\n');
   }
 
-  async setWorkingMemory(key, value, { ttlMs = null, metadata = {} } = {}) {
-    await this._setLayerValue('working', key, value, ttlMs, metadata);
+  async setWorkingMemory(key, value, { ttlMs = null, metadata = {}, context = {} } = {}) {
+    await this._setLayerValue('working', key, value, ttlMs, metadata, context);
     this._compactKeyValueLayer('working', this.policies.workingLimit);
   }
 
-  getWorkingMemory(key) {
-    return this._getLayerValue('working', key);
+  getWorkingMemory(key, context = {}) {
+    return this._getLayerValue('working', key, context);
   }
 
-  listWorkingMemory() {
-    return this._listLayer('working');
+  listWorkingMemory(context = {}) {
+    return this._listLayer('working', context);
   }
 
   clearWorkingMemory() {
@@ -217,17 +325,17 @@ class Memory extends EventEmitter {
     this.emit('memoryClear', { type: 'working' });
   }
 
-  async setProfile(key, value, { ttlMs = null, metadata = {} } = {}) {
-    await this._setLayerValue('profile', key, value, ttlMs, metadata);
+  async setProfile(key, value, { ttlMs = null, metadata = {}, context = {} } = {}) {
+    await this._setLayerValue('profile', key, value, ttlMs, metadata, context);
     this._compactKeyValueLayer('profile', this.policies.profileLimit);
   }
 
-  getProfile(key) {
-    return this._getLayerValue('profile', key);
+  getProfile(key, context = {}) {
+    return this._getLayerValue('profile', key, context);
   }
 
-  listProfile() {
-    return this._listLayer('profile');
+  listProfile(context = {}) {
+    return this._listLayer('profile', context);
   }
 
   clearProfile() {
@@ -252,17 +360,17 @@ class Memory extends EventEmitter {
     this.clearProfile();
   }
 
-  async setPolicy(key, value, { ttlMs = null, metadata = {} } = {}) {
-    await this._setLayerValue('policy', key, value, ttlMs, metadata);
+  async setPolicy(key, value, { ttlMs = null, metadata = {}, context = {} } = {}) {
+    await this._setLayerValue('policy', key, value, ttlMs, metadata, context);
     this._compactKeyValueLayer('policy', this.policies.policyLimit);
   }
 
-  getPolicy(key) {
-    return this._getLayerValue('policy', key);
+  getPolicy(key, context = {}) {
+    return this._getLayerValue('policy', key, context);
   }
 
-  listPolicies() {
-    return this._listLayer('policy');
+  listPolicies(context = {}) {
+    return this._listLayer('policy', context);
   }
 
   clearPolicies() {
@@ -295,6 +403,13 @@ class Memory extends EventEmitter {
       ],
     });
 
+    this.governance.provenanceLedger.record({
+      type: 'semantic_write',
+      layer: 'semantic',
+      key: id,
+      outcome: 'stored',
+      metadata,
+    });
     this.emit('memoryUpdate', { type: 'semantic', fact, id, metadata });
   }
 
@@ -338,14 +453,14 @@ class Memory extends EventEmitter {
     }));
   }
 
-  async get(key) {
-    const fromProfile = this.getProfile(key);
+  async get(key, options = {}) {
+    const fromProfile = this.getProfile(key, options);
     if (fromProfile) return fromProfile;
 
-    const fromWorking = this.getWorkingMemory(key);
+    const fromWorking = this.getWorkingMemory(key, options);
     if (fromWorking) return fromWorking;
 
-    const fromPolicy = this.getPolicy(key);
+    const fromPolicy = this.getPolicy(key, options);
     if (fromPolicy) return fromPolicy;
 
     const fromSemantic = await this.searchSemanticMemory(key);
@@ -354,13 +469,13 @@ class Memory extends EventEmitter {
     return null;
   }
 
-  async set(key, value, { ttlMs = null, persist = false, layer = 'profile', metadata = {} } = {}) {
+  async set(key, value, { ttlMs = null, persist = false, layer = 'profile', metadata = {}, context = {} } = {}) {
     if (layer === 'working') {
-      await this.setWorkingMemory(key, value, { ttlMs, metadata });
+      await this.setWorkingMemory(key, value, { ttlMs, metadata, context });
     } else if (layer === 'policy') {
-      await this.setPolicy(key, value, { ttlMs, metadata });
+      await this.setPolicy(key, value, { ttlMs, metadata, context });
     } else {
-      await this.setProfile(key, value, { ttlMs, metadata });
+      await this.setProfile(key, value, { ttlMs, metadata, context });
     }
 
     if (persist && this.vectorStore) {
@@ -387,6 +502,57 @@ class Memory extends EventEmitter {
     this.clearPolicies();
     await this.clearSemanticMemory();
     this.emit('memoryClear', { type: 'all' });
+  }
+
+  enforceRetention() {
+    for (const layerName of ['working', 'profile', 'policy']) {
+      for (const [key, record] of Object.entries(this.layers[layerName])) {
+        const decision = this.governance.retentionPolicy.evaluate(record, layerName);
+        if (decision.action !== 'keep') {
+          delete this.layers[layerName][key];
+          if (this.stores[layerName]) {
+            void this.stores[layerName].delete(key);
+          }
+          this.governance.provenanceLedger.record({
+            type: 'retention',
+            layer: layerName,
+            key,
+            outcome: decision.action,
+            metadata: { reason: decision.reason },
+          });
+        }
+      }
+    }
+  }
+
+  getMemoryAudit(filters = {}) {
+    return this.governance.provenanceLedger.list(filters);
+  }
+
+  summarizeMemoryGovernance() {
+    return {
+      ledger: this.governance.provenanceLedger.summarize(),
+      layers: {
+        working: Object.keys(this.layers.working).length,
+        profile: Object.keys(this.layers.profile).length,
+        policy: Object.keys(this.layers.policy).length,
+        conversation: this.layers.conversation.length,
+      },
+    };
+  }
+
+  exportGovernedState({ accessContracts = null } = {}) {
+    return {
+      layers: JSON.parse(JSON.stringify(this.layers)),
+      governance: {
+        audit: this.getMemoryAudit(),
+        summary: this.summarizeMemoryGovernance(),
+        accessContracts:
+          accessContracts && typeof accessContracts.list === 'function'
+            ? accessContracts.list()
+            : accessContracts || null,
+      },
+    };
   }
 }
 

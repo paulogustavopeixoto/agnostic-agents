@@ -555,6 +555,10 @@ Key methods:
 - `chunkText(input, options?)`
 - `repairJsonOutput(input)`
 - `encodeBase64(input)`
+- `MemoryProvenanceLedger`
+- `MemoryRetentionPolicy`
+- `MemoryAccessController`
+- `MemoryConflictResolver`
 
 ### Error hierarchy
 

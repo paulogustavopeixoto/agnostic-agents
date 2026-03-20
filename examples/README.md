@@ -165,6 +165,12 @@ These examples are intended as reference deployment patterns rather than feature
 - `referenceEverythingSmoke.js`
   - no API key required
   - runs one smoke check across OpenAPI import, curl import, Postman import, secret resolution, tool recording/mocking, sandboxing, recipes, and route simulation
+- `referenceMemoryGovernance.js`
+  - no API key required
+  - shows memory provenance, retention-based forgetting, trust-zone read blocking, and trust-weighted conflict resolution
+- `referenceMemoryGovernanceReview.js`
+  - no API key required
+  - shows memory audit summaries, provenance/contract benchmark checks, diagnostics, and an operator review checklist
 - `referenceDurableBackends.js`
   - no API key required
   - shows custom durable run/job/layer store implementations and registry usage

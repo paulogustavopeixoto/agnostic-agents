@@ -27,6 +27,11 @@ const { AgentWorkflowStep } = require('../src/runtime/workflow/AgentWorkflowStep
 const { WorkflowRunner } = require('../src/runtime/workflow/WorkflowRunner');
 const { DelegationRuntime } = require('../src/runtime/DelegationRuntime');
 const { DelegationContract } = require('../src/runtime/workflow/DelegationContract');
+const { Memory } = require('../src/agent/Memory');
+const { StateBundle } = require('../src/runtime/StateBundle');
+const { MemoryProvenanceLedger } = require('../src/runtime/MemoryProvenanceLedger');
+const { MemoryAccessContractRegistry } = require('../src/runtime/MemoryAccessContractRegistry');
+const { MemoryGovernanceBenchmarkSuite } = require('../src/runtime/MemoryGovernanceBenchmarkSuite');
 
 class ToolEvalAdapter {
   async generateText(messages, { tools = [] } = {}) {
@@ -393,6 +398,38 @@ describe('Eval and benchmark discipline', () => {
         failedScenarios: 0,
         verdict: 'allow',
       })
+    );
+  });
+
+  test('MemoryGovernanceBenchmarkSuite evaluates provenance and contract coverage', async () => {
+    const memory = new Memory({
+      governance: {
+        provenanceLedger: new MemoryProvenanceLedger(),
+      },
+    });
+    await memory.setWorkingMemory('active_task', 'memory benchmark', {
+      metadata: { source: 'runtime' },
+      context: { actor: 'runtime', trustZone: 'internal' },
+    });
+
+    const accessContracts = new MemoryAccessContractRegistry();
+    const governedState = memory.exportGovernedState({ accessContracts });
+    const stateBundle = new StateBundle({
+      memory: governedState.layers,
+      memoryGovernance: governedState.governance,
+    }).toJSON();
+
+    const report = await new MemoryGovernanceBenchmarkSuite().run({
+      audit: memory.getMemoryAudit(),
+      stateBundle,
+    });
+
+    expect(report.failed).toBe(0);
+    expect(report.results).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'memory-provenance-coverage', passed: true }),
+        expect.objectContaining({ id: 'memory-governance-contract-coverage', passed: true }),
+      ])
     );
   });
 

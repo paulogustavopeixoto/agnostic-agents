@@ -158,6 +158,31 @@ describe('Maintained examples', () => {
     expect(stdout).toContain('Incident bundle');
   });
 
+  test('reference memory governance example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceMemoryGovernance.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Memory governance summary');
+    expect(stdout).toContain('publicPolicyRead');
+    expect(stdout).toContain('governance');
+    expect(stdout).toContain('conflict_detected');
+  });
+
+  test('reference memory governance review example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceMemoryGovernanceReview.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Memory governance review');
+    expect(stdout).toContain('auditSummary');
+    expect(stdout).toContain('benchmarkReport');
+    expect(stdout).toContain('memory_access_blocked');
+    expect(stdout).toContain('checklist');
+  });
+
   test('reference everything smoke example runs', async () => {
     const examplePath = path.join(__dirname, '..', 'examples', 'referenceEverythingSmoke.js');
     const { stdout } = await execFileAsync(process.execPath, [examplePath], {
@@ -506,6 +531,8 @@ describe('Maintained examples', () => {
     expect(stdout).toContain('State integrity report');
     expect(stdout).toContain('State consistency report');
     expect(stdout).toContain("resolvedJobIds: [ 'state-demo-job' ]");
+    expect(stdout).toContain('memoryGovernanceEvents');
+    expect(stdout).toContain('memoryContractSurfaces');
   });
 
   test('reference compensation policy planner example runs', async () => {
@@ -531,6 +558,8 @@ describe('Maintained examples', () => {
     expect(stdout).toContain('State integrity report');
     expect(stdout).toContain('State diff summary');
     expect(stdout).toContain('memoryLayers');
+    expect(stdout).toContain('memoryGovernanceEvents');
+    expect(stdout).toContain('memoryContractSurfaces');
     expect(stdout).toContain('stateKeysAdded');
   });
 

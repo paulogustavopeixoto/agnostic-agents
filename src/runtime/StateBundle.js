@@ -12,10 +12,12 @@ class StateBundle {
   constructor({
     run = null,
     memory = null,
+    memoryGovernance = null,
     metadata = {},
   } = {}) {
     this.run = run instanceof Run ? run : run ? Run.fromJSON(run) : null;
     this.memory = memory ? JSON.parse(JSON.stringify(memory)) : null;
+    this.memoryGovernance = memoryGovernance ? JSON.parse(JSON.stringify(memoryGovernance)) : null;
     this.metadata = { ...metadata };
   }
 
@@ -27,6 +29,10 @@ class StateBundle {
       messageCount: this.run?.messages?.length || 0,
       toolCallCount: this.run?.toolCalls?.length || 0,
       memoryLayers: this.memory ? Object.keys(this.memory) : [],
+      memoryGovernanceEvents: this.memoryGovernance?.audit?.length || 0,
+      memoryContractSurfaces: this.memoryGovernance?.accessContracts
+        ? Object.keys(this.memoryGovernance.accessContracts)
+        : [],
       metadata: this.metadata,
     };
   }
@@ -39,6 +45,7 @@ class StateBundle {
       metadata: { ...this.metadata },
       run: this.run ? this.run.toJSON() : null,
       memory: this.memory ? JSON.parse(JSON.stringify(this.memory)) : null,
+      memoryGovernance: this.memoryGovernance ? JSON.parse(JSON.stringify(this.memoryGovernance)) : null,
       summary: this.summarize(),
     };
   }
@@ -47,6 +54,7 @@ class StateBundle {
     return new StateBundle({
       run: payload.run || null,
       memory: payload.memory || null,
+      memoryGovernance: payload.memoryGovernance || null,
       metadata: payload.metadata || {},
     });
   }

@@ -22,6 +22,27 @@ The format is intentionally simple:
 
 - none yet
 
+## 1.3.3 - 2026-03-20
+
+### Added
+
+- API/bootstrap utility surfaces including `CurlLoader`, `PostmanLoader`, `SecretResolver`, `SchemaNormalizer`, `ToolRecorder`, `ToolMockBuilder`, `ToolSandboxRunner`, `PromptArtifact`, `PromptRegistry`, `RunRecipe`, `WorkflowPreset`, `IncidentBundleExporter`, `CredentialDelegationKit`, and `RoutePolicySimulator`
+- maintained import and smoke examples including `referenceCurlImport.js`, `referenceUtilityToolkit.js`, and `referenceEverythingSmoke.js`
+- `v18` Memory Governance OS maintained surfaces including `MemoryProvenanceLedger`, `MemoryRetentionPolicy`, `MemoryAccessController`, `MemoryConflictResolver`, `MemoryAccessContractRegistry`, `MemoryAuditView`, `MemoryGovernanceBenchmarkSuite`, `MemoryGovernanceDiagnostics`, and `MemoryGovernanceReviewWorkflow`
+- maintained memory-governance examples and docs including `referenceMemoryGovernance.js`, `referenceMemoryGovernanceReview.js`, and memory governance/state governance documentation
+
+### Changed
+
+- extended `Memory` so governance records, retention rules, access controls, conflict handling, and governed state export are part of the maintained memory surface
+- extended portable state bundles to carry memory governance payloads, access-contract summaries, and stricter memory/state consistency checks
+- updated README, API reference, examples, and roadmap status so the current package reflects the utility layer and completed `v18` memory-governance baseline
+
+### Fixed
+
+- `OpenAPILoader` now preserves path/query/header routing correctly, validates missing path params, and uses a stable `axios.request(...)` path for testability
+- `MCPDiscoveryLoader` and `MCPTool` now preserve prefixed local tool names without breaking remote MCP execution names
+- loader regression coverage now catches path/header leakage, curl auth formatting, MCP remote-name drift, and stricter governed-memory state-bundle consistency
+
 ## 1.3.2 - 2026-03-19
 
 ### Added

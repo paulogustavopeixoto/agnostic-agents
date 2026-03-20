@@ -73,6 +73,15 @@ const { WorkflowPreset } = require('../src/runtime/WorkflowPreset');
 const { IncidentBundleExporter } = require('../src/runtime/IncidentBundleExporter');
 const { CredentialDelegationKit } = require('../src/runtime/CredentialDelegationKit');
 const { RoutePolicySimulator } = require('../src/runtime/RoutePolicySimulator');
+const { MemoryProvenanceLedger } = require('../src/runtime/MemoryProvenanceLedger');
+const { MemoryRetentionPolicy } = require('../src/runtime/MemoryRetentionPolicy');
+const { MemoryAccessController } = require('../src/runtime/MemoryAccessController');
+const { MemoryConflictResolver } = require('../src/runtime/MemoryConflictResolver');
+const { MemoryAccessContractRegistry } = require('../src/runtime/MemoryAccessContractRegistry');
+const { MemoryAuditView } = require('../src/runtime/MemoryAuditView');
+const { MemoryGovernanceBenchmarkSuite } = require('../src/runtime/MemoryGovernanceBenchmarkSuite');
+const { MemoryGovernanceDiagnostics } = require('../src/runtime/MemoryGovernanceDiagnostics');
+const { MemoryGovernanceReviewWorkflow } = require('../src/runtime/MemoryGovernanceReviewWorkflow');
 const { GovernanceRecordLedger } = require('../src/runtime/GovernanceRecordLedger');
 const { AuditStitcher } = require('../src/runtime/AuditStitcher');
 const { GovernanceTimeline } = require('../src/runtime/GovernanceTimeline');
@@ -269,6 +278,15 @@ describe('Package/module unit tests', () => {
     expect(pkg.IncidentBundleExporter).toBeDefined();
     expect(pkg.CredentialDelegationKit).toBeDefined();
     expect(pkg.RoutePolicySimulator).toBeDefined();
+    expect(pkg.MemoryProvenanceLedger).toBeDefined();
+    expect(pkg.MemoryRetentionPolicy).toBeDefined();
+    expect(pkg.MemoryAccessController).toBeDefined();
+    expect(pkg.MemoryConflictResolver).toBeDefined();
+    expect(pkg.MemoryAccessContractRegistry).toBeDefined();
+    expect(pkg.MemoryAuditView).toBeDefined();
+    expect(pkg.MemoryGovernanceBenchmarkSuite).toBeDefined();
+    expect(pkg.MemoryGovernanceDiagnostics).toBeDefined();
+    expect(pkg.MemoryGovernanceReviewWorkflow).toBeDefined();
     expect(pkg.GovernanceRecordLedger).toBeDefined();
     expect(pkg.AuditStitcher).toBeDefined();
     expect(pkg.GovernanceTimeline).toBeDefined();
@@ -1212,6 +1230,45 @@ describe('Package/module unit tests', () => {
     });
   });
 
+  test('StateBundle carries memory governance payloads and StateConsistencyChecker validates them', async () => {
+    const memory = new Memory({
+      governance: {
+        provenanceLedger: new MemoryProvenanceLedger(),
+      },
+    });
+    await memory.setWorkingMemory('active_task', 'Bundle this state.', {
+      metadata: { source: 'runtime' },
+      context: { actor: 'runtime', trustZone: 'internal' },
+    });
+
+    const accessContracts = new MemoryAccessContractRegistry();
+    const governedState = memory.exportGovernedState({ accessContracts });
+    const run = new Run({
+      input: 'Bundle this state.',
+      status: 'completed',
+    });
+
+    const bundle = new StateBundle({
+      run,
+      memory: governedState.layers,
+      memoryGovernance: governedState.governance,
+      metadata: { jobs: [] },
+    });
+
+    const exported = bundle.toJSON();
+    expect(exported.summary.memoryGovernanceEvents).toBeGreaterThan(0);
+    expect(exported.summary.memoryContractSurfaces).toEqual(
+      expect.arrayContaining(['runtime', 'workflow', 'coordination', 'learning', 'operator'])
+    );
+
+    const report = new StateConsistencyChecker().check(exported);
+    expect(report.valid).toBe(true);
+    expect(report.summary.memoryGovernanceEvents).toBeGreaterThan(0);
+    expect(report.summary.memoryContractSurfaces).toEqual(
+      expect.arrayContaining(['runtime', 'workflow', 'coordination', 'learning', 'operator'])
+    );
+  });
+
   test('StateContractRegistry and StateIntegrityChecker define and validate portable state contracts', () => {
     const registry = new StateContractRegistry();
     const checker = new StateIntegrityChecker({
@@ -1322,6 +1379,7 @@ describe('Package/module unit tests', () => {
       },
     });
     expect(report.warnings).toEqual([
+      'Portable state bundle includes memory layers but no memory governance audit trail.',
       'Run requires recovery but semantic memory does not record the last incident context.',
     ]);
   });
@@ -5784,6 +5842,122 @@ describe('Package/module unit tests', () => {
     expect(memory.listWorkingMemory()).toEqual([]);
     expect(memory.listPolicies()).toEqual([]);
     expect(vectorStore.deleteAll).toHaveBeenCalled();
+  });
+
+  test('Memory governance records provenance, blocks reads by trust zone, resolves conflicts, and enforces retention', async () => {
+    const memory = new Memory({
+      governance: {
+        provenanceLedger: new MemoryProvenanceLedger(),
+        retentionPolicy: new MemoryRetentionPolicy({
+          layerRules: {
+            working: { maxAgeMs: 5 },
+          },
+        }),
+        accessController: new MemoryAccessController({
+          rules: [
+            {
+              action: 'read',
+              layer: 'policy',
+              trustZone: 'public',
+              effect: 'deny',
+              reason: 'policy_memory_is_private',
+            },
+          ],
+        }),
+        conflictResolver: new MemoryConflictResolver({
+          trustScores: {
+            trusted_system: 0.9,
+            import: 0.2,
+          },
+        }),
+      },
+    });
+
+    await memory.setWorkingMemory('current_task', 'prepare release', {
+      metadata: { source: 'trusted_system' },
+      context: { actor: 'runtime', trustZone: 'internal' },
+    });
+    await memory.setPolicy('rollout_policy', 'require approval', {
+      metadata: { source: 'trusted_system' },
+      context: { actor: 'governance', trustZone: 'internal' },
+    });
+    await memory.setProfile('owner', 'Paulo', {
+      metadata: { source: 'trusted_system' },
+      context: { actor: 'sync', trustZone: 'internal' },
+    });
+    await memory.setProfile('owner', 'Unknown', {
+      metadata: { source: 'import' },
+      context: { actor: 'importer', trustZone: 'internal' },
+    });
+
+    expect(memory.getProfile('owner')).toBe('Paulo');
+    expect(
+      memory.getPolicy('rollout_policy', { actor: 'dashboard', trustZone: 'public' })
+    ).toBeNull();
+
+    await new Promise(resolve => setTimeout(resolve, 10));
+    memory.enforceRetention();
+    expect(memory.getWorkingMemory('current_task')).toBeNull();
+
+    const audit = memory.getMemoryAudit();
+    expect(audit.some(entry => entry.type === 'write')).toBe(true);
+    expect(audit.some(entry => entry.type === 'read_blocked')).toBe(true);
+    expect(audit.some(entry => entry.type === 'conflict_detected')).toBe(true);
+    expect(audit.some(entry => entry.type === 'retention')).toBe(true);
+  });
+
+  test('Memory audit, benchmark, diagnostics, and review workflow summarize governed memory behavior', async () => {
+    const memory = new Memory({
+      governance: {
+        provenanceLedger: new MemoryProvenanceLedger(),
+        accessController: new MemoryAccessController({
+          rules: [
+            { action: 'read', layer: 'policy', trustZone: 'public', effect: 'deny', reason: 'private_policy' },
+          ],
+        }),
+      },
+    });
+
+    await memory.setWorkingMemory('active_task', 'review memory', {
+      metadata: { source: 'runtime' },
+      context: { actor: 'runtime', trustZone: 'internal' },
+    });
+    await memory.setPolicy('rollout_policy', 'require approval', {
+      metadata: { source: 'governance' },
+      context: { actor: 'governance', trustZone: 'internal' },
+    });
+    memory.getPolicy('rollout_policy', { actor: 'dashboard', trustZone: 'public' });
+
+    const accessContracts = new MemoryAccessContractRegistry();
+    const stateBundle = new StateBundle({
+      memory: memory.exportGovernedState({ accessContracts }).layers,
+      memoryGovernance: memory.exportGovernedState({ accessContracts }).governance,
+    }).toJSON();
+    const audit = memory.getMemoryAudit();
+
+    const auditSummary = new MemoryAuditView().build({ audit });
+    expect(auditSummary.blocked).toBe(1);
+
+    const benchmarkReport = await new MemoryGovernanceBenchmarkSuite().run({
+      audit,
+      stateBundle,
+    });
+    expect(benchmarkReport.failed).toBe(0);
+
+    const diagnostics = new MemoryGovernanceDiagnostics().summarize({
+      auditView: auditSummary,
+      benchmarkReport,
+      stateSummary: stateBundle.summary,
+    });
+    expect(diagnostics.flags).toEqual(expect.arrayContaining(['memory_access_blocked']));
+
+    const review = new MemoryGovernanceReviewWorkflow().run({
+      audit,
+      benchmarkReport,
+      stateSummary: stateBundle.summary,
+    });
+    expect(review.checklist).toHaveLength(5);
+    expect(review.diagnostics.flags).toEqual(expect.arrayContaining(['memory_access_blocked']));
   });
 
   test('Memory supports backend hydration and compaction policies', async () => {

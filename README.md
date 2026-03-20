@@ -14,6 +14,7 @@ It is designed for projects that need more than a chat wrapper:
 - approvals and policy-gated tools
 - workflows and delegation
 - grounded retrieval and layered memory
+- governed memory with provenance, retention, conflict handling, and access controls
 - distributed handoff across processes or services
 - evals, benchmarks, and incident analysis
 - API and protocol tools imported from OpenAPI, curl, and MCP discovery
@@ -66,6 +67,7 @@ Use `agnostic-agents` when you want:
 - a package that can block unsafe rollout candidates with explicit invariants and assurance reports
 - a package that can evolve toward capability-aware routing instead of static model/provider defaults
 - a package that treats memory as governed operational knowledge instead of ad hoc retrieval glue
+- a package that can audit what memory was stored, recalled, blocked, expired, or superseded
 - a package that treats supervised autonomy as a core operating model rather than an exception path
 - a package that can turn OpenAPI files, curl commands, and MCP discovery into governed executable tools
 - a package that can bootstrap tools from Postman collections, record real tool I/O, mock them offline, and resolve secrets outside prompts and code
@@ -216,6 +218,17 @@ The maintained utility surfaces above the runtime also include:
 - `IncidentBundleExporter`
 - `CredentialDelegationKit`
 - `RoutePolicySimulator`
+
+The first maintained memory-governance surfaces now include:
+
+- `MemoryProvenanceLedger`
+- `MemoryRetentionPolicy`
+- `MemoryAccessController`
+- `MemoryConflictResolver`
+- `MemoryAuditView`
+- `MemoryGovernanceBenchmarkSuite`
+- `MemoryGovernanceDiagnostics`
+- `MemoryGovernanceReviewWorkflow`
 
 ### Workflow and Delegation
 
@@ -471,6 +484,7 @@ Use:
 - `StateContractRegistry` for authoritative-versus-derived state contracts
 - `StateIntegrityChecker` for pre-restore integrity checks
 - `StateConsistencyChecker` for coherence checks across run state, memory, and portable job metadata
+- `MemoryAccessContractRegistry` for explicit memory access contracts across runtime, workflow, coordination, learning, and operator surfaces
 - `StateRestorePlanner` for cross-environment restore planning from portable state bundles
 - `StateDurableRestoreSuite` for process, queue, and service restore scenarios plus workflow/scheduler durability steps
 - `StateIncidentReconstructor` for offline incident reconstruction directly from portable state bundles

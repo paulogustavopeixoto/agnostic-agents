@@ -2,10 +2,11 @@ const { Run } = require('./Run');
 const { StateBundle } = require('./StateBundle');
 
 class StateBundleSerializer {
-  static export({ run = null, memory = null, metadata = {} } = {}) {
+  static export({ run = null, memory = null, memoryGovernance = null, metadata = {} } = {}) {
     return new StateBundle({
       run: run instanceof Run ? run : run ? Run.fromJSON(run) : null,
       memory,
+      memoryGovernance,
       metadata,
     }).toJSON();
   }

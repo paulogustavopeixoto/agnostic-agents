@@ -1,5 +1,8 @@
 const {
   Run,
+  Memory,
+  MemoryProvenanceLedger,
+  MemoryAccessContractRegistry,
   StateBundle,
   StateBundleSerializer,
   StateContractRegistry,
@@ -38,16 +41,26 @@ async function main() {
     snapshot: run.createCheckpointSnapshot(),
   });
 
+  const memory = new Memory({
+    governance: {
+      provenanceLedger: new MemoryProvenanceLedger(),
+    },
+  });
+  await memory.setWorkingMemory('active_task', 'state-bundle-demo', {
+    metadata: { source: 'runtime' },
+    context: { actor: 'runtime', trustZone: 'internal' },
+  });
+  await memory.setPolicy('rollout_mode', 'draft', {
+    metadata: { source: 'governance' },
+    context: { actor: 'governance', trustZone: 'internal' },
+  });
+  const accessContracts = new MemoryAccessContractRegistry();
+  const governedState = memory.exportGovernedState({ accessContracts });
+
   const bundle = new StateBundle({
     run,
-    memory: {
-      working: {
-        active_task: 'state-bundle-demo',
-      },
-      policy: {
-        rollout_mode: 'draft',
-      },
-    },
+    memory: governedState.layers,
+    memoryGovernance: governedState.governance,
     metadata: {
       purpose: 'state-os-demo',
       jobs: [
@@ -95,6 +108,7 @@ async function main() {
         last_incident: 'state-drift',
       },
     },
+    memoryGovernance: restored.memoryGovernance,
     metadata: {
       ...restored.metadata,
       variant: 'failed',

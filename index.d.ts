@@ -434,10 +434,12 @@ export class StateBundle {
   constructor(options?: {
     run?: Run | JsonObject | null;
     memory?: JsonObject | null;
+    memoryGovernance?: JsonObject | null;
     metadata?: JsonObject;
   });
   run: Run | null;
   memory: JsonObject | null;
+  memoryGovernance: JsonObject | null;
   metadata: JsonObject;
   summarize(): JsonObject;
   toJSON(): JsonObject;
@@ -454,6 +456,7 @@ export class StateBundleSerializer {
   static export(options?: {
     run?: Run | JsonObject | null;
     memory?: JsonObject | null;
+    memoryGovernance?: JsonObject | null;
     metadata?: JsonObject;
   }): JsonObject;
   static import(payload?: JsonObject): StateBundle;
@@ -1213,6 +1216,70 @@ export class RouteFleetDiagnostics {
   analyze(summary?: JsonObject | null): JsonObject;
 }
 
+export class MemoryProvenanceLedger {
+  constructor(options?: { records?: JsonObject[] });
+  record(entry?: JsonObject): JsonObject;
+  list(filters?: JsonObject): JsonObject[];
+  summarize(): JsonObject;
+}
+
+export class MemoryRetentionPolicy {
+  constructor(options?: { layerRules?: JsonObject });
+  getRule(layer: string): JsonObject;
+  evaluate(record?: JsonObject, layer?: string): JsonObject;
+  apply(entries?: Array<[string, JsonObject]>, layer?: string): JsonObject[];
+}
+
+export class MemoryAccessController {
+  constructor(options?: { rules?: JsonObject[] });
+  canRead(options?: JsonObject): JsonObject;
+  canWrite(options?: JsonObject): JsonObject;
+  redact(record?: JsonObject, context?: JsonObject): JsonObject;
+}
+
+export class MemoryConflictResolver {
+  constructor(options?: { trustScores?: JsonObject; preferNewer?: boolean });
+  resolve(existing?: JsonObject | null, incoming?: JsonObject | null): JsonObject;
+  detect(existing?: JsonObject | null, incoming?: JsonObject | null): JsonObject;
+}
+
+export class MemoryAccessContractRegistry {
+  constructor(options?: { contracts?: JsonObject });
+  describe(surface: string): JsonObject | null;
+  list(): JsonObject;
+  allows(surface: string, action: string, layer: string): boolean;
+}
+
+export class MemoryAuditView {
+  build(options?: { audit?: JsonObject[] }): JsonObject;
+}
+
+export class MemoryGovernanceBenchmarkSuite {
+  constructor(options?: { auditView?: MemoryAuditView | JsonObject | null; scenarios?: JsonObject[] });
+  buildDefaultScenarios(options?: { audit?: JsonObject[]; stateBundle?: JsonObject | null }): JsonObject[];
+  run(options?: JsonObject): Promise<JsonObject>;
+}
+
+export class MemoryGovernanceDiagnostics {
+  summarize(options?: {
+    auditView?: JsonObject | null;
+    benchmarkReport?: JsonObject | null;
+    stateSummary?: JsonObject | null;
+  }): JsonObject;
+}
+
+export class MemoryGovernanceReviewWorkflow {
+  constructor(options?: {
+    auditView?: MemoryAuditView | JsonObject | null;
+    diagnostics?: MemoryGovernanceDiagnostics | JsonObject | null;
+  });
+  run(options?: {
+    audit?: JsonObject[];
+    benchmarkReport?: JsonObject | null;
+    stateSummary?: JsonObject | null;
+  }): JsonObject;
+}
+
 export class SecretResolver {
   constructor(options?: { providers?: Record<string, Function>; env?: Record<string, string | undefined> });
   resolve(value: JsonValue, context?: JsonObject): JsonValue;
@@ -1640,24 +1707,37 @@ export class Memory {
       policy?: BaseLayerStore;
     };
     policies?: JsonObject;
+    governance?: JsonObject;
   });
   setWorkingMemory(key: string, value: any, options?: JsonObject): Promise<void>;
-  getWorkingMemory(key: string): any;
-  listWorkingMemory(): any[];
+  getWorkingMemory(key: string, context?: JsonObject): any;
+  listWorkingMemory(context?: JsonObject): any[];
   clearWorkingMemory(): void;
   setProfile(key: string, value: any, options?: JsonObject): Promise<void>;
-  getProfile(key: string): any;
-  listProfile(): any[];
+  getProfile(key: string, context?: JsonObject): any;
+  listProfile(context?: JsonObject): any[];
   clearProfile(): void;
   setPolicy(key: string, value: any, options?: JsonObject): Promise<void>;
-  getPolicy(key: string): any;
-  listPolicies(): any[];
+  getPolicy(key: string, context?: JsonObject): any;
+  listPolicies(context?: JsonObject): any[];
   clearPolicies(): void;
   storeConversation(userMessage: string, agentResponse: string, metadata?: JsonObject): void;
   getConversation(): any[];
   hydrate(): Promise<Memory>;
   compact(): void;
   decayExpired(): void;
+  storeSemanticMemory(fact: string, metadata?: JsonObject): Promise<void>;
+  searchSemanticMemory(query: string, topK?: number): Promise<any>;
+  searchSemanticMemoryWithProvenance(query: string, topK?: number): Promise<JsonObject[]>;
+  searchAll(query: string, topK?: number): Promise<JsonObject[]>;
+  get(key: string, options?: JsonObject): Promise<any>;
+  set(key: string, value: any, options?: JsonObject): Promise<void>;
+  clearConversation(): void;
+  clearSemanticMemory(): Promise<void>;
+  clearAll(): Promise<void>;
+  enforceRetention(): void;
+  getMemoryAudit(filters?: JsonObject): JsonObject[];
+  summarizeMemoryGovernance(): JsonObject;
 }
 
 export class RAG {
