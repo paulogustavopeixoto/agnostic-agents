@@ -8,6 +8,9 @@ The maintained baseline for that is:
 - `WorkflowOutcomeContract`
 - `OutcomeScorecard`
 - `GovernedOutcomeOptimizationLoop`
+- `TradeoffAnalyzer`
+- `OutcomeOptimizationExperiment`
+- `OutcomeReviewWorkflow`
 
 ## What these surfaces do
 
@@ -32,6 +35,28 @@ Use it when you want to:
 - tie governed improvement planning to declared outcome contracts
 - keep optimization bounded by explicit contract evaluation instead of opaque heuristics
 
+### `TradeoffAnalyzer`
+
+Use it when you want to:
+
+- evaluate cost, latency, safety, and business tradeoffs explicitly
+- keep outcome optimization explainable instead of intuition-driven
+
+### `OutcomeOptimizationExperiment`
+
+Use it when you want to:
+
+- compare baseline and candidate outcomes with explicit rollback thresholds
+- keep optimization experiments reversible and bounded
+
+### `OutcomeReviewWorkflow`
+
+Use it when you want to:
+
+- require operator review before permanent optimization promotion
+- combine contracts, experiments, and tradeoff analysis into one review record
+
 ## Maintained example
 
 - [`examples/referenceOutcomeContracts.js`](../examples/referenceOutcomeContracts.js)
+- [`examples/referenceOutcomeOptimization.js`](../examples/referenceOutcomeOptimization.js)

@@ -174,6 +174,9 @@ These examples are intended as reference deployment patterns rather than feature
 - `referenceOutcomeContracts.js`
   - no API key required
   - shows workflow outcome contracts, outcome-aware scorecards, and governed outcome optimization review
+- `referenceOutcomeOptimization.js`
+  - no API key required
+  - shows tradeoff analysis, rollback-safe outcome experiments, and operator-facing outcome review
 - `referenceInteropRegistry.js`
   - no API key required
   - shows one public import/export registry across tool, trace, policy, eval, and manifest artifacts

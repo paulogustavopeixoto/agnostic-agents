@@ -724,6 +724,17 @@ describe('Maintained examples', () => {
     expect(stdout).toContain("recommendation: 'promote'");
   });
 
+  test('reference outcome optimization example runs', async () => {
+    const examplePath = path.join(__dirname, '..', 'examples', 'referenceOutcomeOptimization.js');
+    const { stdout } = await execFileAsync(process.execPath, [examplePath], {
+      cwd: path.join(__dirname, '..'),
+    });
+
+    expect(stdout).toContain('Outcome optimization summary');
+    expect(stdout).toContain("kind: 'agnostic-agents/outcome-optimization-experiment'");
+    expect(stdout).toContain("recommendation: 'approve_optimization'");
+  });
+
   test('reference interop registry example runs', async () => {
     const examplePath = path.join(__dirname, '..', 'examples', 'referenceInteropRegistry.js');
     const { stdout } = await execFileAsync(process.execPath, [examplePath], {

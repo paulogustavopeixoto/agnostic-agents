@@ -136,6 +136,9 @@ const { ExternalControlPlaneCertificationKit } = require('./ExternalControlPlane
 const { WorkflowOutcomeContract } = require('./WorkflowOutcomeContract');
 const { OutcomeScorecard } = require('./OutcomeScorecard');
 const { GovernedOutcomeOptimizationLoop } = require('./GovernedOutcomeOptimizationLoop');
+const { TradeoffAnalyzer } = require('./TradeoffAnalyzer');
+const { OutcomeOptimizationExperiment } = require('./OutcomeOptimizationExperiment');
+const { OutcomeReviewWorkflow } = require('./OutcomeReviewWorkflow');
 const { StateBundle } = require('./StateBundle');
 const { StateDiff } = require('./StateDiff');
 const { StateBundleSerializer } = require('./StateBundleSerializer');
@@ -309,6 +312,9 @@ module.exports = {
   WorkflowOutcomeContract,
   OutcomeScorecard,
   GovernedOutcomeOptimizationLoop,
+  TradeoffAnalyzer,
+  OutcomeOptimizationExperiment,
+  OutcomeReviewWorkflow,
   StateBundle,
   StateDiff,
   StateBundleSerializer,

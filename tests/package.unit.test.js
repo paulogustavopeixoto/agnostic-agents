@@ -119,6 +119,9 @@ const { ExternalControlPlaneCertificationKit } = require('../src/runtime/Externa
 const { WorkflowOutcomeContract } = require('../src/runtime/WorkflowOutcomeContract');
 const { OutcomeScorecard } = require('../src/runtime/OutcomeScorecard');
 const { GovernedOutcomeOptimizationLoop } = require('../src/runtime/GovernedOutcomeOptimizationLoop');
+const { TradeoffAnalyzer } = require('../src/runtime/TradeoffAnalyzer');
+const { OutcomeOptimizationExperiment } = require('../src/runtime/OutcomeOptimizationExperiment');
+const { OutcomeReviewWorkflow } = require('../src/runtime/OutcomeReviewWorkflow');
 const { DelegationBudget } = require('../src/coordination/DelegationBudget');
 const { SharedContextScope } = require('../src/coordination/SharedContextScope');
 const { CoordinationSafetyGuard } = require('../src/coordination/CoordinationSafetyGuard');
@@ -369,6 +372,9 @@ describe('Package/module unit tests', () => {
     expect(pkg.WorkflowOutcomeContract).toBeDefined();
     expect(pkg.OutcomeScorecard).toBeDefined();
     expect(pkg.GovernedOutcomeOptimizationLoop).toBeDefined();
+    expect(pkg.TradeoffAnalyzer).toBeDefined();
+    expect(pkg.OutcomeOptimizationExperiment).toBeDefined();
+    expect(pkg.OutcomeReviewWorkflow).toBeDefined();
     expect(pkg.GovernanceRecordLedger).toBeDefined();
     expect(pkg.AuditStitcher).toBeDefined();
     expect(pkg.GovernanceTimeline).toBeDefined();
@@ -466,6 +472,9 @@ describe('Package/module unit tests', () => {
     expect(declarationSource).toContain('export class WorkflowOutcomeContract');
     expect(declarationSource).toContain('export class OutcomeScorecard');
     expect(declarationSource).toContain('export class GovernedOutcomeOptimizationLoop');
+    expect(declarationSource).toContain('export class TradeoffAnalyzer');
+    expect(declarationSource).toContain('export class OutcomeOptimizationExperiment');
+    expect(declarationSource).toContain('export class OutcomeReviewWorkflow');
     expect(declarationSource).toContain('export class DeploymentPatternCertificationKit');
     expect(declarationSource).toContain('export class DelegationBudget');
     expect(declarationSource).toContain('export class SharedContextScope');
@@ -1808,6 +1817,36 @@ describe('Package/module unit tests', () => {
     expect(scorecard.outcomes.service.met).toBe(true);
     expect(review.contractEvaluation.passed).toBe(true);
     expect(review.recommendation).toBe('promote');
+  });
+
+  test('TradeoffAnalyzer, OutcomeOptimizationExperiment, and OutcomeReviewWorkflow keep optimization bounded and reviewable', () => {
+    const tradeoff = new TradeoffAnalyzer().evaluate({
+      baseline: { cost: 0.14, latency: 1100, safety: 0.95, business: 0.89 },
+      candidate: { cost: 0.12, latency: 980, safety: 0.95, business: 0.94 },
+      priorities: { safety: 3, business: 2, latency: 1, cost: 1 },
+    });
+    const experiment = OutcomeOptimizationExperiment.build({
+      id: 'support-optimization-experiment',
+      baseline: { business: 0.89, service: 0.94, safety: 0.95 },
+      candidate: { business: 0.94, service: 0.97, safety: 0.95 },
+      thresholds: { minBusinessDelta: 0.02, minServiceDelta: 0.01, maxSafetyRegression: 0 },
+    });
+    const review = new OutcomeReviewWorkflow().review({
+      contract: new WorkflowOutcomeContract({
+        acceptanceCriteria: [
+          { key: 'businessOutcomeMet', expected: true },
+          { key: 'serviceOutcomeMet', expected: true },
+          { key: 'overallScore', expected: value => value >= 0 },
+        ],
+        operatorReviewPoints: ['optimization_promotion'],
+      }),
+      experiment,
+      tradeoff,
+    });
+
+    expect(tradeoff.recommendation).toBe('candidate_favored');
+    expect(experiment.decision).toBe('promote_candidate');
+    expect(review.recommendation).toBe('approve_optimization');
   });
 
   test('ToolSchemaArtifact and InteropArtifactRegistry import and export maintained artifact families', () => {

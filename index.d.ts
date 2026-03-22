@@ -1775,6 +1775,18 @@ export class GovernedOutcomeOptimizationLoop {
   review(input?: JsonObject): JsonObject;
 }
 
+export class TradeoffAnalyzer {
+  evaluate(input?: JsonObject): JsonObject;
+}
+
+export class OutcomeOptimizationExperiment {
+  static build(input?: JsonObject): JsonObject;
+}
+
+export class OutcomeReviewWorkflow {
+  review(input?: JsonObject): JsonObject;
+}
+
 export class GovernanceRecordLedger {
   constructor(options?: { records?: JsonObject[] });
   records: JsonObject[];
