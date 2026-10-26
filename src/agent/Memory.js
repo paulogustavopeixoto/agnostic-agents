@@ -1,4 +1,5 @@
 const { EventEmitter } = require('events');
+const { randomUUID } = require('crypto');
 const { InMemoryLayerStore } = require('./memory/InMemoryLayerStore');
 const { BaseLayerStore } = require('./memory/BaseLayerStore');
 const { MemoryProvenanceLedger } = require('../runtime/MemoryProvenanceLedger');
@@ -13,10 +14,19 @@ class Memory extends EventEmitter {
     stores = {},
     policies = {},
     governance = {},
+    conversationStore = null,
+    episodicMemory = null,
   } = {}) {
     super();
     this.vectorStore = vectorStore;
+    this.conversationStore = conversationStore ? BaseLayerStore.assert(conversationStore, 'Conversation store') : null;
+    if (episodicMemory && (typeof episodicMemory.append !== 'function' || typeof episodicMemory.search !== 'function')) {
+      throw new TypeError('Invalid episodic memory.');
+    }
+    this.episodicMemory = episodicMemory;
     this.adapter = adapter;
+    this.pendingStorage = new Set();
+    this.storageFailures = [];
     const workingStore = stores.working || new InMemoryLayerStore();
     const profileStore = stores.profile || new InMemoryLayerStore();
     const policyStore = stores.policy || new InMemoryLayerStore();
@@ -76,7 +86,25 @@ class Memory extends EventEmitter {
     };
   }
 
+  _scheduleDeletion(layerName, key) {
+    const pending = Promise.resolve().then(() => this.stores[layerName].delete(key))
+      .catch(() => { this.storageFailures.push({ layer: layerName, operation: 'delete' }); })
+      .finally(() => this.pendingStorage.delete(pending));
+    this.pendingStorage.add(pending);
+  }
+
+  async flushStorage() {
+    while (this.pendingStorage.size) await Promise.all([...this.pendingStorage]);
+    if (this.storageFailures.length) {
+      const count = this.storageFailures.length;
+      this.storageFailures = [];
+      throw new Error(`Memory storage deletion failed (${count} operations); reconcile the backing store.`);
+    }
+  }
+
   async _setLayerValue(layerName, key, value, ttlMs = null, metadata = {}, context = {}) {
+    // Drain older evictions before a key can be reused by a newer write.
+    if (this.pendingStorage.size || this.storageFailures.length) await this.flushStorage();
     const normalizedKey = key.toLowerCase();
     const writeDecision = this.governance.accessController.canWrite({
       layer: layerName,
@@ -99,7 +127,7 @@ class Memory extends EventEmitter {
     }
 
     const record = this._createRecord(value, ttlMs, metadata);
-    const existing = this.layers[layerName][normalizedKey] || null;
+    const existing = Object.hasOwn(this.layers[layerName], normalizedKey) ? this.layers[layerName][normalizedKey] : null;
     const conflict = this.governance.conflictResolver.detect(existing, record);
     const resolution = this.governance.conflictResolver.resolve(existing, record);
 
@@ -119,9 +147,17 @@ class Memory extends EventEmitter {
       });
     }
 
-    this.layers[layerName][normalizedKey] = resolution.record;
-    if (this.stores[layerName]) {
-      await this.stores[layerName].set(normalizedKey, resolution.record);
+    Object.defineProperty(this.layers[layerName], normalizedKey, {
+      value: resolution.record, enumerable: true, configurable: true, writable: true,
+    });
+    try {
+      if (this.stores[layerName]) await this.stores[layerName].set(normalizedKey, resolution.record);
+    } catch (error) {
+      if (this.layers[layerName][normalizedKey] === resolution.record) {
+        if (existing) this.layers[layerName][normalizedKey] = existing;
+        else delete this.layers[layerName][normalizedKey];
+      }
+      throw error;
     }
     this.governance.provenanceLedger.record({
       type: 'write',
@@ -144,7 +180,7 @@ class Memory extends EventEmitter {
 
   _getLayerValue(layerName, key, context = {}) {
     const normalizedKey = key.toLowerCase();
-    const record = this.layers[layerName][normalizedKey];
+    const record = Object.hasOwn(this.layers[layerName], normalizedKey) ? this.layers[layerName][normalizedKey] : null;
 
     if (!record) {
       return null;
@@ -153,7 +189,7 @@ class Memory extends EventEmitter {
     if (record.expiresAt && record.expiresAt < Date.now()) {
       delete this.layers[layerName][normalizedKey];
       if (this.stores[layerName]) {
-        void this.stores[layerName].delete(normalizedKey);
+        this._scheduleDeletion(layerName, normalizedKey);
       }
       this.governance.provenanceLedger.record({
         type: 'expire',
@@ -228,6 +264,13 @@ class Memory extends EventEmitter {
     }
 
     this.entities = this.layers.profile;
+    if (this.conversationStore) {
+      this.layers.conversation = await this.getConversationHistory();
+      if (this.policies.conversationLimit) {
+        this.layers.conversation = this.layers.conversation.slice(-this.policies.conversationLimit);
+      }
+      this.conversation = this.layers.conversation;
+    }
     return this;
   }
 
@@ -247,7 +290,7 @@ class Memory extends EventEmitter {
       .forEach(([key]) => {
         delete this.layers[layerName][key];
         if (this.stores[layerName]) {
-          void this.stores[layerName].delete(key);
+          this._scheduleDeletion(layerName, key);
         }
       });
   }
@@ -281,8 +324,9 @@ class Memory extends EventEmitter {
     return result[0]?.embedding;
   }
 
-  storeConversation(userMessage, agentResponse, metadata = {}) {
+  async storeConversation(userMessage, agentResponse, metadata = {}) {
     const turn = {
+      id: randomUUID(),
       user: userMessage,
       agent: agentResponse,
       createdAt: Date.now(),
@@ -292,6 +336,30 @@ class Memory extends EventEmitter {
     this.layers.conversation.push(turn);
     this.compact();
     this.emit('conversationUpdate', turn);
+    if (this.conversationStore) await this.conversationStore.set(turn.id, turn);
+    if (this.episodicMemory) await this.episodicMemory.append({ content: { user: userMessage, agent: agentResponse },
+      runId: metadata.runId || null, tags: ['conversation'] });
+  }
+
+  async searchEpisodicMemory(query, options = {}) {
+    return this.episodicMemory ? this.episodicMemory.search({ ...options, query }) : [];
+  }
+
+  async getConversationHistory() {
+    if (!this.conversationStore) return this.getConversation();
+    return (await this.conversationStore.entries()).map(([, turn]) => turn)
+      .sort((a, b) => a.createdAt - b.createdAt);
+  }
+
+  async deleteConversationHistoryBefore(timestamp) {
+    if (!Number.isFinite(timestamp)) throw new TypeError('Retention timestamp is required.');
+    if (this.conversationStore) {
+      for (const [key, turn] of await this.conversationStore.entries()) {
+        if (turn.createdAt < timestamp) await this.conversationStore.delete(key);
+      }
+    }
+    this.layers.conversation = this.layers.conversation.filter(turn => turn.createdAt >= timestamp);
+    this.conversation = this.layers.conversation;
   }
 
   getConversation() {
@@ -307,6 +375,7 @@ class Memory extends EventEmitter {
   async setWorkingMemory(key, value, { ttlMs = null, metadata = {}, context = {} } = {}) {
     await this._setLayerValue('working', key, value, ttlMs, metadata, context);
     this._compactKeyValueLayer('working', this.policies.workingLimit);
+    await this.flushStorage();
   }
 
   getWorkingMemory(key, context = {}) {
@@ -317,10 +386,10 @@ class Memory extends EventEmitter {
     return this._listLayer('working', context);
   }
 
-  clearWorkingMemory() {
+  async clearWorkingMemory() {
     this.layers.working = {};
     if (this.stores.working) {
-      void this.stores.working.clear();
+      await this.stores.working.clear();
     }
     this.emit('memoryClear', { type: 'working' });
   }
@@ -328,6 +397,7 @@ class Memory extends EventEmitter {
   async setProfile(key, value, { ttlMs = null, metadata = {}, context = {} } = {}) {
     await this._setLayerValue('profile', key, value, ttlMs, metadata, context);
     this._compactKeyValueLayer('profile', this.policies.profileLimit);
+    await this.flushStorage();
   }
 
   getProfile(key, context = {}) {
@@ -338,18 +408,18 @@ class Memory extends EventEmitter {
     return this._listLayer('profile', context);
   }
 
-  clearProfile() {
+  async clearProfile() {
     this.layers.profile = {};
     this.entities = this.layers.profile;
     if (this.stores.profile) {
-      void this.stores.profile.clear();
+      await this.stores.profile.clear();
     }
     this.emit('memoryClear', { type: 'profile' });
   }
 
   // Backward-compatible entity aliases.
   setEntity(key, value, ttlMs = null) {
-    void this.setProfile(key, value, { ttlMs });
+    return this.setProfile(key, value, { ttlMs });
   }
 
   getEntity(key) {
@@ -357,12 +427,13 @@ class Memory extends EventEmitter {
   }
 
   clearEntities() {
-    this.clearProfile();
+    return this.clearProfile();
   }
 
   async setPolicy(key, value, { ttlMs = null, metadata = {}, context = {} } = {}) {
     await this._setLayerValue('policy', key, value, ttlMs, metadata, context);
     this._compactKeyValueLayer('policy', this.policies.policyLimit);
+    await this.flushStorage();
   }
 
   getPolicy(key, context = {}) {
@@ -373,10 +444,10 @@ class Memory extends EventEmitter {
     return this._listLayer('policy', context);
   }
 
-  clearPolicies() {
+  async clearPolicies() {
     this.layers.policy = {};
     if (this.stores.policy) {
-      void this.stores.policy.clear();
+      await this.stores.policy.clear();
     }
     this.emit('memoryClear', { type: 'policy' });
   }
@@ -484,10 +555,11 @@ class Memory extends EventEmitter {
     }
   }
 
-  clearConversation() {
+  async clearConversation() {
     this.layers.conversation = [];
     this.conversation = this.layers.conversation;
     this.emit('memoryClear', { type: 'conversation' });
+    if (this.conversationStore) await this.conversationStore.clear();
   }
 
   async clearSemanticMemory() {
@@ -496,11 +568,16 @@ class Memory extends EventEmitter {
   }
 
   async clearAll() {
-    this.clearConversation();
-    this.clearWorkingMemory();
-    this.clearProfile();
-    this.clearPolicies();
+    await this.clearConversation();
+    await this.clearWorkingMemory();
+    await this.clearProfile();
+    await this.clearPolicies();
     await this.clearSemanticMemory();
+    if (this.episodicMemory) {
+      if (typeof this.episodicMemory.clear !== 'function') throw new Error('Episodic memory must support clear() for complete deletion.');
+      await this.episodicMemory.clear();
+    }
+    await this.flushStorage();
     this.emit('memoryClear', { type: 'all' });
   }
 
@@ -511,7 +588,7 @@ class Memory extends EventEmitter {
         if (decision.action !== 'keep') {
           delete this.layers[layerName][key];
           if (this.stores[layerName]) {
-            void this.stores[layerName].delete(key);
+            this._scheduleDeletion(layerName, key);
           }
           this.governance.provenanceLedger.record({
             type: 'retention',

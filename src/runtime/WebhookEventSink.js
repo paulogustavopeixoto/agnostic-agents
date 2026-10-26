@@ -2,6 +2,8 @@
  * Transport-backed event sink for forwarding runtime events to an external
  * status or observability service.
  */
+const { RuntimeEventRedactor } = require('./RuntimeEventRedactor');
+
 class WebhookEventSink {
   /**
    * @param {object} [options]
@@ -15,7 +17,12 @@ class WebhookEventSink {
     transport = null,
     headers = {},
     eventTypes = null,
+    captureContent = false,
+    redactor = new RuntimeEventRedactor(),
   } = {}) {
+    if (!redactor || typeof redactor.redact !== 'function') throw new TypeError('Invalid webhook redactor.');
+    this.captureContent = captureContent === true;
+    this.redactor = redactor;
     this.endpoint = endpoint;
     this.transport =
       typeof transport === 'function'
@@ -44,20 +51,18 @@ class WebhookEventSink {
       return null;
     }
 
+    const body = this.captureContent ? {
+      event,
+      run: run ? { id: run.id, status: run.status, metadata: run.metadata || {} } : null,
+    } : {
+      event: { id: event?.id || null, type: event?.type || null, timestamp: event?.timestamp || null },
+      run: run ? { id: run.id, status: run.status } : null,
+    };
     return this.transport({
       url: this.endpoint,
       method: 'POST',
       headers: this.headers,
-      body: {
-        event,
-        run: run
-          ? {
-              id: run.id,
-              status: run.status,
-              metadata: run.metadata || {},
-            }
-          : null,
-      },
+      body: this.redactor.redact(body),
     });
   }
 }

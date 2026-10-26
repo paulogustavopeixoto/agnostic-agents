@@ -40,7 +40,20 @@ class MissingInfoResolver {
     const finalValidation = this.validator.validate(tool, currentArgs);
     if (!finalValidation.valid) {
       const missing = finalValidation.missingFields.join(', ');
-      throw new ToolExecutionError(`Missing required field(s) for tool "${tool.name}": ${missing}`);
+      const validationDetails = (finalValidation.errors || [])
+        .map(error => {
+          const path = error.instancePath || '(root)';
+          return `${path} ${error.message}`.trim();
+        })
+        .join('; ');
+
+      if (missing) {
+        throw new ToolExecutionError(`Missing required field(s) for tool "${tool.name}": ${missing}`);
+      }
+
+      throw new ToolExecutionError(
+        `Invalid arguments for tool "${tool.name}": ${validationDetails || 'schema validation failed'}`
+      );
     }
 
     return currentArgs;
@@ -87,7 +100,10 @@ class MissingInfoResolver {
   }
 
   _applyDefaults(args, schema) {
-    const nextArgs = { ...args };
+    const shouldCoerceToObject =
+      schema?.type === 'object' &&
+      (args === null || args === undefined || typeof args !== 'object' || Array.isArray(args));
+    const nextArgs = shouldCoerceToObject ? {} : { ...args };
     const properties = schema?.properties || {};
 
     for (const [key, propertySchema] of Object.entries(properties)) {

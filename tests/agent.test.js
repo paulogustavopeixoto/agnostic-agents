@@ -345,6 +345,7 @@ describe('Agent', () => {
         required: ['query'],
       },
       mcpClient: new MockMCPClient(),
+      metadata: { sideEffectLevel: 'none', executionPolicy: 'auto' },
     });
 
     const agent = new Agent(mockAdapter, { tools: [mcpTool], retryManager });

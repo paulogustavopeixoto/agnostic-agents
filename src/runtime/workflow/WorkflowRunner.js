@@ -11,6 +11,8 @@ const { ExecutionIdentity } = require('../ExecutionIdentity');
 const { Workflow } = require('./Workflow');
 const { ExecutionGraph } = require('./ExecutionGraph');
 const { RunNotFoundError, RunCancelledError } = require('../../errors');
+const { ToolPolicyError } = require('../../errors');
+const { defaultRunLock } = require('../RunLock');
 
 class WorkflowPauseSignal extends Error {
   constructor(reason, payload = {}) {
@@ -30,6 +32,7 @@ class WorkflowRunner {
     onEvent = null,
     debug = false,
     executionIdentity = null,
+    runLock = null,
     } = {}) {
     this.workflow = workflow instanceof Workflow ? workflow : new Workflow(workflow || {});
     this.runStore = BaseRunStore.assert(runStore, 'WorkflowRunner runStore');
@@ -41,7 +44,11 @@ class WorkflowRunner {
     this.onEvent = onEvent;
     this.debug = debug;
     this.executionIdentity = ExecutionIdentity.normalize(executionIdentity);
+    this.runLock = runLock || runStore.runLock || defaultRunLock;
+    if (typeof this.runLock.withLock !== 'function') throw new TypeError('Invalid workflow lock.');
   }
+
+  _lockKey(runId) { return JSON.stringify(['workflow', this.runStore.prefix || '', runId]); }
 
   async _persistRun(run) {
     if (!this.runStore?.saveRun) {
@@ -157,6 +164,12 @@ class WorkflowRunner {
   }
 
   async run(input, options = {}) {
+    const runId = options.runId || randomUUID();
+    return this.runLock.withLock(this._lockKey(runId), () => this._run(input, { ...options, runId }));
+  }
+
+  async _run(input, options = {}) {
+    if (await this.runStore.getRun(options.runId)) throw new ToolPolicyError('Workflow run ID already exists.');
     const executionIdentity =
       ExecutionIdentity.normalize(options.executionIdentity) ||
       ExecutionIdentity.normalize(options.metadata?.executionIdentity) ||
@@ -207,6 +220,10 @@ class WorkflowRunner {
   }
 
   async resumeRun(runId) {
+    return this.runLock.withLock(this._lockKey(runId), () => this._resumeRun(runId));
+  }
+
+  async _resumeRun(runId) {
     if (!this.runStore?.getRun) {
       throw new RunNotFoundError('Cannot resume a workflow run without a configured runStore.');
     }
@@ -218,6 +235,7 @@ class WorkflowRunner {
 
     const run = storedRun instanceof Run ? storedRun : Run.fromJSON(storedRun);
     const workflowState = this._getWorkflowState(run);
+    if (run.status === 'running') throw new ToolPolicyError('Running workflow requires dead-owner reconciliation before resume.');
 
     if (workflowState.workflowId !== this.workflow.id) {
       throw new Error(
@@ -422,6 +440,10 @@ class WorkflowRunner {
   }
 
   async cancelRun(runId, { reason = 'Cancelled manually.', payload = {} } = {}) {
+    return this.runLock.withLock(this._lockKey(runId), () => this._cancelStoredRun(runId, { reason, payload }));
+  }
+
+  async _cancelStoredRun(runId, { reason, payload }) {
     if (!this.runStore?.getRun) {
       throw new RunNotFoundError('Cannot cancel a workflow run without a configured runStore.');
     }

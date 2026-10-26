@@ -18,8 +18,7 @@ class PineconeManager {
   async upsert({ indexName, vectors, namespace = "" }) {
     const index = this.client.Index(indexName).namespace(namespace);
     const insertedIds = vectors.map(v => v.id);
-    const upsertResponse = await index.upsert(vectors);
-    console.log("Upsert succeeded! Response:", upsertResponse);
+    await index.upsert(vectors);
     return { insertedIds };
   }
 
@@ -55,8 +54,7 @@ class PineconeManager {
    */
   async delete({ indexName, ids, namespace = "" }) {
     const index = this.client.Index(indexName);
-    const deleteResponse = await index.namespace(namespace).deleteMany(ids);
-    console.log("Delete response:", deleteResponse);
+    await index.namespace(namespace).deleteMany(ids);
   }
 
   /**
@@ -69,8 +67,8 @@ class PineconeManager {
    */
   async deleteAll({ indexName, namespace }) {
     const index = this.client.Index(indexName);
-    const deleteResponse = await index.delete({ deleteAll: true, namespace });
-    console.log(`Namespace "${namespace}" deleted. Response:`, deleteResponse);
+    if (typeof namespace !== 'string') throw new TypeError('An explicit namespace is required.');
+    await index.namespace(namespace).deleteAll();
   }
 
   /**
@@ -90,7 +88,6 @@ class PineconeManager {
       metric,
       spec, // Default to serverless AWS us-east-1
     });
-    console.log(`Index "${indexName}" created.`);
   }
 
   /**
@@ -116,7 +113,6 @@ class PineconeManager {
     if (podType) updateSpec.pod_type = podType;
     if (Object.keys(updateSpec).length === 0) throw new Error("updateIndex requires replicas or podType.");
     await this.client.configureIndex({ name: indexName, spec: updateSpec });
-    console.log(`Index "${indexName}" updated.`);
   }
 }
 

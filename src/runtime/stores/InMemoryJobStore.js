@@ -16,6 +16,14 @@ class InMemoryJobStore extends BaseJobStore {
     return job ? JSON.parse(JSON.stringify(job)) : null;
   }
 
+  async claimJob(jobId, expectedRunAt) {
+    const job = this.jobs.get(jobId);
+    if (!job || job.status !== 'scheduled' || job.runAt !== expectedRunAt) return null;
+    const claimed = { ...job, status: 'running' };
+    this.jobs.set(jobId, JSON.parse(JSON.stringify(claimed)));
+    return JSON.parse(JSON.stringify(claimed));
+  }
+
   async listJobs() {
     return [...this.jobs.values()].map(job => JSON.parse(JSON.stringify(job)));
   }

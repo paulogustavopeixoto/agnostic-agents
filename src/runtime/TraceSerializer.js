@@ -58,6 +58,7 @@ class TraceSerializer {
    * @returns {Run}
    */
   static importRun(trace = {}) {
+    if (trace.schemaVersion === '1.0') trace = this.migrateTrace(trace);
     const validation = TraceSerializer.validateTrace(trace);
     if (!validation.valid) {
       throw new Error(`Invalid run trace format: ${validation.errors.join('; ')}`);
@@ -139,6 +140,7 @@ class TraceSerializer {
    * @returns {Run[]}
    */
   static importBundle(bundle = {}) {
+    if (bundle.schemaVersion === '1.0') bundle = this.migrateTrace(bundle);
     const validation = TraceSerializer.validateTrace(bundle, { allowBundle: true });
     if (!validation.valid || bundle.format !== TraceSerializer.BUNDLE_FORMAT) {
       throw new Error(`Invalid trace bundle format: ${validation.errors.join('; ')}`);
@@ -168,7 +170,9 @@ class TraceSerializer {
       errors.push('schemaVersion is required.');
     }
 
-    if (trace.schemaVersion && trace.schemaVersion !== TraceSerializer.SCHEMA_VERSION) {
+    if (trace.schemaVersion && !['1.0', TraceSerializer.SCHEMA_VERSION].includes(trace.schemaVersion)) {
+      errors.push('Unsupported trace schema version.');
+    } else if (trace.schemaVersion === '1.0') {
       warnings.push(
         `Trace schemaVersion "${trace.schemaVersion}" differs from supported version "${TraceSerializer.SCHEMA_VERSION}".`
       );
@@ -215,6 +219,21 @@ class TraceSerializer {
       errors,
       warnings,
     };
+  }
+
+  static migrateTrace(trace) {
+    const validation = this.validateTrace(trace, { allowBundle: true });
+    if (!validation.valid) throw new Error('Invalid trace migration input.');
+    if (trace.schemaVersion === this.SCHEMA_VERSION) return JSON.parse(JSON.stringify(trace));
+    if (trace.schemaVersion !== '1.0') throw new Error('Unsupported trace migration.');
+    if (trace.format === this.BUNDLE_FORMAT) {
+      const traces = trace.traces.map(entry => this.migrateTrace(entry));
+      return { ...trace, schemaVersion: this.SCHEMA_VERSION,
+        metadata: { ...trace.metadata, migratedFrom: '1.0' }, traces,
+        index: traces.map(entry => ({ runId: entry.run.id, status: entry.run.status })) };
+    }
+    return { ...this.exportRun(Run.fromJSON(trace.run), { ...trace.metadata, migratedFrom: '1.0' }),
+      exportedAt: trace.exportedAt, traceType: trace.traceType || 'run' };
   }
 }
 

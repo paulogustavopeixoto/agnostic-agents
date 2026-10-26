@@ -1,4 +1,18 @@
 const { Run } = require('./Run');
+const { ContextWindow } = require('./ContextWindow');
+const { RunBudget } = require('./RunBudget');
+const { ApprovalSigner } = require('./ApprovalSigner');
+const { InMemoryRunLock, FileRunLock } = require('./RunLock');
+const { SchemaSafety } = require('./SchemaSafety');
+const { RealtimeSession } = require('./RealtimeSession');
+const { ContentEnvelope } = require('./ContentEnvelope');
+const { ElevenLabsProducer } = require('./providers/ElevenLabsProducer');
+const { FalJobBackend, HiggsfieldJobBackend } = require('./providers/MediaJobBackends');
+const { FunctionProducer, ProducerRuntime, normalizeContent } = require('./ProducerRuntime');
+const { ProducerTool } = require('./ProducerTool');
+const { ProducerJobRunner } = require('./ProducerJobRunner');
+const { ArtifactResolver } = require('./ArtifactResolver');
+const { ScopedRunStore } = require('./stores/ScopedRunStore');
 const { RunInspector } = require('./RunInspector');
 const { RunTreeInspector } = require('./RunTreeInspector');
 const { IncidentDebugger } = require('./IncidentDebugger');
@@ -174,6 +188,24 @@ const { AgentWorkflowStep } = require('./workflow/AgentWorkflowStep');
 const { WorkflowRunner } = require('./workflow/WorkflowRunner');
 
 module.exports = {
+  ContextWindow,
+  FunctionProducer,
+  ProducerRuntime,
+  RunBudget,
+  ApprovalSigner,
+  InMemoryRunLock,
+  FileRunLock,
+  SchemaSafety,
+  RealtimeSession,
+  ContentEnvelope,
+  ElevenLabsProducer,
+  FalJobBackend,
+  HiggsfieldJobBackend,
+  normalizeContent,
+  ProducerTool,
+  ProducerJobRunner,
+  ArtifactResolver,
+  ScopedRunStore,
   Run,
   RunInspector,
   RunTreeInspector,

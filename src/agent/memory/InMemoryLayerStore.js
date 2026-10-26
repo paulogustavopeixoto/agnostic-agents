@@ -3,11 +3,11 @@ const { BaseLayerStore } = require('./BaseLayerStore');
 class InMemoryLayerStore extends BaseLayerStore {
   constructor({ initial = {} } = {}) {
     super();
-    this.records = { ...initial };
+    this.records = Object.assign(Object.create(null), initial);
   }
 
   async get(key) {
-    return this.records[key] || null;
+    return Object.hasOwn(this.records, key) ? this.records[key] : null;
   }
 
   async set(key, value) {
@@ -24,7 +24,7 @@ class InMemoryLayerStore extends BaseLayerStore {
   }
 
   async clear() {
-    this.records = {};
+    this.records = Object.create(null);
   }
 }
 

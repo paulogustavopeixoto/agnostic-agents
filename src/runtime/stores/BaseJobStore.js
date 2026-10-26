@@ -1,4 +1,7 @@
 class BaseJobStore {
+  async claimJob(_jobId, _expectedRunAt) {
+    throw new Error('Scheduling requires an atomic claimJob() implementation.');
+  }
   async saveJob(_job) {
     throw new Error('BaseJobStore.saveJob() must be implemented by subclasses.');
   }

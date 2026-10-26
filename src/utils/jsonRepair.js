@@ -25,8 +25,8 @@ async function repairJsonOutput(agent, rawOutput) {
     const parsed = JSON.parse(cleaned);
     // If successful, return immediately
     return parsed;
-  } catch (parseErr) {
-    console.warn("[repairJsonOutput] parse fail on initial output:", parseErr.message);
+  } catch {
+    // Parse errors can contain excerpts of private model output.
   }
 
   // 3) If the first parse failed, ask the LLM to fix the JSON
@@ -47,8 +47,7 @@ async function repairJsonOutput(agent, rawOutput) {
   // 4) Second attempt: parse the repaired JSON
   try {
     return JSON.parse(repairedCleaned);
-  } catch (err2) {
-    console.error("[repairJsonOutput] parse fail after repair attempt:", err2.message);
+  } catch {
     throw new Error("Failed to parse JSON after repair pass.");
   }
 }

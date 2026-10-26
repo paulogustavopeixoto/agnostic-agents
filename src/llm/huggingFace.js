@@ -1,6 +1,7 @@
 // src/llm/huggingFace.js
 const { HfInference } = require('@huggingface/inference');
 const { BaseProvider } = require('./BaseProvider');
+const { BoundedHttpClient } = require('../utils/BoundedHttpClient');
 const fs = require('fs');
 const path = require('path');
 
@@ -25,7 +26,7 @@ class HFAdapter extends BaseProvider {
       },
     });
     this.apiKey = apiKey;
-    this.inference = new HfInference(apiKey);
+    this.inference = new HfInference(apiKey, { retry_on_error: false });
     this.textModel = options.textModel || "mistralai/Mixtral-8x7B-Instruct-v0.1";
     this.visionModel = options.visionModel || "Salesforce/blip-image-captioning-base";
     this.imageGenModel = options.imageGenModel || "black-forest-labs/Flux.1-dev";
@@ -38,7 +39,7 @@ class HFAdapter extends BaseProvider {
    * @param {object} options - {model, temperature, tools, maxTokens}
    * @returns {Promise<object>} - {message: string, toolCalls?: array}
    */
-  async generateText(promptObject, { model, temperature = 0.7, tools = [], maxTokens = 12000 } = {}) {
+  async generateText(promptObject, { model, temperature = 0.7, tools = [], maxTokens = 12000, signal } = {}) {
     return await this.retryManager.execute(async () => {
       const messages = Array.isArray(promptObject) ? promptObject : [
         ...(promptObject.system ? [{ role: "system", content: promptObject.system }] : []),
@@ -56,7 +57,7 @@ class HFAdapter extends BaseProvider {
         model: model || this.textModel,
         inputs: fullPrompt,
         parameters: { max_new_tokens: maxTokens, temperature },
-      });
+      }, { signal, retry_on_error: false });
 
       try {
         const parsed = JSON.parse(result.generated_text);
@@ -68,7 +69,7 @@ class HFAdapter extends BaseProvider {
         }
       } catch (err) {
         // Not a JSON tool call; return as text
-        console.warn("HFAdapter: Failed to parse tool call response; treating as text:", err.message);
+        // Plain text is a valid response; do not log private model output.
       }
       return { message: result.generated_text };
     });
@@ -108,7 +109,7 @@ class HFAdapter extends BaseProvider {
           max_new_tokens: config.maxTokens || 12000,
           temperature: config.temperature || 0.7,
         },
-      });
+      }, { signal: config.signal, retry_on_error: false });
       return result.generated_text;
     });
   }
@@ -128,7 +129,7 @@ class HFAdapter extends BaseProvider {
       const result = await this.inference.textToImage({
         model: config.model || this.imageGenModel,
         inputs: prompt,
-      });
+      }, { signal: config.signal, retry_on_error: false });
       return result; // Buffer or base64
     });
   }
@@ -150,7 +151,7 @@ class HFAdapter extends BaseProvider {
         model: config.model || this.visionModel,
         data: imageData,
         parameters: { prompt },
-      });
+      }, { signal: config.signal, retry_on_error: false });
       return result[0]?.generated_text || "No description generated.";
     });
   }
@@ -161,7 +162,7 @@ class HFAdapter extends BaseProvider {
    * @param {object} options - {model}
    * @returns {Promise<object[]>} - Array of embedding objects
    */
-  async embedChunks(chunks, { model = "sentence-transformers/all-MiniLM-L6-v2" } = {}) {
+  async embedChunks(chunks, { model = "sentence-transformers/all-MiniLM-L6-v2", signal } = {}) {
     if (!Array.isArray(chunks) || !chunks.length || chunks.some(c => typeof c !== 'string' || !c.trim())) {
       throw new Error("embedChunks requires a non-empty array of non-empty strings.");
     }
@@ -170,7 +171,7 @@ class HFAdapter extends BaseProvider {
         const result = await this.inference.featureExtraction({
           model,
           inputs: chunk
-        });
+        }, { signal, retry_on_error: false });
         return result;
       }));
       return embeddings;
@@ -192,47 +193,27 @@ class HFAdapter extends BaseProvider {
    * @returns {Promise<string>} - Video description text
    */
   async analyzeVideo(videoData, config = {}) {
-    return await this.retryManager.execute(async () => {
-      const model = config.model || 'microsoft/git-large-videocaption'; // Hypothetical model
-      const promptObject = config.prompt || { user: 'Describe this video.' };
-      let data;
-
-      if (Buffer.isBuffer(videoData)) {
-        const tempPath = path.join(__dirname, `temp-video-${Date.now()}.mp4`);
-        fs.writeFileSync(tempPath, videoData);
-        data = fs.readFileSync(tempPath);
-        fs.unlinkSync(tempPath);
-      } else if (typeof videoData === 'string') {
-        if (videoData.startsWith('http') || videoData.startsWith('file://')) {
-          const response = await fetch(videoData);
-          data = Buffer.from(await response.arrayBuffer());
-        } else {
-          const ext = path.extname(videoData).toLowerCase().slice(1);
-          const supportedFormats = ['mp4', 'avi', 'mov', 'webm'];
-          if (!supportedFormats.includes(ext)) {
-            throw new Error(`Unsupported file format: ${ext}. Supported formats: ${supportedFormats.join(', ')}`);
-          }
-          data = fs.readFileSync(videoData);
-        }
-      } else {
-        throw new Error('Unsupported videoData format. Must be a URL, file path, or Buffer.');
-      }
-
-      const response = await fetch(`${this.baseUrl}/${model}`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-        },
-        body: data,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Hugging Face API error: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      return result[0]?.generated_text || promptObject.user;
-    });
+    if (!Buffer.isBuffer(videoData) && !(videoData instanceof Uint8Array)) {
+      throw new TypeError('Unsupported file format or unsafe video source. Resolve an authorized artifact to bytes before analysis.');
+    }
+    const maxBytes = config.maxBytes ?? 16 * 1024 * 1024;
+    if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 || maxBytes > 104857600 || videoData.byteLength > maxBytes) {
+      throw new TypeError('Video exceeds bounded input size.');
+    }
+    const data = Buffer.from(videoData);
+    const url = new URL(this.baseUrl);
+    const client = new BoundedHttpClient({ origin: url.origin,
+      headers: { Authorization: `Bearer ${this.apiKey}`, 'Content-Type': 'application/octet-stream' },
+      maxBytes, timeoutMs: config.timeoutMs ?? 30000 });
+    const model = config.model || 'microsoft/git-large-videocaption';
+    if (typeof model !== 'string' || !/^[\w-]+\/[\w.-]+$/.test(model) || ['.', '..'].includes(model.split('/')[1])) {
+      throw new TypeError('Invalid video model identifier.');
+    }
+    const modelPath = model.split('/').map(encodeURIComponent).join('/');
+    const result = await client.request({ path: `${url.pathname.replace(/\/$/, '')}/${modelPath}`,
+      rawBody: data, signal: config.signal });
+    if (typeof result?.[0]?.generated_text !== 'string') throw new Error('Invalid video analysis response.');
+    return result[0].generated_text;
   }
 
   /**

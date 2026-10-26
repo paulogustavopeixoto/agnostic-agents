@@ -3,7 +3,7 @@ const { Tool } = require('../tools/adapters/Tool');
 const { MCPClient } = require('./MCPClient');
 
 class MCPTool extends Tool {
-  constructor({ name, description, parameters, endpoint, apiKey, mcpClient, remoteName = null, strict = true }) {
+  constructor({ name, description, parameters, endpoint, apiKey, mcpClient, remoteName = null, strict = true, outputSchema = null, metadata = {} }) {
     if (!mcpClient && !endpoint) {
       throw new Error('MCPTool requires mcpClient or endpoint.');
     }
@@ -26,8 +26,12 @@ class MCPTool extends Tool {
       parameters,
       implementation,
       strict,
-      outputSchema: { type: "object" },
+      outputSchema,
       metadata: {
+        sideEffectLevel: 'external_write',
+        executionPolicy: 'require_approval',
+        ...metadata,
+        retryabilityHint: 'never',
         tags: ["mcp"],
         version: "1.0.0"
       }

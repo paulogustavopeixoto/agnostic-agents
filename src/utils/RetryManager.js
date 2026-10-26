@@ -1,5 +1,9 @@
 // src/utils/RetryManager.js
+const { AsyncLocalStorage } = require('async_hooks');
+const dispatchContext = new AsyncLocalStorage();
 class RetryManager {
+    static withoutRetries(action) { return dispatchContext.run({ singleAttempt: true }, action); }
+    static isSingleAttempt() { return dispatchContext.getStore()?.singleAttempt === true; }
     constructor({ retries = 3, baseDelay = 1000, maxDelay = 10000 } = {}) {
       this.retries = retries;
       this.baseDelay = baseDelay;
@@ -7,11 +11,12 @@ class RetryManager {
     }
   
     async execute(fn, ...args) {
+      if (dispatchContext.getStore()?.singleAttempt) return fn(...args);
       for (let attempt = 0; attempt <= this.retries; attempt++) {
         try {
           return await fn(...args);
         } catch (error) {
-          if (attempt === this.retries) throw error;
+          if (attempt === this.retries || error?.retryable === false) throw error;
           const delay = Math.min(this.baseDelay * Math.pow(2, attempt), this.maxDelay);
           await new Promise(resolve => setTimeout(resolve, delay));
         }
@@ -19,10 +24,12 @@ class RetryManager {
     }
 
     async executeWithPolicy(fn, { policy = null, context = {}, onEscalate = null } = {}, ...args) {
+      if (dispatchContext.getStore()?.singleAttempt) return fn(...args);
       for (let attempt = 0; attempt <= this.retries; attempt++) {
         try {
           return await fn(...args);
         } catch (error) {
+          if (error?.retryable === false) throw error;
           const decision = policy?.onFailure
             ? policy.onFailure(error, {
                 attempt,

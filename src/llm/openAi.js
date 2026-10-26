@@ -1,6 +1,7 @@
 // src/llm/openAi.js
 const { OpenAI } = require("openai");
 const { BaseProvider } = require('./BaseProvider');
+const { completionState } = require('./ProviderMessages');
 const { RetryManager } = require('../utils/RetryManager');
 const fs = require('fs');
 const path = require('path');
@@ -25,7 +26,7 @@ class OpenAIAdapter extends BaseProvider {
       },
     });
     this.apiKey = apiKey;
-    this.openai = new OpenAI({ apiKey });
+    this.openai = new OpenAI({ apiKey, maxRetries: 0 });
     this.model = options.model || "gpt-4o-mini";
     this.retryManager = options.retryManager || this.retryManager;
   }
@@ -36,7 +37,7 @@ class OpenAIAdapter extends BaseProvider {
    * @param {object} options - {model, temperature, tools, maxTokens}
    * @returns {Promise<object>} - {message: string, toolCalls?: array}
    */
-  async generateText(promptObject, { model, temperature = 0.7, tools = [], maxTokens = 1024 } = {}) {
+  async generateText(promptObject, { model, temperature = 0.7, tools = [], maxTokens = 1024, signal } = {}) {
     return await this.retryManager.execute(async () => {
       const openAIFunctions = tools.map((tool) => tool.toOpenAIFunction());
       const messages = Array.isArray(promptObject) ? promptObject : [
@@ -52,9 +53,10 @@ class OpenAIAdapter extends BaseProvider {
         max_tokens: maxTokens,
         functions: openAIFunctions.length > 0 ? openAIFunctions : undefined,
         function_call: openAIFunctions.length > 0 ? "auto" : undefined,
-      });
+      }, { signal });
 
       const choice = completion.choices[0].message;
+      const state = completionState(completion.choices[0].finish_reason);
       const usage = completion.usage
         ? {
             prompt: completion.usage.prompt_tokens || 0,
@@ -67,6 +69,7 @@ class OpenAIAdapter extends BaseProvider {
           const parsed = JSON.parse(choice.function_call.arguments || "{}");
           return {
             message: "",
+            ...state,
             toolCalls: [{
               name: choice.function_call.name,
               arguments: parsed,
@@ -77,6 +80,7 @@ class OpenAIAdapter extends BaseProvider {
         } catch (err) {
           return {
             message: choice.content || "",
+            ...state, completionStatus: 'uncertain',
             toolCalls: [{ name: choice.function_call.name, arguments: {}, id: `tool_use_${Date.now()}` }],
             usage,
           };
@@ -84,6 +88,7 @@ class OpenAIAdapter extends BaseProvider {
       }
       return {
         message: choice.content || "",
+        ...state,
         usage,
       };
     });
@@ -120,7 +125,7 @@ class OpenAIAdapter extends BaseProvider {
         messages,
         temperature: config.temperature || 0.7,
         max_tokens: config.maxTokens || 1024,
-      });
+      }, { signal: config.signal });
 
       return completion.choices[0].message.content || "";
     });
@@ -132,7 +137,7 @@ class OpenAIAdapter extends BaseProvider {
    * @param {object} config - {model, size, returnBase64, n, maxTokens}
    * @returns {Promise<string[]|string>} - Array of image URLs or base64 strings
    */
-  async generateImage(promptObject, { model = "dall-e-3", size = "1024x1024", returnBase64 = false, n = 1, maxTokens = 1024 } = {}) {
+  async generateImage(promptObject, { model = "dall-e-3", size = "1024x1024", returnBase64 = false, n = 1, maxTokens = 1024, signal } = {}) {
     return await this.retryManager.execute(async () => {
       const prompt = Array.isArray(promptObject)
         ? promptObject.filter(msg => msg.role === "user").map(msg => msg.content).join("\n")
@@ -143,14 +148,14 @@ class OpenAIAdapter extends BaseProvider {
         prompt,
         n,
         size,
-      });
+      }, { signal });
 
       if (!returnBase64) {
         return response.data.map(img => img.url);
       }
 
       const base64Array = await Promise.all(response.data.map(async (image) => {
-        const res = await fetch(image.url);
+        const res = await fetch(image.url, { signal, redirect: 'error' });
         if (!res.ok) throw new Error(`Failed to fetch image: ${res.statusText}`);
         const arrayBuffer = await res.arrayBuffer();
         const base64 = Buffer.from(arrayBuffer).toString("base64");
@@ -240,7 +245,7 @@ class OpenAIAdapter extends BaseProvider {
         model,
         messages,
         max_tokens: maxTokens,
-      });
+      }, { signal: config.signal });
 
       return response.choices[0].message.content || "";
     });
@@ -252,7 +257,7 @@ class OpenAIAdapter extends BaseProvider {
    * @param {object} options - {model}
    * @returns {Promise<object[]>} - Array of embedding objects
    */
-  async embedChunks(chunks, { model = "text-embedding-ada-002" } = {}) {
+  async embedChunks(chunks, { model = "text-embedding-ada-002", signal } = {}) {
     if (!Array.isArray(chunks) || !chunks.length || chunks.some(c => typeof c !== 'string' || !c.trim())) {
       throw new Error("embedChunks requires a non-empty array of non-empty strings.");
     }
@@ -261,7 +266,7 @@ class OpenAIAdapter extends BaseProvider {
         model,
         input: chunks,
         encoding_format: "float",
-      });
+      }, { signal });
       return response.data;
     });
   }
@@ -302,7 +307,7 @@ class OpenAIAdapter extends BaseProvider {
           model,
           file: audioFile,
           language: config.language || 'en',
-        });
+        }, { signal: config.signal });
         return response.text;
       } finally {
         if (tempPath && fs.existsSync(tempPath)) {
@@ -329,7 +334,7 @@ class OpenAIAdapter extends BaseProvider {
         voice,
         input: text,
         response_format: format,
-      });
+      }, { signal: config.signal });
 
       const buffer = Buffer.from(await response.arrayBuffer());
       return buffer;

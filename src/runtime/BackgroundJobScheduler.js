@@ -73,7 +73,8 @@ class BackgroundJobScheduler {
     const jobs = await this.store.listJobs();
     const results = [];
 
-    for (const job of jobs) {
+    for (const candidate of jobs) {
+      let job = candidate;
       if (job.status !== 'scheduled') {
         continue;
       }
@@ -81,6 +82,10 @@ class BackgroundJobScheduler {
       if (new Date(job.runAt).getTime() > currentTime) {
         continue;
       }
+
+      if (typeof this.store.claimJob !== 'function') throw new Error('Scheduler store must implement atomic claimJob().');
+      job = await this.store.claimJob(job.id, job.runAt);
+      if (!job) continue;
 
       const handler = this.handlers.get(job.handler);
       if (typeof handler !== 'function') {
@@ -92,9 +97,6 @@ class BackgroundJobScheduler {
       }
 
       try {
-        job.status = 'running';
-        await this.store.saveJob(job);
-
         const result = await handler(job.payload || {}, job);
         job.runCount += 1;
         job.result = result;

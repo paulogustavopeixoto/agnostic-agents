@@ -10,7 +10,8 @@ class EvalHarness {
       const startedAt = Date.now();
       try {
         const output = await scenario.run();
-        const passed = typeof scenario.assert === 'function' ? await scenario.assert(output) !== false : true;
+        // An absent/undefined verdict is not positive evaluation evidence.
+        const passed = typeof scenario.assert === 'function' && await scenario.assert(output) === true;
         results.push({
           id: scenario.id,
           passed,
@@ -35,7 +36,7 @@ class EvalHarness {
     };
 
     if (learningLoop?.recordEvaluation) {
-      learningLoop.recordEvaluation(report);
+      await learningLoop.recordEvaluation(report);
     }
 
     return report;

@@ -1,6 +1,8 @@
-// src/llm/gemini.js 
+// src/llm/gemini.js
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { BaseProvider } = require('./BaseProvider');
+const { randomUUID } = require('crypto');
+const { geminiMessages, completionState } = require('./ProviderMessages');
 const { RetryManager } = require('../utils/RetryManager');
 const fs = require('fs');
 const path = require('path');
@@ -13,7 +15,7 @@ class GeminiAdapter extends BaseProvider {
         embeddings: true,
         imageAnalysis: true,
         videoAnalysis: true,
-        videoGeneration: true,
+        videoGeneration: false,
       },
     });
     this.genAI = new GoogleGenerativeAI(apiKey);
@@ -22,18 +24,9 @@ class GeminiAdapter extends BaseProvider {
   }
 
   async generateText(messages, config = {}) {
-    // Validate and normalize messages
-    let normalizedMessages = Array.isArray(messages) ? messages : [
-      { role: 'user', content: typeof messages === 'string' ? messages : JSON.stringify(messages) }
-    ];
-    // Ensure each message has role and content
-    normalizedMessages = normalizedMessages.map(m => ({
-      role: m.role || 'user',
-      content: m.content || ''
-    }));
-
     const modelName = config.model || this.model;
-    const model = this.genAI.getGenerativeModel({ model: modelName });
+    const native = geminiMessages(messages);
+    const model = this.genAI.getGenerativeModel({ model: modelName, systemInstruction: native.systemInstruction });
     const maxTokens = config.maxTokens || 1024;
     const tools = config.tools?.map(t => ({
       functionDeclarations: [{
@@ -43,52 +36,38 @@ class GeminiAdapter extends BaseProvider {
       }],
     })) || [];
 
-    const formattedMessages = normalizedMessages.map(m => ({
-      role: m.role === 'system' ? 'system' : m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) }],
-    }));
+    const formattedMessages = native.contents;
 
     const response = await this.retryManager.execute(async () => {
       const result = await model.generateContent({
         contents: formattedMessages,
         generationConfig: {
           maxOutputTokens: maxTokens,
-          temperature: config.temperature || 0.7,
+          temperature: config.temperature ?? 0.7,
         },
         tools,
-      });
+      }, { signal: config.signal });
       return result.response;
     });
 
     const message = response.text();
-    const toolCalls = response.functionCalls?.map(fc => ({
-      id: `call_${Date.now()}`,
+    const toolCalls = (response.functionCalls?.() || []).map(fc => ({
+      id: `call_${randomUUID()}`,
       name: fc.name,
       arguments: fc.args,
     })) || [];
 
-    return { message, toolCalls };
+    return { message, toolCalls, ...completionState(response.candidates?.[0]?.finishReason) };
   }
 
   async generateToolResult(messages, toolCall, toolResult, config = {}) {
-    // Validate messages
-    let normalizedMessages = Array.isArray(messages) ? messages : [
-      { role: 'user', content: typeof messages === 'string' ? messages : JSON.stringify(messages) }
-    ];
-    normalizedMessages = normalizedMessages.map(m => ({
-      role: m.role || 'user',
-      content: m.content || ''
-    }));
-
     const modelName = config.model || this.model;
-    const model = this.genAI.getGenerativeModel({ model: modelName });
+    const native = geminiMessages(messages);
+    const model = this.genAI.getGenerativeModel({ model: modelName, systemInstruction: native.systemInstruction });
     const maxTokens = config.maxTokens || 1024;
 
-    const formattedMessages = normalizedMessages.map(m => ({
-      role: m.role === 'system' ? 'system' : m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) }],
-    })).concat({
-      role: 'function',
+    const formattedMessages = native.contents.concat({
+      role: 'user',
       parts: [{ functionResponse: { name: toolCall.name, response: toolResult } }],
     });
 
@@ -96,7 +75,7 @@ class GeminiAdapter extends BaseProvider {
       const result = await model.generateContent({
         contents: formattedMessages,
         generationConfig: { maxOutputTokens: maxTokens },
-      });
+      }, { signal: config.signal });
       return result.response.text();
     });
 
@@ -122,7 +101,7 @@ class GeminiAdapter extends BaseProvider {
       const result = await model.generateContent([
         { text: typeof prompt === 'string' ? prompt : prompt.user || 'What’s in this image?' },
         { inlineData: typeof dataUrl === 'string' ? undefined : dataUrl, fileData: typeof dataUrl === 'string' ? { uri: dataUrl, mimeType: 'image/jpeg' } : undefined },
-      ]);
+      ], { signal: config.signal });
       return result.response.text();
     });
 
@@ -134,7 +113,8 @@ class GeminiAdapter extends BaseProvider {
     const embedModel = this.genAI.getGenerativeModel({ model: modelName });
 
     const response = await this.retryManager.execute(async () => {
-      const result = await embedModel.embedContent(texts.map(text => ({ content: { parts: [{ text }] } })));
+      const result = await embedModel.batchEmbedContents({ requests: texts.map(text => ({ content: { role: 'user', parts: [{ text }] } })) },
+        { signal: config.signal });
       return result.embeddings.map(e => ({ embedding: e.values }));
     });
 
@@ -197,7 +177,7 @@ class GeminiAdapter extends BaseProvider {
       const response = await model.generateContent([
         ...promptParts.map(text => ({ text })),
         videoContent,
-      ]);
+      ], { signal: config.signal });
 
       return response.response.candidates[0].content.parts[0].text || '';
     });
@@ -210,6 +190,9 @@ class GeminiAdapter extends BaseProvider {
    * @returns {Promise<Buffer>} - Video data as a Buffer
    */
   async generateVideo(text, config = {}) {
+    if (!this.genAI.models?.generateVideos || !this.genAI.operations?.getVideosOperation) {
+      throw this._unsupportedCapability('generateVideo');
+    }
     return await this.retryManager.execute(async () => {
       const model = config.model || 'veo-2.0-generate-001';
       const format = config.format || 'mp4';

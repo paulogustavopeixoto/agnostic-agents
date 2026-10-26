@@ -1,6 +1,7 @@
 // src/llm/deepSeek.js
 const { OpenAI } = require("openai");
 const { BaseProvider } = require('./BaseProvider');
+const { completionState } = require('./ProviderMessages');
 
 class DeepSeekAdapter extends BaseProvider {
   /**
@@ -18,7 +19,7 @@ class DeepSeekAdapter extends BaseProvider {
       },
     });
     this.apiKey = apiKey;
-    this.openai = new OpenAI({ baseURL: 'https://api.deepseek.com', apiKey });
+    this.openai = new OpenAI({ baseURL: 'https://api.deepseek.com', apiKey, maxRetries: 0 });
     this.model = options.model || 'deepseek-chat';
   }
 
@@ -28,7 +29,7 @@ class DeepSeekAdapter extends BaseProvider {
    * @param {object} options - {model, temperature, tools, maxTokens}
    * @returns {Promise<object>} - {message: string, toolCalls?: array}
    */
-  async generateText(promptObject, { model, temperature = 0.7, tools = [], maxTokens = 1024 } = {}) {
+  async generateText(promptObject, { model, temperature = 0.7, tools = [], maxTokens = 1024, signal } = {}) {
     return await this.retryManager.execute(async () => {
       const openAIFunctions = tools.map((tool) => tool.toOpenAIFunction());
       const messages = Array.isArray(promptObject) ? promptObject : [
@@ -44,14 +45,16 @@ class DeepSeekAdapter extends BaseProvider {
         max_tokens: maxTokens,
         functions: openAIFunctions.length > 0 ? openAIFunctions : undefined,
         function_call: openAIFunctions.length > 0 ? "auto" : undefined,
-      });
+      }, { signal });
 
       const choice = completion.choices[0].message;
+      const state = completionState(completion.choices[0].finish_reason);
       if (choice.function_call) {
         try {
           const parsed = JSON.parse(choice.function_call.arguments || "{}");
           return {
             message: "",
+            ...state,
             toolCalls: [{
               name: choice.function_call.name,
               arguments: parsed,
@@ -61,11 +64,12 @@ class DeepSeekAdapter extends BaseProvider {
         } catch (err) {
           return {
             message: choice.content || "",
+            ...state, completionStatus: 'uncertain',
             toolCalls: [{ name: choice.function_call.name, arguments: {}, id: `tool_use_${Date.now()}` }],
           };
         }
       }
-      return { message: choice.content || "" };
+      return { message: choice.content || "", ...state };
     });
   }
 
@@ -100,7 +104,7 @@ class DeepSeekAdapter extends BaseProvider {
         messages,
         temperature: config.temperature || 0.7,
         max_tokens: config.maxTokens || 1024,
-      });
+      }, { signal: config.signal });
 
       return completion.choices[0].message.content || "";
     });
@@ -126,7 +130,7 @@ class DeepSeekAdapter extends BaseProvider {
    * @param {object} options - {model}
    * @returns {Promise<object[]>} - Array of embedding objects
    */
-  async embedChunks(chunks, { model = "text-embedding" } = {}) {
+  async embedChunks(chunks, { model = "text-embedding", signal } = {}) {
     if (!Array.isArray(chunks) || !chunks.length || chunks.some(c => typeof c !== 'string' || !c.trim())) {
       throw new Error("embedChunks requires a non-empty array of non-empty strings.");
     }
@@ -135,7 +139,7 @@ class DeepSeekAdapter extends BaseProvider {
         model,
         input: chunks,
         encoding_format: "float",
-      });
+      }, { signal });
       return response.data;
     });
   }

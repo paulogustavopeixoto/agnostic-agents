@@ -2,44 +2,24 @@ require('dotenv').config();
 
 const { Agent } = require('../../src/agent/Agent');
 const { Tool } = require('../../src/tools/adapters/Tool');
-const { OpenAIAdapter } = require('../../src/llm/OpenAi');
-const { GeminiAdapter } = require('../../src/llm/Gemini');
-const { AnthropicAdapter } = require('../../src/llm/Anthropic');
-const { HFAdapter } = require('../../src/llm/HuggingFace');
-const { DeepSeekAdapter } = require('../../src/llm/DeepSeek');
+const { OpenAIAdapter } = require('../../src/llm/openAi');
+const { GeminiAdapter } = require('../../src/llm/gemini');
+const { AnthropicAdapter } = require('../../src/llm/anthropic');
+const { HFAdapter } = require('../../src/llm/huggingFace');
+const { DeepSeekAdapter } = require('../../src/llm/deepSeek');
+const { verifyLiveCall: runProviderSmokeTest } = require('../../scripts/certifyProviders');
 
 const runLive = process.env.RUN_LIVE_API_TESTS === '1';
 const describeLive = runLive ? describe : describe.skip;
 
 jest.setTimeout(180000);
 
-function isSkippableProviderError(error) {
-  const message = String(error?.message || error);
-  return [
-    'credit balance is too low',
-    'No Inference Provider available',
-    'is not found for API version',
-    'quota',
-    'billing',
-  ].some(fragment => message.includes(fragment));
-}
-
-async function runProviderSmokeTest(fn) {
-  try {
-    await fn();
-  } catch (error) {
-    if (isSkippableProviderError(error)) {
-      console.warn(`Skipping provider smoke assertion: ${error.message}`);
-      return;
-    }
-    throw error;
-  }
-}
+const providerTest = key => process.env[key]?.trim() ? test : test.skip;
 
 describeLive('Live adapter smoke tests', () => {
-  test('OpenAI adapter can generate text and embeddings', async () => {
+  providerTest('OPENAI_API_KEY')('OpenAI adapter can generate text and embeddings', async () => {
     if (!process.env.OPENAI_API_KEY) {
-      return;
+      throw new Error('OPENAI_API_KEY disappeared after live-test registration.');
     }
 
     await runProviderSmokeTest(async () => {
@@ -58,9 +38,9 @@ describeLive('Live adapter smoke tests', () => {
     });
   });
 
-  test('OpenAI agent can execute a local tool end-to-end', async () => {
+  providerTest('OPENAI_API_KEY')('OpenAI agent can execute a local tool end-to-end', async () => {
     if (!process.env.OPENAI_API_KEY) {
-      return;
+      throw new Error('OPENAI_API_KEY disappeared after live-test registration.');
     }
 
     await runProviderSmokeTest(async () => {
@@ -93,9 +73,9 @@ describeLive('Live adapter smoke tests', () => {
     });
   });
 
-  test('Gemini adapter can generate text', async () => {
+  providerTest('GEMINI_API_KEY')('Gemini adapter can generate text', async () => {
     if (!process.env.GEMINI_API_KEY) {
-      return;
+      throw new Error('GEMINI_API_KEY disappeared after live-test registration.');
     }
 
     await runProviderSmokeTest(async () => {
@@ -111,9 +91,9 @@ describeLive('Live adapter smoke tests', () => {
     });
   });
 
-  test('Anthropic adapter can generate text', async () => {
+  providerTest('ANTHROPIC_API_KEY')('Anthropic adapter can generate text', async () => {
     if (!process.env.ANTHROPIC_API_KEY) {
-      return;
+      throw new Error('ANTHROPIC_API_KEY disappeared after live-test registration.');
     }
 
     await runProviderSmokeTest(async () => {
@@ -130,9 +110,9 @@ describeLive('Live adapter smoke tests', () => {
     });
   });
 
-  test('Hugging Face adapter can generate text', async () => {
+  providerTest('HUGGINGFACE_API_KEY')('Hugging Face adapter can generate text', async () => {
     if (!process.env.HUGGINGFACE_API_KEY) {
-      return;
+      throw new Error('HUGGINGFACE_API_KEY disappeared after live-test registration.');
     }
 
     await runProviderSmokeTest(async () => {
@@ -149,9 +129,9 @@ describeLive('Live adapter smoke tests', () => {
     });
   });
 
-  test('DeepSeek adapter can generate text', async () => {
+  providerTest('DEEPSEEK_API_KEY')('DeepSeek adapter can generate text', async () => {
     if (!process.env.DEEPSEEK_API_KEY) {
-      return;
+      throw new Error('DEEPSEEK_API_KEY disappeared after live-test registration.');
     }
 
     await runProviderSmokeTest(async () => {

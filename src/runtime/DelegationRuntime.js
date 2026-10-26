@@ -1,10 +1,13 @@
 const { EventBus } = require('./EventBus');
 const { DelegationContract } = require('./workflow/DelegationContract');
+const { ToolPolicyError } = require('../errors');
 
 class DelegationRuntime {
-  constructor({ eventBus = null, onEvent = null } = {}) {
+  constructor({ eventBus = null, onEvent = null, authorize = null, maxDelegations = 8, maxDepth = 4, runStore = null } = {}) {
+    if ([maxDelegations, maxDepth].some(value => !Number.isSafeInteger(value) || value < 1)) throw new TypeError('Invalid delegation limits.');
     this.eventBus = eventBus instanceof EventBus ? eventBus : new EventBus(eventBus || {});
     this.onEvent = onEvent;
+    Object.assign(this, { authorize, maxDelegations, maxDepth, runStore });
   }
 
   async _emit(parentRun, type, payload = {}) {
@@ -40,6 +43,15 @@ class DelegationRuntime {
     if (!agent || typeof agent.run !== 'function') {
       throw new Error('DelegationRuntime requires an agent with a run(...) method.');
     }
+    const depth = parentRun.metadata?.delegationDepth || 0;
+    const count = parentRun.state.delegationCount || 0;
+    if (!Number.isSafeInteger(depth) || depth < 0 || depth >= this.maxDepth ||
+        !Number.isSafeInteger(count) || count < 0 || count >= this.maxDelegations) {
+      throw new ToolPolicyError('Delegation budget exceeded.');
+    }
+    if (this.authorize && await this.authorize({ parentRun, agent, prompt, metadata, state, config }) !== true) {
+      throw new ToolPolicyError('Delegation denied.');
+    }
 
     const resolvedContract =
       contract instanceof DelegationContract
@@ -58,6 +70,8 @@ class DelegationRuntime {
       });
     }
 
+    parentRun.state.delegationCount = count + 1;
+    if (this.runStore) await this.runStore.saveRun(parentRun);
     await this._emit(parentRun, 'delegation_runtime_started', {
       assignee: resolvedContract?.assignee || metadata.assignee || null,
       prompt,
@@ -69,6 +83,7 @@ class DelegationRuntime {
       metadata: {
         ...(config.metadata || {}),
         ...metadata,
+        delegationDepth: depth + 1,
         lineage: {
           rootRunId: parentRun.metadata?.lineage?.rootRunId || parentRun.id,
           parentRunId: parentRun.id,

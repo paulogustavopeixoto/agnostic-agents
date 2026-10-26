@@ -1,19 +1,44 @@
 // index.js
 const { Agent } = require('./src/agent/Agent');
+const { normalizeContent, FunctionProducer, ProducerRuntime } = require('./src/runtime/ProducerRuntime');
+const { ProducerTool } = require('./src/runtime/ProducerTool');
+const { ContextWindow } = require('./src/runtime/ContextWindow');
+const { ScopedRetriever } = require('./src/rag/retrievers/ScopedRetriever');
+const { ScopedLayerStore } = require('./src/agent/memory/ScopedLayerStore');
+const { ArtifactResolver } = require('./src/runtime/ArtifactResolver');
+const { ProducerJobRunner } = require('./src/runtime/ProducerJobRunner');
+const { ScopedRunStore } = require('./src/runtime/stores/ScopedRunStore');
+const { GuardedProvider } = require('./src/llm/GuardedProvider');
+const { RunBudget } = require('./src/runtime/RunBudget');
+const { ApprovalSigner } = require('./src/runtime/ApprovalSigner');
+const { InMemoryRunLock, FileRunLock } = require('./src/runtime/RunLock');
+const { SchemaSafety } = require('./src/runtime/SchemaSafety');
+const { EpisodicMemory } = require('./src/agent/memory/EpisodicMemory');
+const { ScopedVectorStore } = require('./src/db/ScopedVectorStore');
+const { PineconeVectorStore } = require('./src/db/PineconeVectorStore');
+const { QdrantVectorStore } = require('./src/db/QdrantVectorStore');
+const { PgVectorStore } = require('./src/db/PgVectorStore');
+const { ProviderCatalog } = require('./src/llm/ProviderCatalog');
+const { MistralAdapter, XAIAdapter } = require('./src/llm/CompatibleChatAdapter');
+const { ElevenLabsProducer } = require('./src/runtime/providers/ElevenLabsProducer');
+const { FalJobBackend, HiggsfieldJobBackend } = require('./src/runtime/providers/MediaJobBackends');
+const { RealtimeSession } = require('./src/runtime/RealtimeSession');
+const { ContentEnvelope } = require('./src/runtime/ContentEnvelope');
 const { Tool } = require('./src/tools/adapters/Tool');
 const { MCPDiscoveryLoader } = require('./src/tools/adapters/MCPDiscoveryLoader');
 const { Memory } = require('./src/agent/Memory'); 
 const { BaseLayerStore } = require('./src/agent/memory/BaseLayerStore');
 const { InMemoryLayerStore } = require('./src/agent/memory/InMemoryLayerStore');
 const { FileLayerStore } = require('./src/agent/memory/FileLayerStore');
-const { OpenAIAdapter } = require('./src/llm/OpenAi');
-const { GeminiAdapter } = require('./src/llm/Gemini');
-const { HFAdapter } = require('./src/llm/HuggingFace');
-const { AnthropicAdapter } = require('./src/llm/Anthropic');
-const { DeepSeekAdapter } = require('./src/llm/DeepSeek');
+const { OpenAIAdapter } = require('./src/llm/openAi');
+const { GeminiAdapter } = require('./src/llm/gemini');
+const { HFAdapter } = require('./src/llm/huggingFace');
+const { AnthropicAdapter } = require('./src/llm/anthropic');
+const { DeepSeekAdapter } = require('./src/llm/deepSeek');
 const { FallbackRouter } = require('./src/llm/FallbackRouter');
 const { PineconeManager } = require('./src/db/PineconeManager');
 const { LocalVectorStore } = require('./src/db/LocalVectorStore');
+const { FileVectorStore } = require('./src/db/FileVectorStore');
 const { RAG } = require('./src/rag/RAG');
 const { BaseRetriever } = require('./src/rag/retrievers/BaseRetriever');
 const { VectorStoreRetriever } = require('./src/rag/retrievers/VectorStoreRetriever');
@@ -238,6 +263,35 @@ const {
 } = require('./src/errors');
 
 module.exports = {
+  normalizeContent,
+  FunctionProducer,
+  ProducerRuntime,
+  ProducerTool,
+  ContextWindow,
+  ScopedRetriever,
+  ScopedLayerStore,
+  ArtifactResolver,
+  ProducerJobRunner,
+  ScopedRunStore,
+  GuardedProvider,
+  RunBudget,
+  ApprovalSigner,
+  InMemoryRunLock,
+  FileRunLock,
+  SchemaSafety,
+  EpisodicMemory,
+  ScopedVectorStore,
+  PineconeVectorStore,
+  QdrantVectorStore,
+  PgVectorStore,
+  ProviderCatalog,
+  MistralAdapter,
+  XAIAdapter,
+  ElevenLabsProducer,
+  FalJobBackend,
+  HiggsfieldJobBackend,
+  RealtimeSession,
+  ContentEnvelope,
   Agent,
   Tool,
   Memory,
@@ -252,6 +306,7 @@ module.exports = {
   FallbackRouter,
   PineconeManager,
   LocalVectorStore,
+  FileVectorStore,
   RAG,
   BaseRetriever,
   VectorStoreRetriever,

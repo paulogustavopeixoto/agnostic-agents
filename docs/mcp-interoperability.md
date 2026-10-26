@@ -2,6 +2,22 @@
 
 This guide explains the maintained Model Context Protocol interoperability surfaces in `agnostic-agents`.
 
+## Transport And Conformance Boundary
+
+The endpoint option is a legacy JSON-RPC WebSocket bridge, not a complete standard
+MCP transport or lifecycle implementation. For standard HTTP/stdio servers, supply
+`transport: async ({ method, params, signal }) => ...` backed by an initialized MCP
+SDK client. The host owns initialization, negotiated capabilities, authentication,
+transport closure, and cancellation translation. No live-server certification is claimed.
+
+Discovery reads canonical inputSchema/outputSchema and bounded pagination.
+Calls send name/arguments and return structuredContent when supplied, otherwise
+content blocks (with legacy output accepted for compatibility). Tool errors are
+sanitized and calls are not automatically retried: losing a response is not proof
+that the external action failed. These fields follow the
+[MCP tools specification](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-11-25/server/tools.mdx).
+Use Agent rather than direct execute() when runtime policy/approvals are required.
+
 The package is currently strongest on the MCP client side:
 
 - connect to an MCP endpoint

@@ -1,5 +1,6 @@
 // src/rag/RAG.js
 const { chunkText } = require('../utils/chunkText');
+const { randomUUID } = require('crypto');
 const { RetryManager } = require('../utils/RetryManager');
 const { VectorStoreRetriever } = require('./retrievers/VectorStoreRetriever');
 
@@ -59,7 +60,7 @@ class RAG {
    * @returns {Promise<string>} - Generated response.
    */
   async query(prompt, options = {}) {
-    if (!this.vectorStore) throw new Error("Query requires a vector store.");
+    if (!this.retriever?.search) throw new Error("Query requires a retriever.");
     const retrieval = await this.retryManager.execute(() => this.searchWithProvenance(prompt, options));
     const context = retrieval.matches.map(match => match.text);
     const fullPrompt = {
@@ -95,7 +96,6 @@ class RAG {
    * @returns {Promise<object>} - Structured retrieval payload with matches and provenance.
    */
   async searchWithProvenance(query, options = {}) {
-    if (!this.vectorStore) throw new Error("Search requires a vector store.");
     if (!this.retriever?.search) {
       throw new Error("Search requires a retriever.");
     }
@@ -177,8 +177,9 @@ class RAG {
       throw new Error("Chunks must be a non-empty array of non-empty strings.");
     }
     const embeddings = await this.retryManager.execute(() => this.adapter.embedChunks(chunks));
+    const ingestionId = randomUUID();
     const vectors = embeddings.map((emb, i) => ({
-      id: `${Date.now()}-${i}`,
+      id: `${ingestionId}-${i}`,
       values: emb.embedding,
       metadata: {
         text: chunks[i],

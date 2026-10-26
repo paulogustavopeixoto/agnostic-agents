@@ -10,6 +10,13 @@ class ProofPromotionGate {
       ? evidenceBundle
       : ReleaseEvidenceBundle.build(evidenceBundle || {});
     const reasons = [];
+    for (const [name, report] of [['Simulation', simulationReport], ['Failure-injection', failureInjectionReport]]) {
+      if (!report || !Number.isSafeInteger(report.total) || report.total < 1 ||
+          !Number.isSafeInteger(report.passed) || !Number.isSafeInteger(report.failed) ||
+          report.passed < 0 || report.failed < 0 || report.passed + report.failed !== report.total) {
+        reasons.push(`${name} evidence is missing, empty, or invalid.`);
+      }
+    }
 
     if (bundle.summary?.promotionAction !== 'promote') {
       reasons.push('Release evidence bundle does not support promotion.');
@@ -29,6 +36,12 @@ class ProofPromotionGate {
 
     if ((bundle.attestations || []).length === 0) {
       reasons.push('At least one policy/autonomy attestation is required.');
+    }
+    if ((bundle.routeProofs || []).some(proof => proof?.summary?.decision !== 'promote')) {
+      reasons.push('A route proof does not support promotion.');
+    }
+    if ((bundle.attestations || []).some(attestation => attestation?.summary?.valid !== true)) {
+      reasons.push('A policy/autonomy attestation is invalid.');
     }
 
     return {

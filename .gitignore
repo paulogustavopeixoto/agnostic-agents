@@ -6,5 +6,6 @@ build/
 *.log
 ROADMAP.md
 coverage/
+.agnostic-agents/
 *.tgz
 private-agents/

@@ -1,4 +1,12 @@
 const { RetryManager } = require('../utils/RetryManager');
+const { ContextWindow } = require('../runtime/ContextWindow');
+const Ajv = require('ajv');
+const { randomUUID } = require('crypto');
+const { defaultRunLock } = require('../runtime/RunLock');
+const { RunBudget } = require('../runtime/RunBudget');
+const { SchemaSafety } = require('../runtime/SchemaSafety');
+const { ToolValidator } = require('../utils/ToolValidator');
+const { invokeWithDeadline } = require('../runtime/InvocationControl');
 const { repairJsonOutput } = require('../utils');
 const { MissingInfoResolver } = require('./MissingInfoResolver');
 const { Run } = require('../runtime/Run');
@@ -72,6 +80,18 @@ class Agent {
       approvalInbox = null,
       governanceHooks = null,
       extensionHost = null,
+      contextWindow = null,
+      authorizeModelCall = null,
+      executionLimits = {},
+      outputSchema,
+      authorizeResume = null,
+      approvalTtlMs = 5 * 60 * 1000,
+      runLock = defaultRunLock,
+      lockNamespace = 'agent',
+      approvalSigner = null,
+      budget = null,
+      schemaSafety = {},
+      invocationTimeoutMs = null,
     } = {}
   ) {
     this.extensionHost =
@@ -81,8 +101,42 @@ class Agent {
           ? new ExtensionHost({ extensions: Array.isArray(extensionHost) ? extensionHost : [extensionHost] })
           : null;
     this.adapter = adapter;
+    if (typeof runLock?.withLock !== 'function' || typeof lockNamespace !== 'string' ||
+        (approvalSigner && (typeof approvalSigner.sign !== 'function' || typeof approvalSigner.verify !== 'function'))) {
+      throw new TypeError('Invalid run coordination configuration.');
+    }
+    this.runLock = runLock;
+    if (invocationTimeoutMs !== null && (!Number.isSafeInteger(invocationTimeoutMs) ||
+        invocationTimeoutMs < 1 || invocationTimeoutMs > 2147483647)) throw new TypeError('Invalid invocation timeout.');
+    this.invocationTimeoutMs = invocationTimeoutMs;
+    this.lockNamespace = lockNamespace;
+    this.approvalSigner = approvalSigner;
+    this.budget = budget instanceof RunBudget ? budget : budget ? new RunBudget(budget) : null;
+    this.schemaSafety = schemaSafety instanceof SchemaSafety ? schemaSafety : new SchemaSafety(schemaSafety);
+    if (outputSchema !== undefined) this.schemaSafety.assertSchema(outputSchema);
+    this.contextWindow = contextWindow instanceof ContextWindow ? contextWindow :
+      contextWindow ? new ContextWindow(contextWindow) : null;
+    if (authorizeModelCall !== null && typeof authorizeModelCall !== 'function') {
+      throw new TypeError('authorizeModelCall must be a function.');
+    }
+    this.authorizeModelCall = authorizeModelCall;
+    if ((authorizeResume !== null && typeof authorizeResume !== 'function') ||
+        !Number.isSafeInteger(approvalTtlMs) || approvalTtlMs < 1) {
+      throw new TypeError('Invalid approval authorization configuration.');
+    }
+    this.authorizeResume = authorizeResume;
+    this.approvalTtlMs = approvalTtlMs;
+    this.validateOutput = outputSchema === undefined ? null : new Ajv({ strict: false }).compile(outputSchema);
+    this.executionLimits = { modelCalls: 32, toolCalls: 64, ...executionLimits };
+    for (const value of Object.values(this.executionLimits)) {
+      if (!Number.isSafeInteger(value) || value < 1) throw new TypeError('Execution limits must be positive integers.');
+    }
     this.toolRegistry = null;
     this.tools = this._normalizeTools(tools);
+    for (const tool of this.tools) {
+      this.schemaSafety.assertSchema(tool.parameters || { type: 'object' });
+      if (tool.outputSchema != null) this.schemaSafety.assertSchema(tool.outputSchema);
+    }
     this.memory = memory;
     this.defaultConfig = defaultConfig;
     this.description = description;
@@ -135,6 +189,7 @@ class Agent {
       askUser,
       tools: this.tools,
     });
+    this.resolver.validator = new ToolValidator({ schemaSafety: this.schemaSafety });
   }
 
   _normalizeTools(tools) {
@@ -162,6 +217,64 @@ class Agent {
     }
 
     return this.runStore.saveRun(run);
+  }
+
+  async _reserveExecution(run, kind) {
+    const counts = run.state.executionCounts || {};
+    const used = counts[kind] ?? 0;
+    if (!Number.isSafeInteger(used) || used < 0 || used >= this.executionLimits[kind]) {
+      throw new ToolPolicyError(`Run ${kind} limit reached.`);
+    }
+    run.state.executionCounts = { ...counts, [kind]: used + 1 };
+    await this._persistRun(run);
+  }
+
+  _checkSignal(signal) {
+    if (signal?.aborted) throw new RunCancelledError('Run cancelled by caller.');
+  }
+
+  async _withBudget(run, operation, input, invoke) {
+    const step = run && ['memory_read', 'memory_write', 'argument_resolution'].includes(operation)
+      ? this._startStep(run, operation, {}) : null;
+    if (step) await this._emitEvent(run, `${operation}_started`, { stepId: step.id });
+    let reservation;
+    try {
+      if (this.budget && run) {
+        reservation = await this.budget.reserve(run, { operation, input });
+        await this._persistRun(run);
+      }
+      const result = await RetryManager.withoutRetries(invoke);
+      if (reservation) {
+        this.budget.settle(run, reservation, operation === 'model' ? {
+          tokens: result?.usage?.total, costMicros: result?.costMicros,
+        } : {});
+        await this._persistRun(run);
+      }
+      if (step) {
+        this._completeStep(run, step.id, { recorded: true });
+        await this._emitEvent(run, `${operation}_completed`, { stepId: step.id });
+      }
+      return result;
+    } catch (error) {
+      if (reservation) {
+        if (reservation.status !== 'breached') reservation.status = 'uncertain';
+        await this._persistRun(run);
+      }
+      if (step) {
+        this._failStep(run, step.id, error);
+        await this._emitEvent(run, `${operation}_failed`, { stepId: step.id });
+      }
+      throw error;
+    }
+  }
+
+  _canRetryTool(tool) {
+    const metadata = tool?.metadata || {};
+    if (metadata.retryabilityHint === 'never') return false;
+    if (['external_write', 'system_write', 'destructive'].includes(metadata.sideEffectLevel)) {
+      return metadata.idempotencyHint === 'idempotent' && metadata.retryabilityHint === 'retryable';
+    }
+    return true;
   }
 
   async _emitEvent(run, type, payload = {}) {
@@ -327,6 +440,11 @@ class Agent {
       const semantic = await this.memory.searchSemanticMemory(userMessage);
       if (semantic) {
         facts.push(`Related info: ${semantic}`);
+      }
+    }
+    if (typeof this.memory.searchEpisodicMemory === 'function') {
+      for (const episode of await this.memory.searchEpisodicMemory(userMessage)) {
+        facts.push(`Episode ${episode.id} (run ${episode.runId || 'unknown'}): ${JSON.stringify(episode.content)}`);
       }
     }
 
@@ -511,7 +629,7 @@ class Agent {
 
     try {
       const startedAt = Date.now();
-      const verdict = await this._invokeVerifier(
+      const verdict = await this._withBudget(run, 'verifier', { stage: 'final_output' }, () => this._invokeVerifier(
         {
           name: 'final_response',
           description: 'Validate the final agent response before completion.',
@@ -527,7 +645,7 @@ class Agent {
           toolResults: run.toolResults || [],
         },
         { run, config: finalConfig, stage: 'self_verification' }
-      );
+      ));
       const normalizedVerdict = verdict || { action: 'allow', reason: null };
       if (
         normalizedVerdict.action === 'require_approval' &&
@@ -574,11 +692,11 @@ class Agent {
         run.metrics.debug.lastRetrievalStartedAt = new Date(startedAt).toISOString();
       }
 
-      const retrieval = await this.retryManager.execute(() =>
+      const retrieval = await this.retryManager.execute(() => this._withBudget(run, 'retrieval', { query: userMessage }, () =>
         typeof this.rag.searchWithProvenance === 'function'
           ? this.rag.searchWithProvenance(userMessage, config.ragOptions || {})
           : this.rag.search(userMessage, config.ragOptions || {})
-      );
+      ));
       const matches = Array.isArray(retrieval)
         ? retrieval.map(text => ({ text, score: null, metadata: {} }))
         : retrieval.matches || [];
@@ -635,6 +753,7 @@ class Agent {
 
       return `Retrieved context:\n${contextLines.join('\n')}\n\nSources:\n${citations}\n`;
     } catch (error) {
+      if (error?.retryable === false) throw error;
       if (run) {
         run.state.retrieval = {
           query: userMessage,
@@ -653,7 +772,8 @@ class Agent {
   }
 
   async _buildSystemPrompt(userPrompt = '', config = {}, runtime = {}) {
-    const memoryContext = await this._retrieveMemoryContext(userPrompt);
+    const memoryContext = this.memory ? await this._withBudget(runtime.run, 'memory_read', { query: userPrompt },
+      () => this._retrieveMemoryContext(userPrompt)) : '';
     const ragContext = await this._getRagContext(userPrompt, config, runtime);
     const now = new Date().toUTCString();
     const system = `${this.description || ''}\nCurrent date and time is: ${now}\n`.trim();
@@ -693,6 +813,10 @@ class Agent {
           ? tools
           : [tools];
 
+    for (const tool of nextTools) {
+      this.schemaSafety.assertSchema(tool.parameters || { type: 'object' });
+      if (tool.outputSchema != null) this.schemaSafety.assertSchema(tool.outputSchema);
+    }
     this.tools.push(...nextTools);
     this.resolver.tools = this.tools;
   }
@@ -708,6 +832,76 @@ class Agent {
   }
 
   async run(userMessage, config = {}) {
+    const runId = config.runId || randomUUID();
+    return this.runLock.withLock(this._lockKey(runId), () => this._run(userMessage, { ...config, runId }));
+  }
+
+  async runTool(toolName, args = {}, config = {}) {
+    const runId = config.runId || randomUUID();
+    return this.runLock.withLock(this._lockKey(runId), async () => {
+      if (this.runStore?.getRun && await this.runStore.getRun(runId)) throw new ToolPolicyError('Run ID already exists.');
+      const run = new Run({ id: runId, input: { toolName, args }, metadata: {
+        ...config.metadata, executionMode: 'tool', executionIdentity: this._resolveExecutionIdentity(config),
+      } });
+      run.setStatus('running');
+      await this._persistRun(run);
+      try {
+        this._checkSignal(config.signal);
+        const toolCall = { id: randomUUID(), name: toolName, arguments: args };
+        this._validateToolCall(toolCall);
+        let gate = await this._gateToolCall(run, toolCall, config);
+        if (gate.status !== 'waiting_for_approval') {
+          const original = JSON.stringify(toolCall.arguments);
+          toolCall.arguments = await this._withBudget(run, 'argument_resolution', { toolName },
+            () => this.resolver.resolve(this.tools.find(tool => tool.name === toolName), toolCall.arguments));
+          if (JSON.stringify(toolCall.arguments) !== original) gate = await this._gateToolCall(run, toolCall, config);
+        }
+        if (gate.status === 'waiting_for_approval') return run;
+        const execute = () => this._handleToolCall(toolCall, { run, signal: config.signal, frozenArgs: true });
+        const output = this._canRetryTool(this.tools.find(tool => tool.name === toolName))
+          ? await this.retryManager.execute(execute) : await execute();
+        this._appendToolMessages(run, toolCall, output);
+        if (output?.__adaptiveEscalated) return run;
+        return await this._finishToolRun(run, output);
+      } catch (error) { return this._failRun(run, error); }
+    });
+  }
+
+  _validateFinalOutput(run) {
+    if (!this.validateOutput) return;
+    let output = run.output;
+    try {
+      this.schemaSafety.assertValue(output);
+      if (typeof output === 'string') output = JSON.parse(output);
+      this.schemaSafety.assertValue(output);
+      if (!this.validateOutput(output)) throw new Error('Invalid output.');
+    } catch {
+      run.state.outputValidation = { valid: false };
+      run.output = null;
+      throw new InvalidToolCallError('Agent output schema validation failed.');
+    }
+    run.output = output;
+    run.state.outputValidation = { valid: true };
+  }
+
+  async _finishToolRun(run, output) {
+    run.output = output;
+    this._validateFinalOutput(run);
+    run.state.resultStatus = 'completed';
+    run.setStatus('completed');
+    await this._emitEvent(run, 'run_completed', { output: run.output });
+    await this._checkpointRun(run, 'run_completed');
+    return run;
+  }
+
+  _lockKey(runId) {
+    return JSON.stringify([this.lockNamespace, this.runStore?.prefix || '', runId]);
+  }
+
+  async _run(userMessage, config = {}) {
+    if (this.runStore?.getRun && await this.runStore.getRun(config.runId)) {
+      throw new ToolPolicyError('Run ID already exists; resume or branch explicitly.');
+    }
     if (!this.adapter?.generateText) {
       throw new AdapterCapabilityError('Agent requires an adapter with generateText().');
     }
@@ -751,6 +945,7 @@ class Agent {
     await this._linkParentRun(run);
 
     try {
+      this._checkSignal(finalConfig.signal);
       const promptObject = await this._buildSystemPrompt(userMessage, finalConfig, { run });
       const messages = this._promptObjectToMessages(promptObject);
 
@@ -777,6 +972,10 @@ class Agent {
   }
 
   async resumeRun(runId, config = {}) {
+    return this.runLock.withLock(this._lockKey(runId), () => this._resumeRun(runId, config));
+  }
+
+  async _resumeRun(runId, config = {}) {
     if (!this.runStore?.getRun) {
       throw new RunNotFoundError('Cannot resume a run without a configured runStore.');
     }
@@ -788,7 +987,16 @@ class Agent {
 
     const run = storedRun instanceof Run ? storedRun : Run.fromJSON(storedRun);
 
+    if (run.metadata.producerId || run.metadata.realtime || run.metadata.remoteJob || run.metadata.executionMode === 'media') {
+      throw new ToolPolicyError('This run must be resumed by its owning runtime.');
+    }
     if (run.status === 'paused' && run.pendingPause) {
+      if (run.metadata.executionMode === 'tool') {
+        throw new ToolPolicyError('Paused direct tool runs require explicit reconciliation, not model continuation.');
+      }
+      if (this.authorizeResume && await this.authorizeResume(run.pendingPause, { run, config }) !== true) {
+        throw new ToolPolicyError('Pause resume authorization denied.');
+      }
       const previousPause = run.pendingPause;
       run.pendingPause = null;
       run.setStatus('running');
@@ -812,6 +1020,33 @@ class Agent {
       return run;
     }
 
+    if (!run.pendingApproval.expiresAt || Date.parse(run.pendingApproval.expiresAt) <= Date.now() ||
+        !Number.isFinite(Date.parse(run.pendingApproval.expiresAt))) {
+      throw new ToolPolicyError('Approval request expired or has no expiry.');
+    }
+    if (run.pendingApproval.runId !== run.id || run.pendingApproval.scopeKey !== this._lockKey(run.id) ||
+        run.pendingApproval.toolCall?.name !== run.pendingApproval.toolName ||
+        JSON.stringify(run.pendingApproval.toolCall?.arguments) !== JSON.stringify(run.pendingApproval.arguments)) {
+      throw new ToolPolicyError('Approval does not match this run, scope, or action.');
+    }
+    if (this.approvalSigner && !this.approvalSigner.verify(run.pendingApproval)) {
+      throw new ToolPolicyError('Approval action signature is invalid.');
+    }
+    if (this.authorizeResume && await this.authorizeResume(run.pendingApproval, { run, config }) !== true) {
+      throw new ToolPolicyError('Approval resume authorization denied.');
+    }
+    const approvedTool = this.tools.find(tool => tool.name === run.pendingApproval.toolName);
+    if (!approvedTool) throw new ToolNotFoundError('Approved tool is no longer available.');
+    if (JSON.stringify(approvedTool.parameters || {}) !== JSON.stringify(run.pendingApproval.toolSchema) ||
+        JSON.stringify(approvedTool.outputSchema || null) !== JSON.stringify(run.pendingApproval.toolOutputSchema) ||
+        JSON.stringify(approvedTool.metadata || {}) !== JSON.stringify(run.pendingApproval.metadata)) {
+      throw new ToolPolicyError('Approved tool contract changed; new review is required.');
+    }
+    const currentPolicy = await this.toolPolicy.evaluate(approvedTool, run.pendingApproval.arguments, { run, config });
+    if (!['allow', 'require_approval'].includes(currentPolicy?.action)) {
+      throw new ToolPolicyError('Current policy does not permit approved tool execution.');
+    }
+
     run.setStatus('running');
     await this._emitEvent(run, 'approval_resolved', {
       request: run.pendingApproval,
@@ -830,21 +1065,36 @@ class Agent {
           ? { approved: true, reason: config.reason || null }
           : await this.toolPolicy.resolveApproval(approvalRequest, { run, config });
 
-      if (!approvalResult?.approved) {
+      if (approvalResult?.approved !== true) {
         throw new ToolPolicyError(
           approvalResult?.reason || `Execution denied for tool "${run.pendingApproval.toolName}".`
         );
       }
 
-      const toolResult = await this.retryManager.execute(() =>
-        this._handleToolCall(approvalRequest.toolCall, { run })
-      );
+      const consumed = run.state.approvalConsumptions || {};
+      if (this.approvalSigner && !this.approvalSigner.verify(approvalRequest)) {
+        throw new ToolPolicyError('Approval changed during authorization.');
+      }
+      if (Object.hasOwn(consumed, approvalRequest.id)) throw new ToolPolicyError('Approval was already consumed.');
+      run.state.approvalConsumptions = { ...consumed, [approvalRequest.id]: {
+        status: 'uncertain', consumedAt: new Date().toISOString(), toolName: approvalRequest.toolName,
+      } };
+      run.pendingApproval = null;
+      await this._persistRun(run);
+
+      const resumedConfig = { ...this.defaultConfig, ...config };
+      const noRetry = !this._canRetryTool(approvedTool);
+      const execute = () => this._handleToolCall(approvalRequest.toolCall, { run, signal: resumedConfig.signal, frozenArgs: true });
+      const toolResult = noRetry ? await execute() : await this.retryManager.execute(execute);
       this._appendToolMessages(run, approvalRequest.toolCall, toolResult);
+      run.state.approvalConsumptions[approvalRequest.id].status = 'completed';
       run.pendingApproval = null;
       await this._persistRun(run);
       await this._checkpointRun(run, 'tool_approved_and_resumed', {
         toolName: approvalRequest.toolName,
       });
+      if (toolResult?.__adaptiveEscalated) return run;
+      if (run.metadata.executionMode === 'tool') return await this._finishToolRun(run, toolResult);
 
       return this._continueRun(run, { ...this.defaultConfig, ...config }, { skipPromptBuild: true });
     } catch (error) {
@@ -857,6 +1107,7 @@ class Agent {
 
     try {
       while (true) {
+        this._checkSignal(finalConfig.signal);
         const pauseBeforeModel = await this._maybePause(run, finalConfig, 'before_model', {
           messageCount: run.messages.length,
         });
@@ -873,9 +1124,42 @@ class Agent {
         });
         const modelStartedAt = Date.now();
 
-        result = await this.retryManager.execute(() =>
-          this.adapter.generateText(run.messages, { ...finalConfig, tools: this.tools })
-        );
+        const projection = this.contextWindow ? await this.contextWindow.project(run.messages, this.tools) : null;
+        if (projection) {
+          const { messages, ...summary } = projection;
+          run.state.contextWindow = summary;
+          await this._emitEvent(run, 'context_projected', summary);
+        }
+        const modelMessages = projection?.messages || run.messages;
+        const modelConfig = { ...finalConfig, tools: this.tools };
+        if (projection) modelConfig.maxTokens = Math.min(
+          modelConfig.maxTokens ?? projection.reserveOutputTokens, projection.reserveOutputTokens);
+        result = await this.retryManager.execute(async () => {
+          this._checkSignal(finalConfig.signal);
+          if (this.authorizeModelCall && await this.authorizeModelCall({
+            messages: modelMessages, config: modelConfig, adapter: this.adapter,
+          }, { run }) !== true) throw new ToolPolicyError('Model call denied.');
+          await this._reserveExecution(run, 'modelCalls');
+          try {
+            return await this._withBudget(run, 'model', { messages: modelMessages, config: modelConfig },
+              () => invokeWithDeadline(signal => this.adapter.generateText(modelMessages, { ...modelConfig, signal }),
+                { signal: finalConfig.signal, timeoutMs: this.invocationTimeoutMs }));
+          } catch (error) {
+            this._checkSignal(finalConfig.signal);
+            throw error;
+          }
+        });
+        this._checkSignal(finalConfig.signal);
+        const completion = result?.completionStatus ||
+          (['length', 'max_tokens'].includes(result?.finishReason) ? 'incomplete' : 'completed');
+        if (!['completed', 'incomplete', 'uncertain'].includes(completion)) {
+          throw new InvalidToolCallError('Invalid model completion status.');
+        }
+        run.state.resultStatus = completion;
+        if (completion !== 'completed') {
+          run.output = result?.message || null;
+          return this._pauseRun(run, 'Model output is not complete.', { stage: `output_${completion}` });
+        }
         run.recordTiming('modelMs', Date.now() - modelStartedAt);
         if (result?.usage) {
           run.recordUsage(result.usage);
@@ -919,7 +1203,15 @@ class Agent {
             return pauseBeforeTool;
           }
 
-          const gate = await this._gateToolCall(run, toolCall, finalConfig);
+          let gate = await this._gateToolCall(run, toolCall, finalConfig);
+          if (gate.status !== 'waiting_for_approval') {
+            const originalArgs = JSON.stringify(toolCall.arguments);
+            toolCall.arguments = await this._withBudget(run, 'argument_resolution', { toolName: toolCall.name },
+              () => this.resolver.resolve(this.tools.find(tool => tool.name === toolCall.name), toolCall.arguments));
+            if (JSON.stringify(toolCall.arguments) !== originalArgs) {
+              gate = await this._gateToolCall(run, toolCall, finalConfig);
+            }
+          }
           if (gate.status === 'waiting_for_approval') {
             await this._checkpointRun(run, 'waiting_for_approval', {
               toolName: toolCall.name,
@@ -927,9 +1219,10 @@ class Agent {
             return run;
           }
 
-          const toolResult = await this.retryManager.execute(() =>
-            this._handleToolCall(toolCall, { run })
-          );
+          const noRetry = !this._canRetryTool(this.tools.find(tool => tool.name === toolCall.name));
+          const toolResult = noRetry
+            ? await this._handleToolCall(toolCall, { run, signal: finalConfig.signal, frozenArgs: true })
+            : await this.retryManager.execute(() => this._handleToolCall(toolCall, { run, signal: finalConfig.signal, frozenArgs: true }));
           if (toolResult?.__adaptiveEscalated) {
             return run;
           }
@@ -948,6 +1241,7 @@ class Agent {
       }
 
       run.output = result?.message || result;
+      this._validateFinalOutput(run);
       await this._selfVerifyRunOutput(run, finalConfig);
       const assessment = this._assessRun(run);
       const confidenceDecision = await this._applyRunConfidencePolicy(run, assessment, finalConfig);
@@ -957,13 +1251,13 @@ class Agent {
       if (confidenceDecision?.action === 'deny') {
         throw new ToolPolicyError(confidenceDecision.reason || 'Run denied by confidence policy.');
       }
-      run.setStatus('completed');
-
       if (this.memory?.storeConversation) {
-        this.memory.storeConversation(run.input, result.message || JSON.stringify(result));
+        await this._withBudget(run, 'memory_write', { input: run.input },
+          () => this.memory.storeConversation(run.input, result.message || JSON.stringify(result), { runId: run.id }));
       } else if (this.memory?.store) {
         this.memory.store(run.input, result);
       }
+      run.setStatus('completed');
 
       await this._emitEvent(run, 'run_completed', { output: run.output });
       await this._checkpointRun(run, 'run_completed', { output: run.output });
@@ -979,12 +1273,14 @@ class Agent {
       name: error.name || 'Error',
       message: error.message || String(error),
     });
-    run.setStatus('failed');
-    await this._emitEvent(run, 'run_failed', {
+    const cancelled = error instanceof RunCancelledError;
+    run.state.resultStatus = error?.uncertain ? 'uncertain' : cancelled ? 'cancelled' : 'failed';
+    run.setStatus(cancelled ? 'cancelled' : 'failed');
+    await this._emitEvent(run, cancelled ? 'run_cancelled' : 'run_failed', {
       name: error.name || 'Error',
       message: error.message || String(error),
     });
-    await this._checkpointRun(run, 'run_failed', {
+    await this._checkpointRun(run, cancelled ? 'run_cancelled' : 'run_failed', {
       name: error.name || 'Error',
       message: error.message || String(error),
     });
@@ -1005,12 +1301,25 @@ class Agent {
     }
 
     const request = {
+      id: randomUUID(),
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + this.approvalTtlMs).toISOString(),
       runId: run.id,
+      scopeKey: this._lockKey(run.id),
       toolName: toolCall.name,
       toolCall,
       arguments: toolCall.arguments || {},
       metadata: toolInstance.metadata || {},
+      toolSchema: toolInstance.parameters || {},
+      toolOutputSchema: toolInstance.outputSchema || null,
     };
+    this.schemaSafety.assertValue(request);
+    request.toolCall = JSON.parse(JSON.stringify(request.toolCall));
+    request.arguments = JSON.parse(JSON.stringify(request.arguments));
+    request.metadata = JSON.parse(JSON.stringify(request.metadata));
+    request.toolSchema = JSON.parse(JSON.stringify(request.toolSchema));
+    request.toolOutputSchema = JSON.parse(JSON.stringify(request.toolOutputSchema));
+    if (this.approvalSigner) request.signature = this.approvalSigner.sign(request);
 
     run.addToolCall(request);
     await this._emitEvent(run, 'tool_requested', request);
@@ -1044,10 +1353,13 @@ class Agent {
       return { status: 'waiting_for_approval' };
     }
 
-    const decision = this.toolPolicy.evaluate(toolInstance, toolCall.arguments || {}, {
+    const decision = await this.toolPolicy.evaluate(toolInstance, toolCall.arguments || {}, {
       run,
       config: finalConfig,
     });
+    if (!['allow', 'deny', 'require_approval'].includes(decision?.action)) {
+      throw new ToolPolicyError('Invalid tool policy decision.');
+    }
     run.state.policyDecisions = run.state.policyDecisions || [];
     run.state.policyDecisions.push({
       toolName: toolCall.name,
@@ -1085,6 +1397,9 @@ class Agent {
       toolCall.arguments || {},
       { run, config: finalConfig }
     );
+    if (!['allow', 'deny', 'require_approval'].includes(beforeExecution?.action)) {
+      throw new ToolPolicyError('Invalid before-execute decision.');
+    }
     run.state.policyDecisions.push({
       toolName: toolCall.name,
       stage: 'before_execute',
@@ -1208,15 +1523,12 @@ class Agent {
         },
       ];
 
-      const response = await this.verifier.generateText(prompt, {
-        temperature: 0,
-        maxTokens: 200,
-      });
+      const response = await this._callVerifierModel(prompt, context);
       const content = response?.message || response?.content || '';
       return repairJsonOutput(
         {
           sendMessage: async repairPrompt => {
-            const repairResponse = await this.verifier.generateText(
+            const repairResponse = await this._callVerifierModel(
               [
                 {
                   role: 'system',
@@ -1224,7 +1536,7 @@ class Agent {
                 },
                 { role: 'user', content: repairPrompt },
               ],
-              { temperature: 0, maxTokens: 200 }
+              context
             );
             return repairResponse?.message || repairResponse?.content || '';
           },
@@ -1234,6 +1546,19 @@ class Agent {
     }
 
     return null;
+  }
+
+  async _callVerifierModel(messages, { run, config = {} } = {}) {
+    const options = { temperature: 0, maxTokens: 200, signal: config.signal };
+    this._checkSignal(config.signal);
+    if (this.authorizeModelCall && await this.authorizeModelCall({
+      operation: 'verifier', messages, config: options, adapter: this.verifier,
+    }, { run }) !== true) throw new ToolPolicyError('Verifier model call denied.');
+    this._checkSignal(config.signal);
+    if (run) await this._reserveExecution(run, 'modelCalls');
+    return this._withBudget(run, 'model', { messages, config: options, operation: 'verifier' },
+      () => invokeWithDeadline(signal => this.verifier.generateText(messages, { ...options, signal }),
+        { signal: config.signal, timeoutMs: this.invocationTimeoutMs }));
   }
 
   async _verifyToolCall(tool, toolCall, { run, config = {} } = {}) {
@@ -1271,9 +1596,13 @@ class Agent {
       const verifierVerdict =
         policyVerdict?.action && policyVerdict.action !== 'allow'
           ? policyVerdict
-          : await this._invokeVerifier(tool, toolCall.arguments || {}, { run, config, toolCall });
+          : await this._withBudget(run, 'verifier', { toolName: tool.name },
+            () => this._invokeVerifier(tool, toolCall.arguments || {}, { run, config, toolCall }));
 
       const verdict = verifierVerdict || policyVerdict || { action: 'allow', reason: null };
+      if (!['allow', 'deny', 'require_approval'].includes(verdict?.action)) {
+        throw new ToolPolicyError('Invalid verifier decision.');
+      }
 
       if (run) {
         run.recordTiming('verifierMs', Date.now() - startedAt);
@@ -1417,18 +1746,28 @@ class Agent {
   }
 
   async _handleToolCall(toolCall, runtime = {}) {
+    this._checkSignal(runtime.signal);
     const toolInstance = this.tools.find(tool => tool.name === toolCall.name);
     if (!toolInstance) {
       throw new ToolNotFoundError(`Tool ${toolCall.name} not found.`);
     }
 
-    const resolvedArgs = await this.resolver.resolve(toolInstance, toolCall.arguments || {});
+    let resolvedArgs;
+    if (runtime.frozenArgs) {
+      resolvedArgs = JSON.parse(JSON.stringify(toolCall.arguments || {}));
+      if (!this.resolver.validator.validate(toolInstance, resolvedArgs).valid) {
+        throw new InvalidToolCallError('Approved tool arguments no longer match its schema.');
+      }
+    } else resolvedArgs = await this.resolver.resolve(toolInstance, toolCall.arguments || {});
     const auth = await this._resolveToolAuth(toolInstance, runtime);
     const toolContext = {
       toolCall,
       run: runtime.run || null,
+      persistRun: runtime.run ? () => this._persistRun(runtime.run) : null,
+      signal: runtime.signal,
       auth,
       getAuth: key => auth[key],
+      idempotencyKey: `${runtime.run?.id || 'direct'}:${toolCall.id || runtime.run?.toolCalls.at(-1)?.id || randomUUID()}`,
     };
     const step = runtime.run
       ? this._startStep(runtime.run, 'tool', {
@@ -1444,13 +1783,45 @@ class Agent {
       });
     }
 
+    let externalReturned = false;
     try {
       const toolStartedAt = Date.now();
-      const rawResult = this.adaptiveRetryPolicy?.onFailure && this.retryManager.executeWithPolicy
+      const invoke = async () => {
+        this._checkSignal(runtime.signal);
+        if (runtime.run) await this._reserveExecution(runtime.run, 'toolCalls');
+        return this._withBudget(runtime.run, 'tool', { toolName: toolCall.name, args: resolvedArgs,
+          metadata: toolInstance.metadata }, () => invokeWithDeadline(async signal => {
+            if (runtime.run) {
+              runtime.run.state.actions = runtime.run.state.actions || {};
+              Object.defineProperty(runtime.run.state.actions, step.id, { value: {
+                toolName: toolCall.name, idempotencyKey: toolContext.idempotencyKey, status: 'uncertain',
+              }, enumerable: true, configurable: true, writable: true });
+              await this._persistRun(runtime.run);
+            }
+            signal.throwIfAborted();
+            const output = await toolInstance.call(resolvedArgs, { ...toolContext, signal });
+            signal.throwIfAborted();
+            externalReturned = true;
+            if (runtime.run) {
+              runtime.run.state.actions[step.id].status = 'completed';
+              await this._persistRun(runtime.run);
+            }
+            return output;
+          },
+            { signal: runtime.signal, timeoutMs: this.invocationTimeoutMs }));
+      };
+      const rawResult = toolInstance.metadata?.retryabilityHint !== 'never' &&
+        this.adaptiveRetryPolicy?.onFailure && this.retryManager.executeWithPolicy
         ? await this.retryManager.executeWithPolicy(
-            () => toolInstance.call(resolvedArgs, toolContext),
+            invoke,
             {
-              policy: this.adaptiveRetryPolicy,
+              policy: {
+                onFailure: (error, details) => {
+                  const decision = this.adaptiveRetryPolicy.onFailure(error, details);
+                  return !this._canRetryTool(toolInstance) && decision?.action === 'retry'
+                    ? { ...decision, action: 'fail' } : decision;
+                },
+              },
               context: {
                 operation: 'tool_execution',
                 toolName: toolCall.name,
@@ -1482,14 +1853,18 @@ class Agent {
               },
             }
           )
-        : await toolInstance.call(resolvedArgs, toolContext);
+        : await invoke();
       if (rawResult?.__adaptiveEscalated) {
         return rawResult;
       }
+      this._checkSignal(runtime.signal);
       const result = await this.toolPolicy.onAfterExecute(toolInstance, rawResult, {
         run: runtime.run || null,
         toolCall,
       });
+      if (!this.resolver.validator.validateOutput(toolInstance, result).valid) {
+        throw new InvalidToolCallError('Tool output schema validation failed.');
+      }
       if (runtime.run) {
         runtime.run.recordTiming('toolMs', Date.now() - toolStartedAt);
       }
@@ -1507,6 +1882,7 @@ class Agent {
 
       return result;
     } catch (error) {
+      if (externalReturned && error && typeof error === 'object') error.retryable = false;
       if (runtime.run) {
         if (step) {
           this._failStep(runtime.run, step.id, error);
@@ -1517,91 +1893,94 @@ class Agent {
         });
       }
 
-      throw new ToolExecutionError(
-        `Tool "${toolCall.name}" failed: ${error.message || String(error)}`
-      );
+      this._checkSignal(runtime.signal);
+      if (error?.retryable === false) throw error;
+      const wrapped = new ToolExecutionError(`Tool "${toolCall.name}" failed: ${error.message || String(error)}`);
+      wrapped.uncertain = ['external_write', 'system_write', 'destructive'].includes(toolInstance.metadata?.sideEffectLevel);
+      throw wrapped;
     }
   }
 
-  async analyzeImage(imageData, config = {}) {
-    if (!this.adapter?.analyzeImage) {
-      throw new AdapterCapabilityError('Adapter does not support analyzeImage().');
+  async runMedia(operation, input, config = {}) {
+    const capabilities = { analyzeImage: 'imageAnalysis', generateImage: 'imageGeneration',
+      transcribeAudio: 'audioTranscription', generateAudio: 'audioGeneration',
+      analyzeVideo: 'videoAnalysis', generateVideo: 'videoGeneration' };
+    const capability = Object.hasOwn(capabilities, operation) ? capabilities[operation] : null;
+    const declared = this.adapter?.getCapabilities?.();
+    if (!capability || typeof this.adapter?.[operation] !== 'function' || (declared && declared[capability] !== true)) {
+      throw new AdapterCapabilityError('Adapter does not support the requested media operation.');
     }
-
     const finalConfig = { ...this.defaultConfig, ...config };
-    const promptObject = await this._buildSystemPrompt(
-      config.prompt || 'Analyze this image.',
-      finalConfig
-    );
-
-    return this.retryManager.execute(() =>
-      this.adapter.analyzeImage(imageData, {
-        ...finalConfig,
-        prompt: promptObject,
-      })
-    );
+    const runId = finalConfig.runId || randomUUID();
+    return this.runLock.withLock(this._lockKey(runId), async () => {
+      if (this.runStore?.getRun && await this.runStore.getRun(runId)) throw new ToolPolicyError('Run ID already exists.');
+      // Legacy adapters may accept buffers, local paths, or signed URLs. Never persist
+      // those inputs or their raw outputs implicitly.
+      const run = new Run({ id: runId, input: { operation, contentRecorded: false },
+        metadata: { ...finalConfig.metadata, executionMode: 'media', operation,
+          executionIdentity: this._resolveExecutionIdentity(finalConfig) } });
+      run.setStatus('running');
+      await this._persistRun(run);
+      let dispatched = false;
+      let mediaStep;
+      try {
+        this._checkSignal(finalConfig.signal);
+        const request = { operation, input, config: finalConfig };
+        if (this.authorizeModelCall && await this.authorizeModelCall(request, { run }) !== true) {
+          throw new ToolPolicyError('Media provider call denied.');
+        }
+        let payload = input;
+        let providerConfig = { ...finalConfig };
+        // Analysis helpers historically included memory and retrieval in their prompt.
+        if (['analyzeImage', 'analyzeVideo', 'generateImage', 'generateVideo'].includes(operation)) {
+          const prompt = operation.startsWith('analyze')
+            ? finalConfig.prompt || (operation === 'analyzeImage' ? 'Analyze this image.' : 'Describe this video.') : input;
+          const promptObject = await this._buildSystemPrompt(prompt, finalConfig, { run, signal: finalConfig.signal });
+          if (operation.startsWith('analyze')) providerConfig.prompt = promptObject;
+          else payload = operation === 'generateImage' ? promptObject : promptObject.user;
+        }
+        // Inspect the fully assembled request as well: memory/RAG can add disclosure.
+        if (this.authorizeModelCall && await this.authorizeModelCall({ operation, input: payload, config: providerConfig }, { run }) !== true) {
+          throw new ToolPolicyError('Assembled media provider call denied.');
+        }
+        this._checkSignal(finalConfig.signal);
+        await this._reserveExecution(run, 'modelCalls');
+        const step = mediaStep = this._startStep(run, 'model', { operation, contentRecorded: false });
+        await this._emitEvent(run, 'media_started', { operation, stepId: step.id });
+        const result = await this._withBudget(run, 'model', { operation, input: payload, config: providerConfig },
+          () => invokeWithDeadline(signal => {
+            dispatched = true;
+            return this.adapter[operation](payload, { ...providerConfig, signal });
+          }, { signal: finalConfig.signal, timeoutMs: this.invocationTimeoutMs }));
+        this._checkSignal(finalConfig.signal);
+        const completion = result?.completionStatus || 'completed';
+        if (!['completed', 'incomplete', 'uncertain'].includes(completion)) throw new Error('Invalid media completion status.');
+        run.output = { operation, contentRecorded: false };
+        run.state.resultStatus = completion;
+        run.setStatus(completion === 'completed' ? 'completed' : 'paused');
+        if (run.status === 'paused') run.pendingPause = { stage: 'media_reconciliation', reason: 'Media output is not complete.' };
+        this._completeStep(run, step.id, { operation, contentRecorded: false, completionStatus: completion });
+        await this._emitEvent(run, `media_${run.status}`, { operation, stepId: step.id });
+        await this._checkpointRun(run, `media_${run.status}`);
+        return { run, result };
+      } catch (error) {
+        const safeError = new ToolExecutionError('Media operation did not complete.');
+        safeError.retryable = false;
+        safeError.uncertain = dispatched;
+        if (mediaStep) this._failStep(run, mediaStep.id, safeError);
+        if (finalConfig.signal?.aborted && !dispatched) return this._failRun(run, new RunCancelledError('Media operation cancelled.'));
+        if (!dispatched && error instanceof ToolPolicyError) return this._failRun(run, error);
+        return this._failRun(run, safeError);
+      }
+    });
   }
 
-  async generateImage(userPrompt, config = {}) {
-    if (!this.adapter?.generateImage) {
-      throw new AdapterCapabilityError('Adapter does not support generateImage().');
-    }
-
-    const finalConfig = { ...this.defaultConfig, ...config };
-    const promptObject = await this._buildSystemPrompt(userPrompt, finalConfig);
-
-    return this.retryManager.execute(() => this.adapter.generateImage(promptObject, finalConfig));
-  }
-
-  async transcribeAudio(audioData, config = {}) {
-    if (!this.adapter?.transcribeAudio) {
-      throw new AdapterCapabilityError('Adapter does not support transcribeAudio().');
-    }
-
-    const finalConfig = { ...this.defaultConfig, ...config };
-    return this.retryManager.execute(() => this.adapter.transcribeAudio(audioData, finalConfig));
-  }
-
-  async generateAudio(text, config = {}) {
-    if (!this.adapter?.generateAudio) {
-      throw new AdapterCapabilityError('Adapter does not support generateAudio().');
-    }
-
-    const finalConfig = { ...this.defaultConfig, ...config };
-    return this.retryManager.execute(() => this.adapter.generateAudio(text, finalConfig));
-  }
-
-  async analyzeVideo(videoData, config = {}) {
-    if (!this.adapter?.analyzeVideo) {
-      throw new AdapterCapabilityError('Adapter does not support analyzeVideo().');
-    }
-
-    const finalConfig = { ...this.defaultConfig, ...config };
-    const promptObject = await this._buildSystemPrompt(
-      config.prompt || 'Describe this video.',
-      finalConfig
-    );
-
-    return this.retryManager.execute(() =>
-      this.adapter.analyzeVideo(videoData, {
-        ...finalConfig,
-        prompt: promptObject,
-      })
-    );
-  }
-
-  async generateVideo(text, config = {}) {
-    if (!this.adapter?.generateVideo) {
-      throw new AdapterCapabilityError('Adapter does not support generateVideo().');
-    }
-
-    const finalConfig = { ...this.defaultConfig, ...config };
-    const promptObject = await this._buildSystemPrompt(text, finalConfig);
-
-    return this.retryManager.execute(() =>
-      this.adapter.generateVideo(promptObject.user, finalConfig)
-    );
-  }
+  async analyzeImage(input, config = {}) { return (await this.runMedia('analyzeImage', input, config)).result; }
+  async generateImage(input, config = {}) { return (await this.runMedia('generateImage', input, config)).result; }
+  async transcribeAudio(input, config = {}) { return (await this.runMedia('transcribeAudio', input, config)).result; }
+  async generateAudio(input, config = {}) { return (await this.runMedia('generateAudio', input, config)).result; }
+  async analyzeVideo(input, config = {}) { return (await this.runMedia('analyzeVideo', input, config)).result; }
+  async generateVideo(input, config = {}) { return (await this.runMedia('generateVideo', input, config)).result; }
 
   async init() {
     if (!this.mcpClient || typeof this.mcpClient.toTools !== 'function') {
@@ -1620,6 +1999,10 @@ class Agent {
   }
 
   async pauseRun(runId, { reason = 'Paused manually.', stage = 'manual', payload = {} } = {}) {
+    return this.runLock.withLock(this._lockKey(runId), () => this._pauseStoredRun(runId, { reason, stage, payload }));
+  }
+
+  async _pauseStoredRun(runId, { reason, stage, payload }) {
     if (!this.runStore?.getRun) {
       throw new RunNotFoundError('Cannot pause a run without a configured runStore.');
     }
@@ -1638,6 +2021,10 @@ class Agent {
   }
 
   async cancelRun(runId, { reason = 'Cancelled manually.', payload = {} } = {}) {
+    return this.runLock.withLock(this._lockKey(runId), () => this._cancelStoredRun(runId, { reason, payload }));
+  }
+
+  async _cancelStoredRun(runId, { reason, payload }) {
     if (!this.runStore?.getRun) {
       throw new RunNotFoundError('Cannot cancel a run without a configured runStore.');
     }

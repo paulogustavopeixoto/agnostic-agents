@@ -1,6 +1,7 @@
 // src/llm/anthropic.js
 const { Anthropic } = require('@anthropic-ai/sdk');
 const { BaseProvider } = require('./BaseProvider');
+const { anthropicMessages, completionState } = require('./ProviderMessages');
 
 class AnthropicAdapter extends BaseProvider {
   /**
@@ -18,7 +19,7 @@ class AnthropicAdapter extends BaseProvider {
       },
     });
     this.apiKey = apiKey;
-    this.client = new Anthropic({ apiKey }); // Remove built-in retries
+    this.client = new Anthropic({ apiKey, maxRetries: 0 });
     this.model = options.model || 'claude-3-5-sonnet-20240620';
   }
 
@@ -28,24 +29,25 @@ class AnthropicAdapter extends BaseProvider {
    * @param {object} options - {model, temperature, tools, maxTokens}
    * @returns {Promise<object>} - {message: string, toolCalls?: array}
    */
-  async generateText(promptObject, { model, temperature = 1, tools = [], maxTokens = 1024 } = {}) {
+  async generateText(promptObject, { model, temperature = 1, tools = [], maxTokens = 1024, signal } = {}) {
     return await this.retryManager.execute(async () => {
       const anthropicTools = tools.map((tool) => tool.toAnthropicTool());
-      const messages = Array.isArray(promptObject) ? promptObject : [
-        ...(promptObject.context ? [{ role: "user", content: promptObject.context }] : []),
-        ...(promptObject.user ? [{ role: "user", content: promptObject.user }] : [])
-      ];
+      const { messages, system } = anthropicMessages(promptObject);
 
       const params = {
         model: model || this.model,
-        system: Array.isArray(promptObject) ? undefined : promptObject.system || undefined,
+        system,
         messages,
         max_tokens: maxTokens,
         temperature,
         tools: anthropicTools.length > 0 ? anthropicTools : undefined,
       };
 
-      const response = await this.client.messages.create(params);
+      const response = await this.client.messages.create(params, { signal });
+      const state = completionState(response.stop_reason);
+      const usage = response.usage ? { prompt: response.usage.input_tokens || 0,
+        completion: response.usage.output_tokens || 0,
+        total: (response.usage.input_tokens || 0) + (response.usage.output_tokens || 0) } : undefined;
 
       let textContent = '';
       const toolCalls = [];
@@ -65,9 +67,9 @@ class AnthropicAdapter extends BaseProvider {
       }
 
       if (toolCalls.length > 0) {
-        return { message: '', toolCalls };
+        return { message: '', toolCalls, ...state, usage };
       }
-      return { message: textContent.trim() };
+      return { message: textContent.trim(), ...state, usage };
     });
   }
 
@@ -85,7 +87,8 @@ class AnthropicAdapter extends BaseProvider {
       const temperature = config.temperature ?? 1;
       const maxTokens = config.maxTokens || 1024;
 
-      const messages = Array.isArray(promptObject) ? promptObject : [
+      const legacy = Array.isArray(promptObject) ? promptObject : [
+        ...(promptObject.system ? [{ role: 'system', content: promptObject.system }] : []),
         ...(promptObject.context ? [{ role: "user", content: promptObject.context }] : []),
         ...(promptObject.user ? [{ role: "user", content: promptObject.user }] : []),
         {
@@ -107,13 +110,15 @@ class AnthropicAdapter extends BaseProvider {
         }
       ];
 
+      const { messages, system } = anthropicMessages(legacy);
+
       const response = await this.client.messages.create({
         model,
-        system: Array.isArray(promptObject) ? undefined : promptObject.system || undefined,
+        system,
         messages,
         temperature,
         max_tokens: maxTokens,
-      });
+      }, { signal: config.signal });
 
       let textContent = '';
       if (Array.isArray(response.content)) {

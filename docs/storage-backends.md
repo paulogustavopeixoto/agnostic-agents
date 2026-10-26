@@ -2,7 +2,17 @@
 
 This guide describes the maintained storage backend expectations for `agnostic-agents` in production-like environments.
 
+Vector storage has a separate shortlist: PineconeVectorStore, QdrantVectorStore and
+PgVectorStore. These are contract-tested adapters with host-injected clients, not
+SQL run/job stores or live-certified deployments. See
+[initial-support-targets.md](initial-support-targets.md) for scope and live checks.
+The earlier PostgreSQL/SQLite/MySQL run-persistence shortlist is not the vector
+selection; this update does not implement those SQL run/job backends.
+
 The package ships:
+
+- `LocalVectorStore` (in-memory vectors)
+- `FileVectorStore` (bounded persistent local vectors; see [local vector storage](local-vector-storage.md))
 
 - `InMemoryRunStore`
 - `FileRunStore`

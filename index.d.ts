@@ -6,6 +6,215 @@ export type JsonValue =
   | JsonObject
   | JsonValue[];
 
+export type ProducerContent =
+  | { type: 'text'; text: string }
+  | { type: 'json'; value: JsonValue }
+  | { type: 'image' | 'audio' | 'video' | 'file'; artifactId: string; mimeType: string };
+export interface ProducerRequest { operation: string; content: ProducerContent[]; }
+export interface ProducerContext { runId: string; signal?: AbortSignal; }
+export interface ProviderTarget {
+  id: string; name: string; integration: 'adapter' | 'producer' | 'job-backend';
+  requiredEnv: string[]; primaryTextSmoke: boolean; verification: 'live-revalidation-pending';
+}
+export class ProviderCatalog {
+  static list(): ProviderTarget[];
+  static vectorStores(): Array<{ id: string; name: string; implementation: string; verification: 'live-revalidation-pending' }>;
+}
+export interface HttpConnectorOptions { fetchImpl?: typeof fetch; timeoutMs?: number; maxBytes?: number; }
+export class MistralAdapter {
+  constructor(apiKey: string, options: HttpConnectorOptions & { model: string });
+  getCapabilities(): Record<string, boolean>;
+  supports(capability: string): boolean;
+  generateText(prompt: any, config?: Record<string, any>): Promise<any>;
+  generateToolResult(prompt: any, toolCall: any, toolResult: any, config?: Record<string, any>): Promise<string>;
+}
+export class XAIAdapter extends MistralAdapter {}
+export class ElevenLabsProducer implements Producer {
+  constructor(options: HttpConnectorOptions & { apiKey: string; voiceId: string; model: string;
+    saveArtifact(asset: { data: Uint8Array; mimeType: string }, context: ProducerContext): Promise<{ artifactId: string }> });
+  id: string;
+  supports(operation: string): boolean;
+  produce(request: ProducerRequest, context?: ProducerContext): Promise<{ content: ProducerContent[] }>;
+}
+export interface MediaJobBackendOptions extends HttpConnectorOptions {
+  apiKey: string; modelPath: string; operation: 'generateImage' | 'generateVideo';
+  toInput(request: ProducerRequest, context: any): JsonObject | Promise<JsonObject>;
+  toContent(result: any, context: ProducerContext & { jobId: string; provider: string }): ProducerContent[] | Promise<ProducerContent[]>;
+}
+export class FalJobBackend {
+  constructor(options: MediaJobBackendOptions);
+  id: string;
+  start(request: ProducerRequest, context?: any): Promise<{ jobId: string }>;
+  poll(jobId: string, context?: any): Promise<{ status: 'pending' | 'completed' | 'failed'; content?: ProducerContent[] }>;
+  cancel(jobId: string, context?: any): Promise<{ cancellationRequested: boolean }>;
+}
+export class HiggsfieldJobBackend extends FalJobBackend {}
+export type CompletionStatus = 'completed' | 'incomplete' | 'failed' | 'cancelled' | 'uncertain';
+export interface SchemaSafetyOptions {
+  maxDepth?: number; maxNodes?: number; maxBytes?: number; allowPatterns?: boolean; allowLocalRefs?: boolean;
+}
+export class SchemaSafety {
+  constructor(options?: SchemaSafetyOptions);
+  assertValue(value: unknown): void;
+  assertSchema(schema: unknown): void;
+}
+export interface RunLock { withLock<T>(key: string, action: () => Promise<T>): Promise<T>; }
+export class InMemoryRunLock implements RunLock {
+  withLock<T>(key: string, action: () => Promise<T>): Promise<T>;
+}
+export class FileRunLock implements RunLock {
+  constructor(options: { directory: string });
+  withLock<T>(key: string, action: () => Promise<T>): Promise<T>;
+}
+export class ApprovalSigner {
+  constructor(options: { key: string | Uint8Array });
+  sign(request: any): string;
+  verify(request: any): boolean;
+}
+export interface RunBudgetOptions {
+  limits: { tokens?: number; costMicros?: number };
+  estimate(request: any, context: { run: Run }): any | Promise<any>;
+}
+export class RunBudget {
+  constructor(options: RunBudgetOptions);
+  reserve(run: Run, request: any): Promise<any>;
+  settle(run: Run, reservation: any, actual?: { tokens?: number; costMicros?: number }): void;
+}
+export interface ContentEnvelopeValue {
+  kind: 'agnostic-agents/content'; version: '1.0'; status: CompletionStatus; content: ProducerContent[];
+}
+export class ContentEnvelope {
+  static create(input: { content: ProducerContent[]; status?: CompletionStatus }): ContentEnvelopeValue;
+  static parse(value: unknown): ContentEnvelopeValue;
+  static migrate(value: any, options: { fromVersion: 'legacy' | '1.0' }): ContentEnvelopeValue;
+}
+export type RealtimeFrame = { type: 'text'; text: string } |
+  { type: 'audio' | 'video' | 'image'; data: Uint8Array; mimeType: string };
+export interface RealtimeTransport {
+  connect(context: { runId: string; signal?: AbortSignal }): Promise<unknown>;
+  send(frame: RealtimeFrame & { epoch: number }, context: { signal?: AbortSignal }): Promise<unknown>;
+  interrupt(context: { epoch: number; signal?: AbortSignal }): Promise<unknown>;
+  events(): AsyncIterable<(RealtimeFrame | { type: 'end' }) & { epoch: number }>;
+  close(): Promise<unknown>;
+}
+export class RealtimeSession {
+  constructor(options: { transport: RealtimeTransport; authorize(request: any): boolean | Promise<boolean>;
+    runStore?: BaseRunStore; maxFrameBytes?: number; maxFrames?: number; maxTotalBytes?: number; invocationTimeoutMs?: number });
+  run: Run | null;
+  open(options?: { signal?: AbortSignal }): Promise<Run>;
+  send(frame: RealtimeFrame, options?: { signal?: AbortSignal }): Promise<void>;
+  interrupt(options?: { signal?: AbortSignal }): Promise<void>;
+  events(options?: { signal?: AbortSignal }): AsyncGenerator<RealtimeFrame & { epoch: number; runId: string }>;
+  close(): Promise<void>;
+}
+export interface Producer {
+  id: string;
+  supports(operation: string): boolean;
+  produce(request: ProducerRequest, context: ProducerContext): Promise<{ content: ProducerContent[]; completionStatus?: 'completed' | 'incomplete' | 'uncertain' }>;
+  supportsStream?(operation: string): boolean;
+  stream?(request: ProducerRequest, context: ProducerContext): AsyncIterable<{ type: 'content'; content: ProducerContent[] }>;
+}
+export function normalizeContent(content: ProducerContent[]): ProducerContent[];
+export class FunctionProducer implements Producer {
+  constructor(options: { id: string; operations?: Record<string,
+    (request: ProducerRequest, context: ProducerContext) => Promise<{ content: ProducerContent[]; completionStatus?: 'completed' | 'incomplete' | 'uncertain' }>>;
+    streams?: Record<string, (request: ProducerRequest, context: ProducerContext) =>
+      AsyncIterable<{ type: 'content'; content: ProducerContent[] }>> });
+  id: string;
+  supports(operation: string): boolean;
+  produce(request: ProducerRequest, context: ProducerContext): Promise<{ content: ProducerContent[]; completionStatus?: 'completed' | 'incomplete' | 'uncertain' }>;
+  supportsStream(operation: string): boolean;
+  stream(request: ProducerRequest, context: ProducerContext): AsyncIterable<{ type: 'content'; content: ProducerContent[] }>;
+}
+export class ProducerRuntime {
+  constructor(options: { producer: Producer; runStore?: { saveRun(run: Run): Promise<unknown> };
+    authorize?: (request: ProducerRequest, context: ProducerContext) => boolean | Promise<boolean>;
+    outputSchema?: JsonObject | boolean; maxOutputBytes?: number; invocationTimeoutMs?: number | null; schemaSafety?: SchemaSafetyOptions });
+  run(request: ProducerRequest, options?: { signal?: AbortSignal; parentRunId?: string | null;
+    rootRunId?: string | null; onRunCreated?: (run: Run) => Promise<void> | void }): Promise<Run>;
+  stream(request: ProducerRequest, options?: { signal?: AbortSignal }): AsyncGenerator<
+    { type: 'content'; runId: string; content: ProducerContent[] } |
+    { type: string; run: Run }, void, unknown>;
+}
+
+export interface ContextWindowOptions {
+  maxTokens: number;
+  reserveOutputTokens?: number;
+  countTokens?: ((request: { messages: any[]; tools: any[] }) => number | Promise<number>) | null;
+  pinnedMessages?: Array<{ role: 'system'; content: string }>;
+  summarize?: ((request: { messages: any[]; sourceIndices: number[]; availableTokens: number }) => string | Promise<string>) | null;
+}
+export class ContextWindow {
+  constructor(options: ContextWindowOptions);
+  project(messages: any[], tools?: any[]): Promise<{ messages: any[]; sourceIndices: number[];
+    omittedIndices: number[]; inputTokens: number; inputBudget: number;
+    reserveOutputTokens: number; countingMode: 'custom' | 'estimate';
+    summary: { text: string; sourceIndices: number[] } | null }>;
+}
+
+export class GuardedProvider {
+  constructor(options: { id: string; provider: any;
+    authorize(request: { providerId: string; operation: string; capability: string; args: any[] }): boolean | Promise<boolean>;
+    capabilities?: Record<string, boolean>; models?: Record<string, Record<string, boolean>>; defaultModel?: string | null });
+  getModelCapabilities(model: string): Record<string, boolean> | null;
+  getCapabilities(): Record<string, boolean>;
+  supports(capability: string): boolean;
+  generateText(...args: any[]): Promise<any>;
+  generateToolResult(...args: any[]): Promise<any>;
+  embedChunks(...args: any[]): Promise<any>;
+  analyzeImage(...args: any[]): Promise<any>;
+  generateImage(...args: any[]): Promise<any>;
+  transcribeAudio(...args: any[]): Promise<any>;
+  generateAudio(...args: any[]): Promise<any>;
+  analyzeVideo(...args: any[]): Promise<any>;
+  generateVideo(...args: any[]): Promise<any>;
+}
+export class ScopedRetriever {
+  constructor(options: { retriever: { search(query: string, options?: any): Promise<any> };
+    tenantId: string; authorizeQuery: (request: { query: string; tenantId: string }) => boolean | Promise<boolean>;
+    authorizeMatch?: (request: any) => boolean | Promise<boolean> });
+  search(query: string, options?: any): Promise<any>;
+}
+export class ScopedLayerStore extends BaseLayerStore {
+  constructor(options: { store: BaseLayerStore; tenantId: string });
+  get(key: string): Promise<any>;
+  set(key: string, value: any): Promise<any>;
+  delete(key: string): Promise<void>;
+  entries(): Promise<Array<[string, any]>>;
+  clear(): Promise<void>;
+}
+export class ScopedRunStore extends BaseRunStore {
+  constructor(options: { store: BaseRunStore; tenantId: string });
+  saveRun(run: Run | JsonObject): Promise<Run>;
+  getRun(runId: string): Promise<Run | null>;
+  listRuns(): Promise<Run[]>;
+}
+export class ArtifactResolver {
+  constructor(options: { tenantId: string; maxBytes?: number; requireVersion?: boolean;
+    authorize: (request: { artifactId: string; tenantId: string; operation: string }) => boolean | Promise<boolean>;
+    store: { stat(id: string, context: any): Promise<{ tenantId: string; sizeBytes: number; mimeType?: string; version?: string; etag?: string }>;
+      read(id: string, context: any): AsyncIterable<Uint8Array> } });
+  read(id: string, options?: { signal?: AbortSignal }): Promise<{ artifactId: string; mimeType?: string; data: Uint8Array }>;
+}
+export class ProducerJobRunner {
+  constructor(options: { backend: {
+    id?: string;
+    start(request: ProducerRequest, context: any): Promise<{ jobId: string }>;
+    poll(jobId: string, context: any): Promise<{ status: 'pending' | 'completed' | 'failed'; content?: ProducerContent[] }>;
+  }; runStore: { saveRun(run: Run): Promise<unknown>; getRun(id: string): Promise<Run | null> };
+    authorize(request: any): boolean | Promise<boolean>; maxPolls?: number; pollIntervalMs?: number;
+    runLock?: RunLock; lockNamespace?: string; invocationTimeoutMs?: number });
+  start(request: ProducerRequest, options?: { signal?: AbortSignal }): Promise<Run>;
+  resume(id: string, options?: { signal?: AbortSignal }): Promise<Run>;
+}
+
+export class ProducerTool extends Tool {
+  constructor(options: { name: string; description?: string; parameters?: JsonObject;
+    runtime: ProducerRuntime; operation: string;
+    toContent: (args: Record<string, any>) => ProducerContent[] | Promise<ProducerContent[]>;
+    maxCallsPerRun?: number; metadata?: ToolMetadata });
+}
+
 export interface JsonObject {
   [key: string]: JsonValue;
 }
@@ -19,6 +228,8 @@ export interface ToolMetadata {
 }
 
 export interface ToolDefinition {
+  outputSchema?: JsonObject | boolean | null;
+  strict?: boolean;
   name: string;
   description?: string;
   parameters?: JsonObject;
@@ -31,6 +242,7 @@ export class Tool {
   name: string;
   description: string;
   parameters: JsonObject;
+  outputSchema: JsonObject | boolean | null;
   metadata: ToolMetadata;
   implementation?: ToolDefinition['implementation'];
   call(args?: Record<string, any>, context?: any): Promise<any>;
@@ -40,6 +252,14 @@ export class Tool {
 }
 
 export interface AgentOptions {
+  runLock?: RunLock; lockNamespace?: string; approvalSigner?: ApprovalSigner | null;
+  budget?: RunBudget | RunBudgetOptions | null; schemaSafety?: SchemaSafetyOptions; invocationTimeoutMs?: number | null;
+  contextWindow?: ContextWindow | ContextWindowOptions | null;
+  authorizeModelCall?: ((request: any, context: { run: Run }) => boolean | Promise<boolean>) | null;
+  authorizeResume?: ((request: any, context: { run: Run; config: any }) => boolean | Promise<boolean>) | null;
+  approvalTtlMs?: number;
+  executionLimits?: { modelCalls?: number; toolCalls?: number };
+  outputSchema?: JsonObject | boolean;
   tools?: Tool[] | any;
   memory?: Memory | null;
   defaultConfig?: JsonObject;
@@ -66,7 +286,16 @@ export class Agent {
   constructor(adapter: any, options?: AgentOptions);
   adapter: any;
   tools: Tool[];
-  run(input: string, config?: JsonObject): Promise<Run>;
+  run(input: string, config?: JsonObject | (Record<string, any> & { signal?: AbortSignal })): Promise<Run>;
+  runTool(toolName: string, args?: Record<string, any>, config?: Record<string, any> & { signal?: AbortSignal }): Promise<Run>;
+  runMedia(operation: 'analyzeImage' | 'generateImage' | 'transcribeAudio' | 'generateAudio' | 'analyzeVideo' | 'generateVideo',
+    input: any, config?: Record<string, any> & { signal?: AbortSignal }): Promise<{ run: Run; result: any }>;
+  analyzeImage(input: any, config?: Record<string, any>): Promise<any>;
+  generateImage(input: any, config?: Record<string, any>): Promise<any>;
+  transcribeAudio(input: any, config?: Record<string, any>): Promise<any>;
+  generateAudio(input: any, config?: Record<string, any>): Promise<any>;
+  analyzeVideo(input: any, config?: Record<string, any>): Promise<any>;
+  generateVideo(input: any, config?: Record<string, any>): Promise<any>;
   sendMessage(input: string, config?: JsonObject): Promise<any>;
   resumeRun(runId: string, options?: JsonObject): Promise<Run>;
   pauseRun(runId: string, options?: JsonObject): Promise<Run>;
@@ -863,6 +1092,7 @@ export class TraceDiffer {
 }
 
 export class TraceSerializer {
+  static migrateTrace(trace: JsonObject): JsonObject;
   static readonly SCHEMA_VERSION: string;
   static readonly RUN_FORMAT: string;
   static readonly BUNDLE_FORMAT: string;
@@ -926,8 +1156,16 @@ export class WebhookEventSink {
     transport?: ((request: JsonObject) => Promise<any> | any) | null;
     headers?: JsonObject;
     eventTypes?: string[] | null;
+    captureContent?: boolean;
+    redactor?: { redact(value: any): any };
   });
   handleEvent(event: JsonObject, run?: Run): Promise<any>;
+}
+
+export class RuntimeEventRedactor {
+  constructor(options?: { replacement?: string; sensitiveKeys?: string[];
+    secrets?: string[]; maxDepth?: number });
+  redact(value: any): any;
 }
 
 export class GovernanceHooks {
@@ -976,6 +1214,7 @@ export abstract class BaseJobStore {
   abstract saveJob(job: JsonObject): Promise<JsonObject>;
   abstract getJob(jobId: string): Promise<JsonObject | null>;
   abstract listJobs(): Promise<JsonObject[]>;
+  claimJob(jobId: string, expectedRunAt: string): Promise<JsonObject | null>;
 }
 
 export abstract class BaseLayerStore {
@@ -987,19 +1226,44 @@ export abstract class BaseLayerStore {
   abstract clear(): Promise<void>;
 }
 
-export class InMemoryRunStore extends BaseRunStore {}
+export class InMemoryRunStore extends BaseRunStore {
+  saveRun(run: Run | JsonObject): Promise<Run>;
+  getRun(runId: string): Promise<Run | null>;
+  listRuns(): Promise<Run[]>;
+}
 export class FileRunStore extends BaseRunStore {
   constructor(options?: { directory?: string });
+  runLock: RunLock;
+  saveRun(run: Run | JsonObject): Promise<Run>;
+  getRun(runId: string): Promise<Run | null>;
+  listRuns(): Promise<Run[]>;
 }
-export class InMemoryJobStore extends BaseJobStore {}
+export class InMemoryJobStore extends BaseJobStore {
+  saveJob(job: JsonObject): Promise<JsonObject>;
+  getJob(jobId: string): Promise<JsonObject | null>;
+  listJobs(): Promise<JsonObject[]>;
+}
 export class FileJobStore extends BaseJobStore {
   constructor(options?: { directory?: string });
+  saveJob(job: JsonObject): Promise<JsonObject>;
+  getJob(jobId: string): Promise<JsonObject | null>;
+  listJobs(): Promise<JsonObject[]>;
 }
 export class InMemoryLayerStore extends BaseLayerStore {
   constructor(options?: { initial?: Record<string, any> });
+  get(key: string): Promise<any>;
+  set(key: string, value: any): Promise<any>;
+  delete(key: string): Promise<void>;
+  entries(): Promise<Array<[string, any]>>;
+  clear(): Promise<void>;
 }
 export class FileLayerStore extends BaseLayerStore {
   constructor(options?: { filePath: string });
+  get(key: string): Promise<any>;
+  set(key: string, value: any): Promise<any>;
+  delete(key: string): Promise<void>;
+  entries(): Promise<Array<[string, any]>>;
+  clear(): Promise<void>;
 }
 
 export class StorageBackendRegistry {
@@ -1031,7 +1295,9 @@ export class BackgroundJobScheduler {
 }
 
 export class DelegationRuntime {
-  delegate(options: JsonObject): Promise<any>;
+  constructor(options?: { eventBus?: EventBus | null; onEvent?: (event: any, run: Run) => any;
+    authorize?: (request: any) => boolean | Promise<boolean>; maxDelegations?: number; maxDepth?: number; runStore?: BaseRunStore | null });
+  delegate(options: { parentRun: Run; agent: Agent | any; prompt: string; contract?: any; metadata?: any; state?: any; config?: any }): Promise<any>;
 }
 
 export class PlanningRuntime {
@@ -2119,6 +2385,7 @@ export class WorkflowRunner {
     onEvent?: ((event: JsonObject, run: Run) => Promise<void> | void) | null;
     debug?: boolean;
     executionIdentity?: JsonObject | null;
+    runLock?: RunLock | null;
   });
   run(input?: any, options?: JsonObject): Promise<Run>;
   resumeRun(runId: string, options?: JsonObject): Promise<Run>;
@@ -2140,31 +2407,40 @@ export class Memory {
     };
     policies?: JsonObject;
     governance?: JsonObject;
+    conversationStore?: BaseLayerStore | null;
+    episodicMemory?: EpisodicMemory | null;
   });
   setWorkingMemory(key: string, value: any, options?: JsonObject): Promise<void>;
   getWorkingMemory(key: string, context?: JsonObject): any;
   listWorkingMemory(context?: JsonObject): any[];
-  clearWorkingMemory(): void;
+  clearWorkingMemory(): Promise<void>;
   setProfile(key: string, value: any, options?: JsonObject): Promise<void>;
+  setEntity(key: string, value: any, ttlMs?: number | null): Promise<void>;
+  getEntity(key: string): any;
+  clearEntities(): Promise<void>;
   getProfile(key: string, context?: JsonObject): any;
   listProfile(context?: JsonObject): any[];
-  clearProfile(): void;
+  clearProfile(): Promise<void>;
   setPolicy(key: string, value: any, options?: JsonObject): Promise<void>;
   getPolicy(key: string, context?: JsonObject): any;
   listPolicies(context?: JsonObject): any[];
-  clearPolicies(): void;
-  storeConversation(userMessage: string, agentResponse: string, metadata?: JsonObject): void;
+  clearPolicies(): Promise<void>;
+  flushStorage(): Promise<void>;
+  storeConversation(userMessage: string, agentResponse: string, metadata?: JsonObject): Promise<void>;
+  getConversationHistory(): Promise<any[]>;
+  deleteConversationHistoryBefore(timestamp: number): Promise<void>;
+  clearConversation(): Promise<void>;
   getConversation(): any[];
   hydrate(): Promise<Memory>;
   compact(): void;
   decayExpired(): void;
   storeSemanticMemory(fact: string, metadata?: JsonObject): Promise<void>;
   searchSemanticMemory(query: string, topK?: number): Promise<any>;
+  searchEpisodicMemory(query: string, options?: { limit?: number; tags?: string[]; runId?: string | null }): Promise<any[]>;
   searchSemanticMemoryWithProvenance(query: string, topK?: number): Promise<JsonObject[]>;
   searchAll(query: string, topK?: number): Promise<JsonObject[]>;
   get(key: string, options?: JsonObject): Promise<any>;
   set(key: string, value: any, options?: JsonObject): Promise<void>;
-  clearConversation(): void;
   clearSemanticMemory(): Promise<void>;
   clearAll(): Promise<void>;
   enforceRetention(): void;
@@ -2179,9 +2455,74 @@ export class RAG {
 }
 
 export class LocalVectorStore {
-  add(embeddings: any[], metadata?: any[]): Promise<any>;
-  query(embedding: any, topK?: number): Promise<any[]>;
-  deleteAll(): Promise<void>;
+  capabilities: { namespaceIsolation: boolean };
+  upsert(options: { vectors: Array<{ id: string; values: number[]; metadata?: any }>; namespace?: string | null }): Promise<{ insertedIds: string[] }>;
+  query(options: { vector: number[]; topK?: number; namespace?: string | null; filter?: any }): Promise<{ matches: any[] }>;
+  delete(options: { ids: string[]; namespace?: string | null }): Promise<void>;
+  deleteAll(options?: { namespace?: string | null }): Promise<void>;
+}
+export class ScopedVectorStore {
+  constructor(options: { store: LocalVectorStore | any; tenantId: string; authorize(request: any): boolean | Promise<boolean> });
+  capabilities: { namespaceIsolation: boolean };
+  upsert(options: { vectors: Array<{ id: string; values: number[]; metadata?: any }> }): Promise<any>;
+  query(options: { vector: number[]; topK?: number; filter?: any }): Promise<{ matches: any[] }>;
+  delete(options: { ids: string[] }): Promise<void>;
+  deleteAll(options?: Record<string, unknown>): Promise<void>;
+}
+export interface VectorRecord { id: string; values: number[]; metadata?: Record<string, any>; }
+export interface VectorMatch { id: string; score: number; metadata: Record<string, any>; }
+export interface VectorQuery { vector: number[]; namespace?: string | null; topK?: number; filter?: Record<string, any>; }
+export interface VectorBackend {
+  capabilities: { namespaceIsolation: boolean };
+  upsert(options: { vectors: VectorRecord[]; namespace?: string | null }): Promise<{ insertedIds: string[] }>;
+  query(options: VectorQuery): Promise<{ matches: VectorMatch[] }>;
+  delete(options: { ids: string[]; namespace?: string | null }): Promise<void>;
+  deleteAll(options?: { namespace?: string | null }): Promise<void>;
+}
+export class FileVectorStore implements VectorBackend {
+  constructor(options: { filePath: string; runLock?: RunLock | null; maxFileBytes?: number; maxEntries?: number });
+  capabilities: { namespaceIsolation: boolean; persistence: boolean };
+  upsert(options: { vectors: VectorRecord[]; namespace?: string | null }): Promise<{ insertedIds: string[] }>;
+  query(options: VectorQuery): Promise<{ matches: VectorMatch[] }>;
+  delete(options: { ids: string[]; namespace?: string | null }): Promise<void>;
+  deleteAll(options?: { namespace?: string | null }): Promise<void>;
+}
+export class PineconeVectorStore implements VectorBackend {
+  constructor(options: { index: { namespace(name: string): any }; timeoutMs?: number });
+  capabilities: { namespaceIsolation: boolean };
+  upsert(options: { vectors: VectorRecord[]; namespace?: string | null }): Promise<{ insertedIds: string[] }>;
+  query(options: VectorQuery): Promise<{ matches: VectorMatch[] }>;
+  delete(options: { ids: string[]; namespace?: string | null }): Promise<void>;
+  deleteAll(options?: { namespace?: string | null }): Promise<void>;
+}
+export class QdrantVectorStore implements VectorBackend {
+  constructor(options: { client: { upsert(collection: string, request: any): Promise<any>;
+    query(collection: string, request: any): Promise<any>; delete(collection: string, request: any): Promise<any> };
+    collection: string; timeoutMs?: number });
+  capabilities: { namespaceIsolation: boolean };
+  upsert(options: { vectors: VectorRecord[]; namespace?: string | null }): Promise<{ insertedIds: string[] }>;
+  query(options: VectorQuery): Promise<{ matches: VectorMatch[] }>;
+  delete(options: { ids: string[]; namespace?: string | null }): Promise<void>;
+  deleteAll(options?: { namespace?: string | null }): Promise<void>;
+}
+export class PgVectorStore implements VectorBackend {
+  constructor(options: { client: { query(sql: string, params?: any[]): Promise<{ rows: any[] }> };
+    table?: string; dimensions: number; timeoutMs?: number });
+  capabilities: { namespaceIsolation: boolean };
+  readonly schemaSql: string;
+  upsert(options: { vectors: VectorRecord[]; namespace?: string | null }): Promise<{ insertedIds: string[] }>;
+  query(options: VectorQuery): Promise<{ matches: VectorMatch[] }>;
+  delete(options: { ids: string[]; namespace?: string | null }): Promise<void>;
+  deleteAll(options?: { namespace?: string | null }): Promise<void>;
+}
+export interface Episode { id: string; content: JsonValue; runId: string | null; tags: string[]; createdAt: number; expiresAt: number | null; }
+export class EpisodicMemory {
+  constructor(options: { store: BaseLayerStore; tenantId: string; authorize(request: any): boolean | Promise<boolean>; maxEntries?: number });
+  append(input: { content: JsonValue; runId?: string | null; tags?: string[]; ttlMs?: number | null }): Promise<Episode>;
+  search(options?: { query?: string; runId?: string | null; tags?: string[]; limit?: number }): Promise<Episode[]>;
+  forget(id: string): Promise<void>;
+  clear(): Promise<void>;
+  pruneExpired(): Promise<{ deleted: number }>;
 }
 
 export class BaseRetriever {
@@ -2197,10 +2538,22 @@ export class FallbackRouter {
   generateText(messages: any[], options?: JsonObject): Promise<any>;
 }
 
-export class MCPTool {}
-export class MCPClient {}
+export class MCPTool extends Tool {
+  constructor(options: { name: string; description?: string; parameters?: JsonObject; outputSchema?: JsonObject | null;
+    mcpClient?: MCPClient; endpoint?: string; apiKey?: string; remoteName?: string | null; strict?: boolean; metadata?: JsonObject });
+}
+export type MCPTransport = (request: { method: string; params: any; signal?: AbortSignal }) => Promise<any>;
+export class MCPClient {
+  constructor(options: { endpoint?: string; apiKey?: string | null; extraHeaders?: Record<string, string>;
+    retryManager?: RetryManager; transport?: MCPTransport | null; requestTimeoutMs?: number; maxPages?: number });
+  listTools(): Promise<any[]>;
+  execute(name: string, args?: Record<string, any>): Promise<any>;
+  toTools(options?: any): Promise<Tool[]>;
+  close(): void;
+}
 export class MCPDiscoveryLoader {
-  static load(options?: { endpoint?: string; apiKey?: string | null; serviceName?: string }): Promise<JsonObject>;
+  static load(options?: { endpoint?: string; apiKey?: string | null; serviceName?: string; mcpClient?: MCPClient; transport?: MCPTransport;
+    metadataForTool?: ((definition: any) => JsonObject) | null }): Promise<JsonObject>;
 }
 export class OpenAPILoader {
   static load(filePath: string, options?: { serviceName?: string; authToken?: string | null }): JsonObject;
@@ -2228,6 +2581,8 @@ export class PostmanLoader {
 export class PineconeManager {}
 
 export class RetryManager {
+  static withoutRetries<T>(action: () => T): T;
+  static isSingleAttempt(): boolean;
   constructor(options?: JsonObject);
   execute<T>(operation: () => Promise<T> | T, ...args: any[]): Promise<T>;
   executeWithPolicy<T>(

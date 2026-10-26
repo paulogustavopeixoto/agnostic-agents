@@ -1,5 +1,6 @@
 // src/tools/adapters/ApiLoader.js
 const { ApiTool } = require('./ApiTool');
+const { invokeWithDeadline } = require('../runtime/InvocationControl');
 
 function normalizeType(type) {
   const valid = ['string', 'number', 'integer', 'boolean', 'object', 'array'];
@@ -118,12 +119,13 @@ class ApiLoader {
             const input = params.propsValue || params;
             const query = {};
             const body = {};
-            const headers = { 'Content-Type': 'application/json', ...(input.headers || {}) };
+            const headers = { 'Content-Type': 'application/json' };
 
             // Interpolate path
             const finalPath = path.replace(/{(\w+)}/g, (_, key) => {
               if (!(key in input)) throw new Error(`Missing path param: ${key}`);
-              return input[key];
+              if (['.', '..'].includes(String(input[key]))) throw new Error('Invalid path segment');
+              return encodeURIComponent(input[key]);
             });
 
             for (const [k, def] of Object.entries(props)) {
@@ -157,21 +159,50 @@ class ApiLoader {
 
             const queryString = buildQueryString(query);
             const url = `${baseUrl}${finalPath}${queryString}`;
+            const base = new URL(baseUrl);
+            const target = new URL(url);
+            if (!['http:', 'https:'].includes(base.protocol) || target.origin !== base.origin || target.username || target.password) {
+              throw new Error('API request must use the configured HTTP origin');
+            }
 
+            return invokeWithDeadline(async signal => {
             const res = await fetch(url, {
               method: httpMethod,
               headers,
+              signal,
+              redirect: 'manual',
               body: ['POST', 'PATCH', 'PUT'].includes(httpMethod) ? JSON.stringify(body) : undefined,
             });
 
             const contentType = res.headers.get('content-type') || '';
-            const data = contentType.includes('application/json') ? await res.json() : await res.text();
-
             if (!res.ok) {
-              throw new Error(`API Error ${res.status}: ${typeof data === 'string' ? data : JSON.stringify(data)}`);
+              await res.body?.cancel?.();
+              throw new Error(`API request failed with status ${res.status}`);
+            }
+            let data;
+            if (res.body?.getReader) {
+              const reader = res.body.getReader();
+              const chunks = [];
+              let size = 0;
+              try {
+                while (true) {
+                  const { done, value } = await reader.read();
+                  if (done) break;
+                  size += value.byteLength;
+                  if (size > 1048576) throw new Error('API response exceeds size limit');
+                  chunks.push(Buffer.from(value));
+                }
+              } finally { await reader.cancel(); reader.releaseLock(); }
+              const text = Buffer.concat(chunks).toString('utf8');
+              data = contentType.includes('application/json') && text ? JSON.parse(text) : text;
+            } else {
+              // Compatibility for injected/mock response implementations.
+              data = contentType.includes('application/json') ? await res.json() : await res.text();
+              if (Buffer.byteLength(JSON.stringify(data) || '') > 1048576) throw new Error('API response exceeds size limit');
             }
 
             return { status: res.status, data };
+            }, { signal: context.signal, timeoutMs: 30000 });
           },
         },
       });
@@ -179,6 +210,7 @@ class ApiLoader {
       tools.push(tool);
     }
 
+    if (new Set(tools.map(tool => tool.name)).size !== tools.length) throw new Error('API tool name collision.');
     return { tools, triggers: {} };
   }
 }

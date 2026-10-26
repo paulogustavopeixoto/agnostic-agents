@@ -1,0 +1,34 @@
+{
+  "kind": "agnostic-agents/production-support-matrix",
+  "version": "1.0",
+  "status": "draft-awaiting-owner-approval",
+  "scopeRule": "No tuple is production accepted until exact models, API versions and measured evidence are approved.",
+  "providers": [
+    { "id": "openai", "accepted": false, "models": [], "candidateCapabilities": ["text", "tools", "embeddings", "image-analysis", "image-generation", "transcription", "speech"] },
+    { "id": "anthropic", "accepted": false, "models": [], "candidateCapabilities": ["text", "tools"] },
+    { "id": "gemini", "accepted": false, "models": [], "candidateCapabilities": ["text", "tools", "embeddings", "image-analysis", "video-analysis"] },
+    { "id": "huggingface", "accepted": false, "models": [], "candidateCapabilities": ["text", "tools", "embeddings", "image-analysis", "image-generation", "video-analysis"] },
+    { "id": "deepseek", "accepted": false, "models": [], "candidateCapabilities": ["text", "tools", "embeddings"] },
+    { "id": "mistral", "accepted": false, "models": [], "candidateCapabilities": ["text", "tools"] },
+    { "id": "xai", "accepted": false, "models": [], "candidateCapabilities": ["text", "tools"] },
+    { "id": "elevenlabs", "accepted": false, "models": [], "candidateCapabilities": ["speech"] },
+    { "id": "fal", "accepted": false, "models": [], "candidateCapabilities": ["image-generation", "video-generation"] },
+    { "id": "higgsfield", "accepted": false, "models": [], "candidateCapabilities": ["image-generation", "video-generation"] }
+  ],
+  "modelTupleRequiredFields": ["tupleId", "exactModelId", "apiVersion", "sdkVersion", "capability", "transport", "deploymentProfileId", "fixtures", "evidenceIds"],
+  "vectorBackends": [
+    { "id": "pinecone", "accepted": false, "resourceId": null, "dimensions": null, "metric": null },
+    { "id": "qdrant", "accepted": false, "resourceId": null, "dimensions": null, "metric": null },
+    { "id": "pgvector", "accepted": false, "resourceId": null, "dimensions": null, "metric": null },
+    { "id": "file-vector", "accepted": false, "resourceId": "host-private-local-file", "dimensions": null, "metric": "cosine" }
+  ],
+  "realtimeProfiles": [
+    { "id": "conversational-audio", "accepted": false, "provider": null, "model": null, "transport": null },
+    { "id": "live-video-input-analysis", "accepted": false, "provider": null, "model": null, "transport": null },
+    { "id": "live-generated-video", "accepted": false, "provider": null, "model": null, "transport": null }
+  ],
+  "unsupportedBehavior": "Reject before dispatch; never infer support from provider branding or another model.",
+  "approvedNodeVersions": [],
+  "approvedOperatingSystems": [],
+  "blockers": ["exact-model-and-realtime-profile-selection", "staging-profile-approval", "live-test-budget", "independent-review-engagement"]
+}

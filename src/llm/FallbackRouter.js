@@ -1,4 +1,5 @@
 const { BaseProvider } = require('./BaseProvider');
+const { RetryManager } = require('../utils/RetryManager');
 
 const METHOD_CAPABILITY_MAP = {
   generateText: 'generateText',
@@ -148,6 +149,10 @@ class FallbackRouter extends BaseProvider {
         }
         return result;
       } catch (error) {
+        const config = args[methodName === 'generateToolResult' ? 3 : 1] || {};
+        if (RetryManager.isSingleAttempt() || error?.retryable === false || error?.uncertain === true || config.signal?.aborted ||
+            ['generateImage', 'generateAudio', 'generateVideo'].includes(methodName) ||
+            ['AbortError', 'RunCancelledError', 'ToolPolicyError'].includes(error?.name)) throw error;
         lastError = error;
         if (this.routingAdvisor?.recordOutcome) {
           const [, config = {}] = args;

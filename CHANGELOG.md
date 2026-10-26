@@ -6,7 +6,106 @@ The format is intentionally simple:
 
 ## Unreleased
 
+## 1.3.4 - 2026-10-26
+
+### Review Fixes
+
+- Closed review findings R01-R14 with regression coverage: verifier egress/deadlines,
+  unsafe media imports, remote-tool risk defaults, terminal fallback, hidden retry
+  multiplication, provider-native histories and completion status, workflow/job
+  ownership, realtime interruption races, RAG IDs and persistent vector integrity.
+- MCP imports now require approval unless trusted host code explicitly overrides
+  risk metadata. Hugging Face video analysis accepts bounded bytes, not URLs/paths.
+- Scheduler backends must implement atomic claimJob; workflow resume rejects an
+  active run and duplicate run IDs. Governed invocations do not hide provider
+  retries/fallback attempts inside one reservation; SDK-native retries are disabled.
+- Updated OpenAI SDK and Zod dependencies for current audit findings. See
+  docs/security-release-migration.md before adopting the tightened defaults.
+
+### Local Storage And Readiness
+
+- Added FileVectorStore with private, bounded, versioned snapshots, writer exclusion
+  and restart/interrupted-write tests; retained in-memory LocalVectorStore behavior.
+- Stabilized cosine scoring for extreme finite vector values.
+- Added a production threat model, draft deployment/support profiles, evidence schema
+  and attestation validation tests. The execution ledger separates offline checks
+  from outstanding live, deployed-environment and independent security review gates.
+
+### Security
+
+- Live tests no longer pass silently for missing credentials, quota or billing failures;
+  added a three-provider certification preflight requiring explicit model IDs.
+
+- Legacy media helpers now use metadata-only inspectable runs, authorization,
+  resource budgets and deadlines, and no longer retry provider work automatically.
+- Memory clearing awaits backing-store deletion and includes episodic memory;
+  eviction failures are observable and stale evictions drain before key reuse.
+- Evaluation verdicts require explicit true, and async evaluation recording is awaited.
+
+- Removed implicit credential injection into API arguments/query strings. API adapters
+  propagate cancellation, reject origin changes and redirects, bound response sizes,
+  and preserve declared input/output contracts.
+- Added run lifecycle locks, HMAC-bound approvals, persisted single-use consumption,
+  conservative token/spend reservations, schema-complexity guards, and invocation deadlines.
+- MCP calls now use name/arguments, preserve structured results, bound discovery,
+  and never automatically retry a potentially side-effecting call.
+
+- Normalized provider filenames/imports to Git's canonical casing and added an exact-case
+  source-import check to detect Linux portability failures hidden by macOS.
+- In-memory run stores now return detached snapshots, preventing unsaved mutations
+  from modifying persisted execution state.
+
+- Added tenant-scoped run/memory stores and retrieval checks, guarded provider operations,
+  bounded artifact reads, expiring approvals and optional host resume authorization.
+- Async and malformed policy decisions fail closed. Risky writes require explicit
+  idempotency/retryability before automatic retries; policy/capability/cancellation
+  errors are not retried.
+- File run/job IDs reject traversal; file stores use private atomic writes. Memory
+  keys such as __proto__ are handled as own data properties.
+- Missing rehearsal or promotion evidence no longer defaults to success.
+
+- ToolSandboxRunner now fails closed without a simulator and rejects unsupported modes.
+- Agent honors retryabilityHint never at both outer and adaptive tool retry layers.
+- Added ProducerTool integration with approval/verification gates, correlated runs,
+  per-run dispatch ceilings, and optional producer output schemas with JSON content.
+- Added scope implementation status and explicit platform prototype/pilot/production gates.
+
+- WebhookEventSink now excludes payloads and run metadata by default. Set
+  `captureContent: true` explicitly to migrate consumers requiring content.
+- Shared runtime redaction now covers credential strings and URLs, configured
+  literal secrets, cookie/API-key headers, binary values, cyclic data, and depth limits.
+- Documented privileged raw-state paths and remaining enterprise security acceptance criteria.
+
 ### Added
+
+- Expanded the shortlist to ten independent model/media providers plus Pinecone,
+  Qdrant and pgvector vector storage. Added detached ProviderCatalog descriptors.
+- Explicit-model Mistral/xAI chat adapters, an ElevenLabs speech producer, and
+  fal/Higgsfield persisted-ID media backends with host-controlled artifact imports.
+- Three host-client vector adapters with scoped IDs/deletion, portable filters,
+  parameterized SQL and local deadlines; opt-in live vector conformance checks.
+
+- Initial adoption-based verification targets: Anthropic/OpenAI/Gemini and planned
+  PostgreSQL/SQLite/MySQL persistence, with implementation and evidence boundaries.
+
+- Provider-neutral realtime sessions with interruption epochs and bounded media frames;
+  per-model capability guards; content-envelope and legacy trace migration contracts.
+- Scoped episodic/vector memory, document-level retrieval authorization, artifact
+  version pins, bounded delegation, and direct inspectable Agent.runTool execution.
+- Real subprocess termination tests covering uncertain approved actions and single-use
+  recovery; public types and deterministic regression tests for the new contracts.
+
+- ContextWindow with pinned constraints, input/output budgets, token-count hooks,
+  source-linked summaries, and non-destructive prompt projection.
+- Optional conversation archives with explicit deletion and awaited persistence.
+- Pull-based producer streams, bounded output, and persisted remote job polling.
+- Agent final-output JSON schemas, dispatch limits, and cooperative signal propagation.
+- Strict public TypeScript validation, a scoped offline multimodal example, and
+  test:foundation combining local tests, types, and the example.
+
+- Opt-in `FunctionProducer`, `ProducerRuntime`, and typed content normalization for inspectable custom text and media production with authorization and cooperative cancellation.
+- Foundation review documenting outstanding context, artifact security, recovery, and assurance work.
+- Compatible production dependency security updates; Gemini no longer advertises unavailable video-generation SDK support.
 
 - `v19` Budgeted Autonomy OS maintained surfaces including `AutonomyBudget`, `AutonomyBudgetLedger`, `UncertaintySupervisionPolicy`, `ApprovalDelegationContract`, `AutonomyEnvelope`, `AutonomyPolicyRegistry`, `InterventionPolicyRegistry`, `ApprovalDecisionCache`, `WorkflowSupervisionCheckpoint`, `ProgressiveAutonomyController`, `AutonomyBenchmarkSuite`, `AutonomyFleetSummary`, and `AutonomyRolloutGuard`
 - `v20` Enterprise Autonomy OS maintained surfaces including `UnifiedExecutionGraph`, `EnterpriseAutonomyArchitecture`, `EnterpriseOperatingModel`, `AutonomyStackConfig`, `AutonomyStackComparator`, `AutonomyDriftGuard`, `OperationalScorecard`, `EnterpriseAutonomyBenchmarkSuite`, `DeploymentPatternCertificationKit`, `EnterpriseBoundaryProfile`, and `TransactionalExecutionPlan`

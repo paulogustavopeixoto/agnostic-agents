@@ -9,18 +9,22 @@ class ApiTool extends Tool {
 
     const parameters = ApiTool.mapPropsToJsonSchema(action.props, spec);
 
-    const outputSchema = action.outputSchema || { type: "object" };
+    const outputSchema = action.outputSchema || null;
+    for (const key of action.required || []) {
+      if (!parameters.required.includes(key)) parameters.required.push(key);
+    }
 
     const implementation = async (args, context = {}) => {
       const transformed = spec.transformArgs(endpointId, args);
-      const auth = ApiTool.normalizeAuth(authToken);
       const parameterLocations = Object.fromEntries(
         Object.entries(action.props || {}).map(([key, value]) => [key, value.location || null])
       );
 
-      const merged = { ...transformed, ...auth, __parameterLocations: parameterLocations };
+      // Credentials belong to transport context, never model-visible arguments.
+      const merged = { ...transformed, __parameterLocations: parameterLocations };
 
       const result = await action.run(merged, {
+        ...context,
         authToken: authToken,
         props: action.props
       });
@@ -38,7 +42,10 @@ class ApiTool extends Tool {
       metadata: {
         examples: ApiTool.generateExample(parameters),
         tags: [serviceName, "api"],
-        version: "1.0.0"
+        version: "1.0.0",
+        sideEffectLevel: 'external_write',
+        retryabilityHint: 'never',
+        ...(action.metadata || {}),
       }
     });
 
@@ -61,7 +68,9 @@ class ApiTool extends Tool {
       .map(part => part.charAt(0).toUpperCase() + part.slice(1))
       .join('');                                    // Rejoin as PascalCase
 
-    return `${serviceName}${clean}`;                // e.g. calcomBookingsCreate
+    const name = `${serviceName}${clean}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+    if (!name || name.length > 64) throw new Error('API tool name must contain 1 to 64 supported characters.');
+    return name;
   }
 
   static mapPropsToJsonSchema(props = {}, spec = new BaseAppSpec()) {
@@ -72,6 +81,8 @@ class ApiTool extends Tool {
       const type = ApiTool.mapPropertyType(prop);
 
       const propertySchema = {
+        ...Object.fromEntries(Object.entries(prop).filter(([name]) =>
+          !['location', 'required', 'type', 'aliases'].includes(name))),
         type,
         description: prop.description || '',
         aliases: [
@@ -81,17 +92,19 @@ class ApiTool extends Tool {
       };
 
       if (type === 'object' && prop.properties) {
-        propertySchema.properties = ApiTool.mapPropsToJsonSchema(prop.properties, spec).properties;
+        const nested = ApiTool.mapPropsToJsonSchema(prop.properties, spec);
+        propertySchema.properties = nested.properties;
+        propertySchema.required = Array.isArray(prop.required) ? prop.required : nested.required;
       }
 
       if (type === 'array') {
         const itemType = (prop.items && prop.items.type) ? prop.items.type : 'string';
-        propertySchema.items = { type: itemType };
+        propertySchema.items = { ...prop.items, type: itemType };
       }
 
       properties[key] = propertySchema;
 
-      if (prop.required) {
+      if (prop.required === true) {
         required.push(key);
       }
     }

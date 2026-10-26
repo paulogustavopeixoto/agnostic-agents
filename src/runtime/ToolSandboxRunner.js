@@ -4,6 +4,9 @@ class ToolSandboxRunner {
   }
 
   async run(tool, args = {}, { mode = 'simulate', context = {} } = {}) {
+    if (!['simulate', 'dry_run'].includes(mode)) {
+      throw new Error('Unsupported sandbox mode.');
+    }
     const request = {
       tool: tool.name,
       args,
@@ -27,11 +30,7 @@ class ToolSandboxRunner {
       };
     }
 
-    return {
-      request,
-      simulated: false,
-      result: await tool.call(args, context),
-    };
+    throw new Error('Simulation requires an explicit simulator; real tool execution is disabled.');
   }
 }
 

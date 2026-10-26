@@ -32,6 +32,10 @@ class DelegationContract {
 
     if (typeof this.inputValidator === 'function') {
       const result = this.inputValidator(payload);
+      if (result?.then) {
+        Promise.resolve(result).catch(() => {});
+        throw new TypeError('Delegation input validators must be synchronous.');
+      }
       if (result === false) {
         throw new Error(`Delegation contract "${this.id}" rejected the input payload.`);
       }
@@ -70,6 +74,10 @@ class DelegationContract {
   validateOutput(payload) {
     if (typeof this.outputValidator === 'function') {
       const result = this.outputValidator(payload);
+      if (result?.then) {
+        Promise.resolve(result).catch(() => {});
+        throw new TypeError('Delegation output validators must be synchronous.');
+      }
       if (result === false) {
         throw new Error(`Delegation contract "${this.id}" rejected the output payload.`);
       }

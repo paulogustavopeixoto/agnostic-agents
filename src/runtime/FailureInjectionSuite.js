@@ -14,24 +14,24 @@ class FailureInjectionSuite {
       {
         id: 'worker-recovery-chaos',
         run: async () => ({
-          recovered: worker.recovered !== false,
-          checkpointed: worker.checkpointed !== false,
+          recovered: worker.recovered === true,
+          checkpointed: worker.checkpointed === true,
         }),
         assert: async output => output.recovered === true && output.checkpointed === true,
       },
       {
         id: 'fleet-canary-chaos',
         run: async () => ({
-          halted: fleet.halted !== false,
-          rollbackReady: fleet.rollbackReady !== false,
+          halted: fleet.halted === true,
+          rollbackReady: fleet.rollbackReady === true,
         }),
         assert: async output => output.halted === true && output.rollbackReady === true,
       },
       {
         id: 'control-plane-failover-chaos',
         run: async () => ({
-          auditPreserved: controlPlane.auditPreserved !== false,
-          operatorFallback: controlPlane.operatorFallback !== false,
+          auditPreserved: controlPlane.auditPreserved === true,
+          operatorFallback: controlPlane.operatorFallback === true,
         }),
         assert: async output => output.auditPreserved === true && output.operatorFallback === true,
       },

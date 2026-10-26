@@ -47,10 +47,6 @@ class ToolPolicy {
    * @returns {{action:string, reason:string|null, source:string, ruleId?:string|null}}
    */
   evaluate(tool, args, context = {}) {
-    if (typeof this.customEvaluate === 'function') {
-      return this.customEvaluate(tool, args, context);
-    }
-
     const metadata = tool?.metadata || {};
     const toolName = tool?.name || null;
 
@@ -68,6 +64,10 @@ class ToolPolicy {
         reason: `Tool "${toolName}" is not in the policy allowlist.`,
         source: 'allowlist',
       };
+    }
+
+    if (typeof this.customEvaluate === 'function') {
+      return this.customEvaluate(tool, args, context);
     }
 
     const matchedRule = this.rules.find(rule => this._matchesRule(rule, tool, args, context));

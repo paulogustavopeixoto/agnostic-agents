@@ -22,6 +22,12 @@ class ReleaseEvidenceBundle {
     const governanceSummary = governanceLedger.summarize();
     const failedBenchmarks = benchmarkReport?.failed || 0;
     const rolloutAction = rolloutGuard?.action || 'allow_rollout';
+    const checks = [...assuranceReport.invariants, ...assuranceReport.scenarios];
+    const hasAssurance = checks.length > 0 && checks.every(check => check?.passed === true);
+    const hasBenchmarks = Number.isSafeInteger(benchmarkReport?.total) && benchmarkReport.total > 0 &&
+      Number.isSafeInteger(benchmarkReport.passed) && Number.isSafeInteger(benchmarkReport.failed) &&
+      benchmarkReport.passed >= 0 && benchmarkReport.failed >= 0 &&
+      benchmarkReport.passed + benchmarkReport.failed === benchmarkReport.total;
 
     return {
       kind: 'agnostic-agents/release-evidence-bundle',
@@ -42,7 +48,8 @@ class ReleaseEvidenceBundle {
         routeProofs: routeProofs.length,
         attestations: attestations.length,
         promotionAction:
-          assuranceSummary.verdict === 'block' || failedBenchmarks > 0 || rolloutAction === 'block_rollout'
+          !hasAssurance || !hasBenchmarks || !rolloutGuard ||
+          assuranceSummary.verdict !== 'allow' || failedBenchmarks > 0 || rolloutAction !== 'allow_rollout'
             ? 'block'
             : 'promote',
       },

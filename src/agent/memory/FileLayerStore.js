@@ -1,6 +1,5 @@
-const fs = require('fs/promises');
-const path = require('path');
 const { BaseLayerStore } = require('./BaseLayerStore');
+const { readJson, writeJson } = require('../../runtime/stores/PrivateJsonFile');
 
 class FileLayerStore extends BaseLayerStore {
   constructor({ filePath } = {}) {
@@ -14,8 +13,7 @@ class FileLayerStore extends BaseLayerStore {
 
   async _read() {
     try {
-      const payload = await fs.readFile(this.filePath, 'utf8');
-      return JSON.parse(payload);
+      return await readJson(this.filePath);
     } catch (error) {
       if (error.code === 'ENOENT') {
         return {};
@@ -26,18 +24,17 @@ class FileLayerStore extends BaseLayerStore {
   }
 
   async _write(records) {
-    await fs.mkdir(path.dirname(this.filePath), { recursive: true });
-    await fs.writeFile(this.filePath, JSON.stringify(records, null, 2), 'utf8');
+    await writeJson(this.filePath, records);
   }
 
   async get(key) {
     const records = await this._read();
-    return records[key] || null;
+    return Object.hasOwn(records, key) ? records[key] : null;
   }
 
   async set(key, value) {
     const records = await this._read();
-    records[key] = value;
+    Object.defineProperty(records, key, { value, enumerable: true, configurable: true, writable: true });
     await this._write(records);
     return value;
   }

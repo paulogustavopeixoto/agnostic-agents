@@ -23,13 +23,35 @@ The goal is to answer two questions quickly:
 
 ## Matrix
 
+Cert labels are historical repository claims, not fresh certification of this
+foundation update. [Initial targets](initial-support-targets.md) define the current
+revalidation backlog. Unsupported adapter features remain unsupported even when a
+provider offers them through some other API.
+
 | Provider | Cert | Text | Tool calling | Embeddings | Image analysis | Image generation | Audio transcription | Audio generation | Video analysis | Video generation | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | OpenAI | L3 | yes | yes | yes | yes | yes | yes | yes | no | no | strongest maintained runtime path in the repo |
-| Gemini | L1 | yes | yes | yes | yes | no | no | no | yes | yes | live example verification currently blocked by provider quota |
+| Gemini | L1 | yes | yes | yes | yes | no | no | no | yes | no | video generation unavailable on bundled adapter SDK path; live revalidation pending |
 | Anthropic | L2 | yes | yes | no | no | no | no | no | no | no | text + tool path only |
 | Hugging Face | L2 | yes | yes | yes | yes | yes | no | no | yes | no | broader multimodal surface, but less runtime verification depth than OpenAI |
 | DeepSeek | L2 | yes | yes | yes | no | no | no | no | no | no | strong text/tool/embedding smoke path |
+| Mistral | L1 | yes | yes | no | no | no | no | no | no | no | new explicit-model chat/tool subset, live verification pending |
+| xAI | L1 | yes | yes | no | no | no | no | no | no | no | new chat compatibility subset, not native Responses; live verification pending |
+
+## Producer And Job Integrations
+
+These are not interchangeable BaseProvider adapters. Use ProducerRuntime/ProducerTool
+or ProducerJobRunner as described in [integration targets](initial-support-targets.md).
+
+| Provider | Entry point | Contract-tested capability | Live verification |
+| --- | --- | --- | --- |
+| ElevenLabs | ElevenLabsProducer | MP3 speech to host-owned artifact references | Pending |
+| fal.ai | FalJobBackend | Image/video job submission/polling and cancel requests | Pending |
+| Higgsfield | HiggsfieldJobBackend | Image/video job submission/polling and cancel requests | Pending |
+
+The ten-provider shortlist is a coverage choice, not a popularity ranking or a claim
+that each implements every modality. Vector integrations are independent:
+PineconeVectorStore, QdrantVectorStore, PgVectorStore, plus the local test store.
 
 ## Interpretation
 

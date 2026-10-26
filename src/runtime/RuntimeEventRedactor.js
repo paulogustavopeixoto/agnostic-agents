@@ -25,10 +25,20 @@ class RuntimeEventRedactor {
       'ssn',
       'email',
       'phone',
+      'cookie',
+      'set-cookie',
+      'x-api-key',
+      'proxy-authorization',
     ],
+    secrets = [],
+    maxDepth = 32,
   } = {}) {
+    if (!Number.isInteger(maxDepth) || maxDepth < 1) throw new TypeError('Invalid redaction depth.');
     this.replacement = replacement;
     this.sensitiveKeys = new Set(sensitiveKeys.map(key => String(key).toLowerCase()));
+    this.secrets = secrets.filter(value => typeof value === 'string' && value.length > 0)
+      .sort((a, b) => b.length - a.length);
+    this.maxDepth = maxDepth;
   }
 
   /**
@@ -38,25 +48,37 @@ class RuntimeEventRedactor {
    * @returns {*}
    */
   redact(value) {
+    return this._redact(value, new WeakSet(), 0);
+  }
+
+  _redact(value, ancestors, depth) {
+    if (typeof value === 'string') {
+      let text = value;
+      for (const secret of this.secrets) text = text.split(secret).join(this.replacement);
+      return text
+        .replace(/\b(Bearer|Basic)\s+[A-Za-z0-9._~+\/-]+=*/gi, (_, scheme) => `${scheme} ${this.replacement}`)
+        .replace(/([?&](?:api[_-]?key|access[_-]?token|token|secret|password)=)[^\s&#]*/gi,
+          (_, prefix) => `${prefix}${this.replacement}`)
+        .replace(/(https?:\/\/)[^\s/@]+:[^\s/@]+@/gi, (_, prefix) => `${prefix}${this.replacement}@`);
+    }
+    if (!value || typeof value !== 'object') return value;
+    if (Buffer.isBuffer(value) || ArrayBuffer.isView(value) || value instanceof ArrayBuffer) {
+      return this.replacement;
+    }
+    if (depth >= this.maxDepth || ancestors.has(value)) return this.replacement;
+    ancestors.add(value);
     if (Array.isArray(value)) {
-      return value.map(item => this.redact(item));
+      const output = value.map(entry => this._redact(entry, ancestors, depth + 1));
+      ancestors.delete(value);
+      return output;
     }
-
-    if (!value || typeof value !== 'object') {
-      return value;
-    }
-
-    const output = {};
+    const entries = [];
     for (const [key, entry] of Object.entries(value)) {
-      if (this._isSensitiveKey(key)) {
-        output[key] = this.replacement;
-        continue;
-      }
-
-      output[key] = this.redact(entry);
+      entries.push([key, this._isSensitiveKey(key) ? this.replacement :
+        this._redact(entry, ancestors, depth + 1)]);
     }
-
-    return output;
+    ancestors.delete(value);
+    return Object.fromEntries(entries);
   }
 
   _isSensitiveKey(key) {

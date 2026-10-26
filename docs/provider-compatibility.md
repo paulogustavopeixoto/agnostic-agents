@@ -6,6 +6,9 @@ For how certification levels are defined, see [`docs/provider-certification.md`]
 For minimal setup snippets, see [`docs/provider-quickstarts.md`](provider-quickstarts.md).
 For the concise provider/feature matrix, see [`docs/support-matrix.md`](support-matrix.md).
 
+Certification labels below are the historical repository baseline. Current-update
+live revalidation is pending; see [initial targets](initial-support-targets.md).
+
 ## Shared contract
 
 All maintained adapters expose:
@@ -44,7 +47,7 @@ Optional methods are governed by capability flags and should throw `AdapterCapab
 - Audio transcription: no
 - Audio generation: no
 - Video analysis: yes
-- Video generation: yes
+- Video generation: no (unavailable on the bundled adapter SDK path)
 
 ### AnthropicAdapter
 
@@ -89,6 +92,23 @@ Optional methods are governed by capability flags and should throw `AdapterCapab
 - Video generation: no
 
 ## Notes
+
+### Additional Chat Adapters
+
+MistralAdapter and XAIAdapter now implement the explicit-model chat/tool compatibility
+contract, including normalized tool calls, usage, incomplete results and signal
+propagation. Their other BaseProvider capabilities are false and inherited unsupported
+methods reject. Contract tests pass; no new live certification is claimed.
+
+### Media Producers And Backends
+
+ElevenLabsProducer provides bounded MP3 speech with a host artifact callback.
+FalJobBackend and HiggsfieldJobBackend provide image/video submission and polling for
+ProducerJobRunner, not BaseProvider text adapters. Live smoke is available behind
+explicit gates but has not run here. See [integration targets](initial-support-targets.md)
+for the ten-provider catalog, vector-store adapters, limits and configuration.
+
+## Shared Notes
 
 - Tool-calling payloads are normalized to `{ message, toolCalls }`.
 - Unsupported optional methods should be treated as capability-checked operations, not runtime surprises.

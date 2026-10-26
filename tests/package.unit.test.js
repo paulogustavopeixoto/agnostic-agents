@@ -6844,6 +6844,7 @@ describe('Package/module unit tests', () => {
     const requests = [];
     const sink = new WebhookEventSink({
       endpoint: 'https://control-plane.example/events',
+      captureContent: true,
       eventTypes: ['run_completed'],
       transport: async request => {
         requests.push(request);

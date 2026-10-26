@@ -51,6 +51,12 @@ Do not store secrets in:
 
 ### Event and audit sinks
 
+- `WebhookEventSink` sends only event/run identifiers and lifecycle metadata by
+  default; `captureContent: true` enables redacted event payloads and run metadata
+- configure `RuntimeEventRedactor({ secrets: [...] })` to mask known credential
+  values in strings; this does not detect arbitrary PII or protect raw checkpoints
+- review [security boundaries](security-boundaries.md) before enabling content capture
+
 - enable `piiSafe: true` on `ConsoleDebugSink` and `FileAuditSink` in environments where payloads may contain identifiers or credentials
 - use `RuntimeEventRedactor` when building custom sinks so secret-like fields are masked consistently
 - do not treat redaction as a license to log everything; keep logged payloads minimal

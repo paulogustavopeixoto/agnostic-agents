@@ -4,6 +4,13 @@ This document defines the adapter and provider certification process for `agnost
 
 For the concise provider/feature support table, see [`docs/support-matrix.md`](support-matrix.md).
 
+The shortlist now contains ten model/media providers. The existing dedicated live
+command remains an OpenAI/Anthropic/Gemini primary-text subset, not ten-provider
+or all-modality certification. test:certify:expanded is a separate explicit opt-in
+to the ten-provider smoke suite, not proof of every modality. See
+[initial-support-targets.md](initial-support-targets.md) for selection evidence,
+explicit-model configuration and fail-closed live verification commands.
+
 The goal is simple:
 
 - do not overclaim provider support
@@ -104,20 +111,26 @@ When changing an adapter:
 4. update certification status in `provider-compatibility.md`
 5. only then broaden public support claims
 
-## Skippable live-test conditions
+## Blocked Live-Test Conditions
 
-The repo treats some live failures as operationally skippable rather than product regressions:
+Some live failures may be environmental rather than product regressions:
 
 - quota exhaustion
 - billing or credit issues
 - model availability mismatches
 - provider-side inference unavailability
 
-Those conditions should block a promotion to a stronger certification level for that provider run, but they should not be recorded as framework contract failures.
+Those conditions fail/block the live verification run and prevent promotion. They
+must not return successfully from a test. Missing credentials explicitly skip ordinary
+live tests; the dedicated certification command instead requires configuration for all
+three primary text providers before running anything. Offline contract tests cover
+the wider shortlist separately. Extended live suites are available, but actual
+paid runs and service-specific evidence remain outstanding.
 
-## Current interpretation in this repo
+## Historical Baseline
 
-As of the current `v4` roadmap state:
+The older `v4` roadmap recorded the following paths; these labels are historical,
+not fresh certification of the current foundation update:
 
 - OpenAI: strongest live/runtime verification path
 - DeepSeek: strong live smoke path

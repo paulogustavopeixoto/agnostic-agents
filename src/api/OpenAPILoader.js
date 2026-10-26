@@ -26,6 +26,7 @@ class OpenAPILoader {
 
     for (const [route, definition] of Object.entries(paths)) {
       for (const [method, endpoint] of Object.entries(definition)) {
+        if (!['get', 'post', 'put', 'patch', 'delete', 'head', 'options', 'trace'].includes(method)) continue;
 
         const name = OpenAPILoader.normalizeName(serviceName, method, route);
         const description = endpoint.summary || endpoint.description || `Call ${method.toUpperCase()} ${route}`;
@@ -33,7 +34,7 @@ class OpenAPILoader {
         // ---------------------------
         // 1. Build JSON Schema parameters
         // ---------------------------
-        const parameters = OpenAPILoader.buildParameterSchema(endpoint.parameters);
+        const parameters = OpenAPILoader.buildParameterSchema([...(definition.parameters || []), ...(endpoint.parameters || [])]);
 
         // Request body → put into properties.body
         if (endpoint.requestBody?.content?.["application/json"]?.schema) {
@@ -80,6 +81,7 @@ class OpenAPILoader {
       }
     }
 
+    if (new Set(tools.map(tool => tool.name)).size !== tools.length) throw new Error('OpenAPI tool name collision.');
     return { tools, triggers: {} };
   }
 
@@ -103,6 +105,7 @@ class OpenAPILoader {
       const schema = p.schema || { type: "string" };
 
       properties[p.name] = {
+        ...schema,
         type: schema.type || "string",
         description: p.description || "",
         location: p.in || 'query',
@@ -122,20 +125,17 @@ class OpenAPILoader {
       responses["201"] ||
       responses["202"];
 
-    return (
-      success?.content?.["application/json"]?.schema || {
-        type: "object",
-        description: "Unspecified API response",
-      }
-    );
+    const payload = success?.content?.['application/json']?.schema;
+    return payload ? { type: 'object', properties: { status: { type: 'integer' }, data: payload }, required: ['status', 'data'] } : null;
   }
 
   static buildImplementation({ baseUrl, route, method, authToken }) {
-    return async (params = {}) => {
+    return async (params = {}, context = {}) => {
       let finalPath = route.replace(/{(\w+)}/g, (_, key) => {
         if (params[key] === undefined) {
           throw new Error(`Missing path param: ${key}`);
         }
+        if (['.', '..'].includes(String(params[key]))) throw new Error('Invalid path segment');
         return encodeURIComponent(params[key]);
       });
 
@@ -148,7 +148,8 @@ class OpenAPILoader {
           continue;
         }
 
-        const location = params.__parameterLocations?.[k] || 'query';
+        const location = params.__parameterLocations?.[k];
+        if (!location) continue;
         if (location === 'path') {
           continue;
         }
@@ -168,11 +169,21 @@ class OpenAPILoader {
         : "";
 
       const url = baseUrl + finalPath + qs;
+      const base = new URL(baseUrl);
+      const target = new URL(url);
+      if (!['http:', 'https:'].includes(base.protocol) || target.origin !== base.origin || target.username || target.password) {
+        throw new Error('API request must use the configured HTTP origin');
+      }
 
       const response = await axios.request({
         url,
         method,
         headers,
+        signal: context.signal,
+        timeout: 30000,
+        maxRedirects: 0,
+        maxContentLength: 1048576,
+        maxBodyLength: 1048576,
         data: ["post", "put", "patch"].includes(method) ? body : undefined,
       });
 

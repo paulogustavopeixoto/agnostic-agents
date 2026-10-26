@@ -2,6 +2,108 @@
 
 # agnostic-agents
 
+Version 1.3.4 addresses the 14 findings from the package review. Read the
+[security release migration notes](docs/security-release-migration.md) for stricter
+MCP approval defaults, bounded media imports, atomic job claims and retry behavior.
+Offline regression coverage is not live provider or deployment certification.
+
+The package's scope is an open-source agent runtime: provider adapters, tools,
+outputs, inspection, memory, and retrieval. Applications supply the agent builder,
+asset hosting, user accounts, billing, and deployment infrastructure. See the
+[agent scope and foundation priorities](docs/agent-scope.md) for the boundary,
+current gaps, and acceptance criteria. Broader operational helpers already exported
+remain available for compatibility.
+
+The [production-readiness execution plan](docs/production-readiness-plan.md) defines
+the remaining implementation, live/deployment tests, realtime acceptance gates and
+independent security review required before stronger production claims.
+The [execution ledger](docs/production-readiness-ledger.md) distinguishes offline
+results from live, deployment and independent-review gates still outstanding.
+
+For security-sensitive deployments, review the [security boundaries and current
+limitations](docs/security-boundaries.md). Webhook events are metadata-only by
+default; full content requires explicit opt-in. Raw run storage and other callback
+paths require their own access, retention, and disclosure controls.
+
+The [foundation guide](docs/foundation-guide.md) covers context budgets and archives,
+scoped stores/retrieval, provider guards, approvals, streams, artifacts, remote jobs,
+and migration requirements. Run `npm run test:foundation` for the local verification
+suite, public type checks, and offline scoped multimodal example.
+
+The [integration shortlist](docs/initial-support-targets.md) covers ten model/media
+providers, including Hugging Face and Higgsfield, independently of vector storage.
+PineconeVectorStore, QdrantVectorStore and PgVectorStore implement the scoped vector
+contract through host-supplied clients; LocalVectorStore remains in-memory.
+[FileVectorStore](docs/local-vector-storage.md) adds bounded persistent local vectors,
+private atomic snapshots and writer exclusion, not a distributed vector database.
+Contract coverage is not live certification, and custom adapters remain unrestricted.
+
+ProviderCatalog.list() and ProviderCatalog.vectorStores() expose the two lists.
+New MistralAdapter/XAIAdapter support explicit-model chat/tools; ElevenLabsProducer
+produces bounded speech artifacts; FalJobBackend/HiggsfieldJobBackend integrate with
+ProducerJobRunner for persisted-ID media polling. Hosts supply credentials, asset
+storage/import policy and authorization. No paid media operation runs automatically.
+
+## Producer Foundation
+
+`FunctionProducer` connects custom text, image, audio, video, or other producers
+to `ProducerRuntime`. Operations use typed text or opaque media artifact references
+and produce inspectable `Run` records compatible with the existing run stores and
+trace serializer. Existing Agent media helpers retain provider-native return values
+but now use an inspectable lifecycle through Agent.runMedia.
+
+```js
+const { FunctionProducer, ProducerRuntime } = require('agnostic-agents');
+
+const producer = new FunctionProducer({
+  id: 'custom-image-service',
+  operations: {
+    generateImage: async (request, { signal }) => {
+      // Call your service with request.content and signal; store the returned bytes.
+      return { content: [{ type: 'image', artifactId: 'assets/image-1', mimeType: 'image/png' }] };
+    },
+  },
+});
+const runtime = new ProducerRuntime({ producer, authorize: async () => true });
+const run = await runtime.run({
+  operation: 'generateImage', content: [{ type: 'text', text: 'A lighthouse' }],
+});
+```
+
+This example returns a placeholder reference. Applications supply storage, tenant
+authorization, and real producer calls. Cancellation is cooperative; the default
+run store is in memory. ProducerRuntime.stream() adds pull-based content streaming,
+and ProducerJobRunner separately supports remote job-ID polling. RealtimeSession
+provides a separate provider-neutral, bounded live-media transport contract with
+interruption epochs; applications supply the actual voice/video transport adapter.
+These APIs do not guarantee remote cancellation or exactly-once producer work.
+Media references are not fetched or access-checked by the runtime. Input/output
+text is recorded, so applications must redact sensitive content before submission.
+
+`ProducerTool` connects a ProducerRuntime operation to an Agent as a normal tool:
+tool policy, approval/verification gates, and parent/child run inspection apply.
+Configure `toContent(args)` to disclose only approved inputs and
+`maxCallsPerRun` to cap dispatches (default: one per tool per run). It defaults to
+an external-write action that is not retried. Use a shared durable run store for
+the Agent and producer runtime. ProducerRuntime also accepts `outputSchema` for
+validating `{ content: [...] }`, including `{ type: 'json', value: ... }` parts.
+See [readiness gates](docs/agent-scope.md#platform-readiness-gates) before using
+customer data; a private prototype can start now, enterprise readiness is not established.
+
+Agent.runTool(name, args) supports policy-gated, inspectable execution without a
+text model. Optional RunBudget conservatively reserves token/spend upper bounds;
+ApprovalSigner binds approval actions; RunLock implementations serialize lifecycle
+operations. EpisodicMemory and ScopedVectorStore add scoped memory contracts.
+These controls require trusted host configuration. See the foundation guide for
+locking, crash recovery, cost-estimation, and transport limitations.
+
+`Agent.runMedia(operation, input, config)` returns `{ run, result }`; the six existing
+media helpers return only `result` for compatibility. Raw media inputs/results are
+not implicitly persisted. These calls use model authorization/budgets and do not
+automatically retry. Use ProducerTool for media requiring tool policy and approvals.
+Await memory clearing methods; `clearAll()` includes configured episodic memory,
+and `flushStorage()` reports failures from background expiry/eviction deletes.
+
 `agnostic-agents` is a Node.js runtime OS for building provider-agnostic agent systems.
 The longer direction is broader than provider agnosticism alone: the package is
 meant to stay agnostic to how intelligence is produced, whether that comes from

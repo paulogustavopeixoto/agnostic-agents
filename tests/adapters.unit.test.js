@@ -3,11 +3,11 @@ const os = require('os');
 const path = require('path');
 
 const { Tool } = require('../src/tools/adapters/Tool');
-const { OpenAIAdapter } = require('../src/llm/OpenAi');
-const { GeminiAdapter } = require('../src/llm/Gemini');
-const { AnthropicAdapter } = require('../src/llm/Anthropic');
-const { HFAdapter } = require('../src/llm/HuggingFace');
-const { DeepSeekAdapter } = require('../src/llm/DeepSeek');
+const { OpenAIAdapter } = require('../src/llm/openAi');
+const { GeminiAdapter } = require('../src/llm/gemini');
+const { AnthropicAdapter } = require('../src/llm/anthropic');
+const { HFAdapter } = require('../src/llm/huggingFace');
+const { DeepSeekAdapter } = require('../src/llm/deepSeek');
 const { RetryManager } = require('../src/utils/RetryManager');
 const { AdapterCapabilityError } = require('../src/errors');
 
@@ -41,6 +41,7 @@ describe('Adapter unit tests', () => {
 
       await expect(adapter.generateText([{ role: 'user', content: 'Hello' }])).resolves.toEqual({
         message: 'hello world',
+        completionStatus: 'completed',
         usage: {
           prompt: 11,
           completion: 7,
@@ -73,6 +74,7 @@ describe('Adapter unit tests', () => {
       await expect(adapter.generateText([{ role: 'user', content: 'Use a tool' }])).resolves.toEqual({
         message: '',
         toolCalls: [{ name: 'lookup', arguments: { city: 'Lisbon' }, id: 'call_1' }],
+        completionStatus: 'completed',
       });
     });
 
@@ -98,6 +100,7 @@ describe('Adapter unit tests', () => {
 
       await expect(adapter.generateText([{ role: 'user', content: 'Use a tool' }])).resolves.toEqual({
         message: 'fallback',
+        completionStatus: 'uncertain',
         toolCalls: [{ name: 'lookup', arguments: {}, id: expect.any(String) }],
       });
     });
@@ -220,7 +223,7 @@ describe('Adapter unit tests', () => {
           .mockResolvedValueOnce({
             response: {
               text: () => 'hello from gemini',
-              functionCalls: [{ name: 'calculate', args: { expression: '1+1' } }],
+              functionCalls: () => [{ name: 'calculate', args: { expression: '1+1' } }],
             },
           })
           .mockResolvedValueOnce({
@@ -235,6 +238,7 @@ describe('Adapter unit tests', () => {
       const result = await adapter.generateText([{ role: 'user', content: 'Hi' }]);
       expect(result).toEqual({
         message: 'hello from gemini',
+        completionStatus: 'completed',
         toolCalls: [{ id: expect.any(String), name: 'calculate', arguments: { expression: '1+1' } }],
       });
 
@@ -255,7 +259,7 @@ describe('Adapter unit tests', () => {
           }),
       };
       const embedModel = {
-        embedContent: jest.fn().mockResolvedValue({
+        batchEmbedContents: jest.fn().mockResolvedValue({
           embeddings: [{ values: [0.5, 0.2, 0.1] }],
         }),
       };
@@ -316,6 +320,7 @@ describe('Adapter unit tests', () => {
       expect(result).toEqual({
         message: '',
         toolCalls: [{ name: 'lookup', arguments: { city: 'Lisbon' }, id: 'tool_1' }],
+        completionStatus: 'completed',
       });
 
       await expect(
@@ -373,7 +378,7 @@ describe('Adapter unit tests', () => {
     test('analyzeVideo rejects unsupported local file formats', async () => {
       const adapter = disableRetries(new HFAdapter('test-key'));
       await expect(adapter.analyzeVideo('/tmp/video.txt')).rejects.toThrow(
-        'Unsupported file format: txt. Supported formats: mp4, avi, mov, webm'
+        'Resolve an authorized artifact to bytes before analysis.'
       );
     });
   });
@@ -406,6 +411,7 @@ describe('Adapter unit tests', () => {
       await expect(adapter.generateText({ user: 'hi' })).resolves.toEqual({
         message: '',
         toolCalls: [{ name: 'lookup', arguments: { q: 'weather' }, id: 'tool_1' }],
+        completionStatus: 'completed',
       });
       await expect(
         adapter.generateToolResult({ user: 'hi' }, { name: 'lookup', arguments: {} }, { ok: true })
@@ -443,6 +449,7 @@ describe('Adapter unit tests', () => {
 
       await expect(adapter.generateText({ user: 'hi' })).resolves.toEqual({
         message: 'fallback',
+        completionStatus: 'uncertain',
         toolCalls: [{ name: 'lookup', arguments: {}, id: expect.any(String) }],
       });
     });
