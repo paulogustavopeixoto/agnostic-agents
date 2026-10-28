@@ -31,8 +31,9 @@ void agent.run('ask', { signal: new AbortController().signal });
 void memory.storeConversation('ask', 'answer');
 void runtime.stream({ operation: 'text', content: [] });
 void new ScopedRetriever({ retriever: { search: async () => ({ matches: [] }) }, tenantId: 'test', authorizeQuery: async () => true });
-void new ArtifactResolver({ tenantId: 'test', authorize: async () => true, store: {
-  stat: async () => ({ tenantId: 'test', sizeBytes: 0 }), read: async function* () {},
+void new ArtifactResolver({ tenantId: 'test', authorize: async request => !request.signal.aborted,
+  requireIntegrity: true, requireVersion: true, timeoutMs: 1000, maxChunks: 10, store: {
+  stat: async () => ({ tenantId: 'test', sizeBytes: 0, version: 'v1', sha256: 'a'.repeat(64) }), read: async function* () {},
 } });
 void new ProducerJobRunner({ runStore: store, authorize: async () => true, backend: {
   start: async () => ({ jobId: 'test' }), poll: async () => ({ status: 'pending' }),

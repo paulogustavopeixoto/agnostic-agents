@@ -241,6 +241,29 @@ cooperative, not an automatic remote voice-session or media-job stop command.
 ArtifactResolver requires host authorization before metadata access, validates
 tenant ownership and declared size, and bounds reads while consuming binary chunks.
 It returns bytes only after a complete read. It does not fetch arbitrary URLs.
+timeoutMs defaults to 30 seconds for the entire operation, including authorization,
+metadata lookup and streaming (not a resettable per-chunk timeout). maxChunks defaults
+to 10,000, counting empty chunks too. Storage and authorization receive an AbortSignal.
+Deadline/cancellation requests stop local delivery; host implementations must honor
+the signal to stop their own I/O. JavaScript callbacks cannot be forcibly preempted.
+Failed streams receive iterator.return() with cleanup bounded to at most one second;
+non-cooperative host work may outlive the rejected read and must be managed by the host.
+
+When metadata supplies sha256, the resolver validates its 64-digit hexadecimal format
+and verifies it against the complete bytes before returning data. requireIntegrity:
+true rejects missing hashes before reading. Uppercase hashes normalize to lowercase.
+For immutable, verifiable reads, combine requireIntegrity: true with requireVersion:
+true and have the store enforce the forwarded version/etag. Verified results include
+sha256 and version when present. Metadata values are captured before streaming so
+later mutation cannot relax the original size/hash constraints. Storage failures
+produce sanitized non-retryable errors, without private backend error messages.
+
+An unkeyed hash proves agreement with the expected digest, not trusted authorship,
+safe decoding or tenant authorization. The expected metadata must come from trusted
+host storage; a compromised backend that replaces both bytes and digest is outside
+this check. Existing stores without hashes remain compatible unless strict integrity
+mode is selected. The runtime does not create hashes, private artifact storage or
+deletion infrastructure on behalf of the host.
 Host stores must prevent content/metadata replacement races, implement retention,
 and restrict access to the underlying storage. Media-type declarations alone do
 not establish that uploaded bytes are safe or authentic.
