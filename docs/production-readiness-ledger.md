@@ -2,6 +2,16 @@
 
 Status: incomplete. Offline engineering evidence is not production certification.
 
+## Unreleased Embedding Contract Hardening
+
+Fifteen regression cases cover the Hugging Face/RAG/semantic-memory representation
+mismatch, invalid result counts, finite/dense vectors, dimensional consistency,
+indexed source ordering, detached values and legacy custom-adapter compatibility.
+The offline foundation run passes 506 tests; 14 live tests remain skipped. This is
+partial progress on P1.1/P1.5/P2.7, not live embedding quality/model certification or
+completion of all shared contracts. The published 1.3.4 release counts below are
+historical release evidence; this change awaits pull-request review and release.
+
 ## Security Review Fixes - 1.3.4
 
 R01-R14 are fixed with 25 regression tests in review-regressions.unit.test.js.

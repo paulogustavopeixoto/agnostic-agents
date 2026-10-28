@@ -368,7 +368,7 @@ describe('Adapter unit tests', () => {
 
       await expect(adapter.generateImage({ user: 'draw' })).resolves.toEqual(Buffer.from('image'));
       await expect(adapter.analyzeImage(Buffer.from('img'))).resolves.toBe('image caption');
-      await expect(adapter.embedChunks(['hello'])).resolves.toEqual([[0.9, 0.1]]);
+      await expect(adapter.embedChunks(['hello'])).resolves.toEqual([{ embedding: [0.9, 0.1] }]);
       await expect(adapter.generateVideo('clip')).rejects.toThrow(
         'HFAdapter does not support generateVideo().'
       );

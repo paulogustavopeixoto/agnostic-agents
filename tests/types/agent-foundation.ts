@@ -6,8 +6,13 @@ import {
   RealtimeSession, EpisodicMemory, LocalVectorStore, ScopedVectorStore, MCPClient, TraceSerializer,
   ProviderCatalog, MistralAdapter, XAIAdapter, ElevenLabsProducer, FalJobBackend, HiggsfieldJobBackend,
   QdrantVectorStore, PgVectorStore, PineconeVectorStore,
-  FileVectorStore,
+  FileVectorStore, HFAdapter, EmbeddingRecord,
 } from '../..';
+
+const embeddingBatch = (adapter: HFAdapter): Promise<EmbeddingRecord[]> => adapter.embedChunks(['fact'], {
+  model: 'example/pooled-model', signal: new AbortController().signal,
+});
+void embeddingBatch;
 
 const store = new ScopedRunStore({ store: new InMemoryRunStore(), tenantId: 'test' });
 const memory = new Memory({ conversationStore: new ScopedLayerStore({ store: new InMemoryLayerStore(), tenantId: 'test' }) });

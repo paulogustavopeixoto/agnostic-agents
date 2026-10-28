@@ -2,6 +2,7 @@
 const { HfInference } = require('@huggingface/inference');
 const { BaseProvider } = require('./BaseProvider');
 const { BoundedHttpClient } = require('../utils/BoundedHttpClient');
+const { normalizeEmbeddingBatch } = require('./EmbeddingContract');
 const fs = require('fs');
 const path = require('path');
 
@@ -174,7 +175,7 @@ class HFAdapter extends BaseProvider {
         }, { signal, retry_on_error: false });
         return result;
       }));
-      return embeddings;
+      return normalizeEmbeddingBatch(embeddings, chunks.length);
     });
   }
 

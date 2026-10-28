@@ -3,6 +3,7 @@ const { chunkText } = require('../utils/chunkText');
 const { randomUUID } = require('crypto');
 const { RetryManager } = require('../utils/RetryManager');
 const { VectorStoreRetriever } = require('./retrievers/VectorStoreRetriever');
+const { normalizeEmbeddingBatch } = require('../llm/EmbeddingContract');
 
 class RAG {
   /**
@@ -176,7 +177,8 @@ class RAG {
     if (!chunks.length || chunks.some(c => typeof c !== 'string' || !c.trim())) {
       throw new Error("Chunks must be a non-empty array of non-empty strings.");
     }
-    const embeddings = await this.retryManager.execute(() => this.adapter.embedChunks(chunks));
+    const embeddings = normalizeEmbeddingBatch(
+      await this.retryManager.execute(() => this.adapter.embedChunks(chunks)), chunks.length);
     const ingestionId = randomUUID();
     const vectors = embeddings.map((emb, i) => ({
       id: `${ingestionId}-${i}`,

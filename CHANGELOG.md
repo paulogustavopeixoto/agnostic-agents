@@ -6,6 +6,11 @@ The format is intentionally simple:
 
 ## Unreleased
 
+- Normalize Hugging Face embeddings to embedding records for RAG/semantic memory.
+  Validate embedding counts, indexed ordering, dense finite values and consistent
+  dimensions before vector queries/writes; reject malformed batches without retries.
+  Custom adapters returning legacy raw vectors remain usable at consumer boundaries.
+
 ## 1.3.4 - 2026-10-26
 
 ### Review Fixes
