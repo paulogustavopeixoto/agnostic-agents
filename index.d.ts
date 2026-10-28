@@ -191,10 +191,11 @@ export class ScopedRunStore extends BaseRunStore {
 }
 export class ArtifactResolver {
   constructor(options: { tenantId: string; maxBytes?: number; requireVersion?: boolean;
-    authorize: (request: { artifactId: string; tenantId: string; operation: string }) => boolean | Promise<boolean>;
-    store: { stat(id: string, context: any): Promise<{ tenantId: string; sizeBytes: number; mimeType?: string; version?: string; etag?: string }>;
-      read(id: string, context: any): AsyncIterable<Uint8Array> } });
-  read(id: string, options?: { signal?: AbortSignal }): Promise<{ artifactId: string; mimeType?: string; data: Uint8Array }>;
+    requireIntegrity?: boolean; timeoutMs?: number; maxChunks?: number;
+    authorize: (request: { artifactId: string; tenantId: string; operation: string; signal: AbortSignal }) => boolean | Promise<boolean>;
+    store: { stat(id: string, context: any): Promise<{ tenantId: string; sizeBytes: number; mimeType?: string; version?: string; etag?: string; sha256?: string }>;
+      read(id: string, context: any): AsyncIterable<Uint8Array> | Promise<AsyncIterable<Uint8Array>> } });
+  read(id: string, options?: { signal?: AbortSignal }): Promise<{ artifactId: string; mimeType?: string; data: Uint8Array; version?: string; sha256?: string }>;
 }
 export class ProducerJobRunner {
   constructor(options: { backend: {

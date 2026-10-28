@@ -2,6 +2,20 @@
 
 Status: incomplete. Offline engineering evidence is not production certification.
 
+## Unreleased Artifact Read Hardening
+
+ArtifactResolver adds SHA-256 verification against host metadata, optional required
+integrity, immutable metadata capture, a whole-operation deadline, chunk limits,
+signal propagation, bounded iterator cleanup and sanitized non-retryable failures.
+Twenty-three regression cases cover valid/mismatched hashes, legacy compatibility,
+same-size substitution, stalled/progressing reads, cancellation, late metadata and
+non-cooperative cleanup. This advances the runtime portion of P1.3/P1.5/P2.9; private
+artifact persistence, actual deployment deletion, trusted metadata management and
+live asset import remain host/external verification work, not completed gates.
+The full offline foundation run passes 529 tests with 14 live tests skipped,
+followed by public TypeScript checks and the scoped multimodal example. Package
+dry-run includes the resolver and excludes private runtime/env paths.
+
 ## Unreleased Embedding Contract Hardening
 
 Fifteen regression cases cover the Hugging Face/RAG/semantic-memory representation

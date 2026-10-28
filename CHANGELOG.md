@@ -6,6 +6,11 @@ The format is intentionally simple:
 
 ## Unreleased
 
+- Bound ArtifactResolver authorization, metadata and streaming reads with one
+  deadline and a chunk ceiling; verify SHA-256 when supplied, with optional required
+  integrity mode. Capture metadata, propagate cancellation, close failed streams
+  with bounded cleanup and sanitize storage errors before returning them.
+
 - Normalize Hugging Face embeddings to embedding records for RAG/semantic memory.
   Validate embedding counts, indexed ordering, dense finite values and consistent
   dimensions before vector queries/writes; reject malformed batches without retries.
