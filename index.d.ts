@@ -2592,12 +2592,17 @@ export class RetryManager {
   ): Promise<T>;
 }
 
+export interface EmbeddingRecord { embedding: number[]; index?: number; }
+export interface EmbeddingOptions { model?: string; signal?: AbortSignal; }
+
 export class OpenAIAdapter {
   constructor(apiKey?: string, options?: JsonObject);
+  embedChunks(chunks: string[], options?: EmbeddingOptions): Promise<EmbeddingRecord[]>;
 }
 
 export class GeminiAdapter {
   constructor(apiKey?: string, options?: JsonObject);
+  embedChunks(chunks: string[], options?: EmbeddingOptions): Promise<EmbeddingRecord[]>;
 }
 
 export class AnthropicAdapter {
@@ -2606,10 +2611,12 @@ export class AnthropicAdapter {
 
 export class HFAdapter {
   constructor(apiKey?: string, options?: JsonObject);
+  embedChunks(chunks: string[], options?: EmbeddingOptions): Promise<EmbeddingRecord[]>;
 }
 
 export class DeepSeekAdapter {
   constructor(apiKey?: string, options?: JsonObject);
+  embedChunks(chunks: string[], options?: EmbeddingOptions): Promise<EmbeddingRecord[]>;
 }
 
 export class Task {

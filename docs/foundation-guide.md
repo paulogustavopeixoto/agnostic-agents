@@ -14,6 +14,24 @@ conversation storage, producer tools, child-run inspection, JSON output validati
 and authorized artifact resolution. Its providers and artifact store are deterministic
 fixtures, not real generation services or persistent infrastructure.
 
+## Embedding Contracts
+
+RAG indexing, VectorStoreRetriever and semantic memory require exactly one dense,
+finite numeric vector per input and consistent dimensions within each batch.
+Malformed results fail before any vector query or write and are not retried as
+transient failures. Indexed provider batches must supply a complete, unique set
+of zero-based indices; results are reordered before binding vectors to source text.
+Missing, duplicate, mixed or out-of-range indices are rejected.
+
+Hugging Face embedChunks now returns `{ embedding: number[] }` records rather than
+raw arrays, matching the existing consumer contract. Custom adapters returning raw
+vector arrays remain accepted by RAG and memory. Token-level matrices are rejected:
+the host must select a pooled embedding model rather than rely on implicit averaging.
+Normalization produces detached vectors and bounds batches to 10,000 inputs,
+vectors to 65,536 dimensions and JSON complexity to one million nodes/64 MiB under
+SchemaSafety's accounting. This validates result structure, not semantic quality,
+model-version compatibility or live provider certification.
+
 ## Recovery, Approval Integrity And Resource Budgets
 
 Agent lifecycle operations use a process-local InMemoryRunLock by default.

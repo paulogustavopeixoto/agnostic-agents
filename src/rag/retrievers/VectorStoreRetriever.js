@@ -1,4 +1,5 @@
 const { BaseRetriever } = require('./BaseRetriever');
+const { normalizeEmbeddingBatch } = require('../../llm/EmbeddingContract');
 
 class VectorStoreRetriever extends BaseRetriever {
   constructor({ adapter, vectorStore, indexName = null, namespace = null, topK = 5 } = {}) {
@@ -11,7 +12,7 @@ class VectorStoreRetriever extends BaseRetriever {
   }
 
   async search(query, options = {}) {
-    const embeddings = await this.adapter.embedChunks([query]);
+    const embeddings = normalizeEmbeddingBatch(await this.adapter.embedChunks([query]), 1);
     const queryVector = embeddings[0].embedding;
     const results = await this.vectorStore.query({
       indexName: options.indexName || this.indexName,

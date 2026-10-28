@@ -6,6 +6,7 @@ const { MemoryProvenanceLedger } = require('../runtime/MemoryProvenanceLedger');
 const { MemoryRetentionPolicy } = require('../runtime/MemoryRetentionPolicy');
 const { MemoryAccessController } = require('../runtime/MemoryAccessController');
 const { MemoryConflictResolver } = require('../runtime/MemoryConflictResolver');
+const { normalizeEmbeddingBatch } = require('../llm/EmbeddingContract');
 
 class Memory extends EventEmitter {
   constructor({
@@ -321,7 +322,7 @@ class Memory extends EventEmitter {
     }
 
     const result = await this.adapter.embedChunks([text]);
-    return result[0]?.embedding;
+    return normalizeEmbeddingBatch(result, 1)[0].embedding;
   }
 
   async storeConversation(userMessage, agentResponse, metadata = {}) {
